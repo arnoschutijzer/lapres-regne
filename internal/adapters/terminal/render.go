@@ -60,6 +60,7 @@ var forestPalette = [][3]int{
 	{198, 187, 120}, // sunlight
 	{236, 185, 105}, // character
 	{205, 214, 218}, // axe head
+	{214, 184, 136}, // wood chips
 }
 
 func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
@@ -159,9 +160,12 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	for _, tree := range trees {
 		shake := 0.0
 		if chopping && tree == chopped {
-			shake = math.Sin(seconds*33) * 0.15
+			shake = jolt(seconds)
 		}
 		r.drawTree(c, tree, shake)
+	}
+	if chopping {
+		drawChips(c, f, chopped, seconds)
 	}
 	r.drawCharacter(c, seconds)
 	r.drawGrass(c, left, right, back, front, seconds)
@@ -190,25 +194,6 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 	if r.world.Chopping() {
 		drawAxe(c, x, z, r.world.Hero().Facing(), seconds)
 	}
-}
-
-// drawAxe swings an axe from the hero's hands toward the faced tree.
-func drawAxe(c *forestCanvas, x, z float64, facing world.Facing, seconds float64) {
-	dx, dz := 0.0, 1.0
-	switch facing {
-	case world.FacingLeft:
-		dx, dz = -1, 0
-	case world.FacingRight:
-		dx, dz = 1, 0
-	case world.FacingUp:
-		dx, dz = 0, -1
-	}
-	// The swing runs from raised overhead down to level with the trunk.
-	angle := 0.2 + 1.1*(0.5+0.5*math.Sin(seconds*10))
-	reachOut, lift := math.Cos(angle)*0.75, math.Sin(angle)*0.75
-	headX, headY, headZ := x+dx*reachOut, 1.0+lift, z+dz*reachOut
-	c.line(x, 1.0, z, headX, headY, headZ, 0.62, 4)
-	c.line(headX, headY-0.18, headZ, headX+dx*0.08, headY+0.18, headZ+dz*0.08, 1, 9)
 }
 
 // groundAt finds the world position under a 1-based terminal cell of the last frame.
@@ -267,7 +252,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
 			bits, ink := 0, 0
-			var votes [10]int
+			var votes [11]int
 			mapping := [4][2]int{{0, 3}, {1, 4}, {2, 5}, {6, 7}}
 			for dy := range 4 {
 				for dx := range 2 {
@@ -280,7 +265,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 				}
 			}
 			for i := range votes {
-				// The hero and their axe stay visible over anything else in the cell.
+				// The hero, their axe and flying chips stay visible over anything else in the cell.
 				if votes[i] > votes[ink] || i >= 8 && votes[i] > 0 {
 					ink = i
 				}

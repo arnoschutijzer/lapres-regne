@@ -71,7 +71,7 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 	}
 }
 
-// drawTree draws a tree; shake sways its top sideways while it is being chopped.
+// drawTree draws a tree; shake leans its top sideways as an axe strikes it.
 func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	if tree.Stump {

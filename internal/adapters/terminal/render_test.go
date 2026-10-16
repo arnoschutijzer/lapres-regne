@@ -140,14 +140,29 @@ func leavesMoved(r *renderer, first, second float64) bool {
 	return false
 }
 
-func TestTheChoppedTreeShakes(t *testing.T) {
+func TestTheChoppedTreeJoltsWhenTheAxeLandsThenSettles(t *testing.T) {
 	w := besideTree()
 	r := newRenderer(w, "L’Après-Règne")
-	if leavesMoved(r, 0, 0.05) {
+	if leavesMoved(r, 0.02, 0.1) {
 		t.Fatal("crowns must stand still while nobody chops")
 	}
 	w.Chop()
-	if !leavesMoved(r, 0, 0.05) {
-		t.Fatal("the chopped tree's crown must shake")
+	if !leavesMoved(r, 0.02, 0.45) {
+		t.Fatal("the chopped tree must jolt as the axe lands")
+	}
+	if leavesMoved(r, 0.45, 0.55) {
+		t.Fatal("the chopped tree must settle between strokes")
+	}
+}
+
+func TestWoodChipsFlyOnlyRightAfterAStrike(t *testing.T) {
+	w := besideTree()
+	r := newRenderer(w, "L’Après-Règne")
+	w.Chop()
+	if countInk(r.render(100, 27, 0.08), 10) == 0 {
+		t.Fatal("wood chips must fly right after the axe lands")
+	}
+	if chips := countInk(r.render(100, 27, 0.5), 10); chips != 0 {
+		t.Fatalf("chips = %d, want none once the stroke is raised again", chips)
 	}
 }
