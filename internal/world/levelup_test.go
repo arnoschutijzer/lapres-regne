@@ -86,3 +86,23 @@ func TestALevelUpPlaysItsJingleOnce(t *testing.T) {
 		t.Fatalf("level-up jingles = %v, want the unlocking jingle for level 15", sounds.levelUps)
 	}
 }
+
+func TestOrdinaryLevelsAreNoMilestone(t *testing.T) {
+	w := besideTreeWithXP(t, 75)
+	w.Chop()
+	chopUntilFelled(t, w)
+	if levelUp, _, _ := w.LatestLevelUp(); levelUp.Milestone != world.NoMilestone {
+		t.Fatalf("milestone = %v at level 2, want none", levelUp.Milestone)
+	}
+}
+
+func TestLevel99InTheOnlySkillReachesTheMaxTotalLevel(t *testing.T) {
+	// Level 99 starts at 13,034,431 xp; one normal log brings the hero over it.
+	w := besideTreeWithXP(t, 13034420)
+	w.Chop()
+	chopUntilFelled(t, w)
+	levelUp, _, ok := w.LatestLevelUp()
+	if !ok || levelUp.Level != 99 || levelUp.Milestone != world.TotalMaxed {
+		t.Fatalf("level up = %+v, %v; want level 99 reaching the max total level", levelUp, ok)
+	}
+}

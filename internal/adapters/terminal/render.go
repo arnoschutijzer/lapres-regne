@@ -120,6 +120,9 @@ var forestPalette = [...][3]int{
 	{124, 232, 168}, // green fireworks
 	{238, 236, 226}, // white fireworks
 	{238, 116, 60},  // ember fireworks
+	{96, 206, 238},  // cyan fireworks
+	{226, 104, 214}, // magenta fireworks
+	{226, 52, 44},   // red fireworks
 }
 
 // foremost marks the inks of the hero, their axe and flying chips.

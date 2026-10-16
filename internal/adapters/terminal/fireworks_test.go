@@ -1,8 +1,12 @@
 package terminal
 
 import (
+	"math"
+	"slices"
 	"testing"
 	"time"
+
+	"lapresregne/internal/world"
 )
 
 // fireworkPixels finds the canvas pixels the fireworks lit.
@@ -43,7 +47,7 @@ func TestALevelUpSetsOffFireworksAroundTheHero(t *testing.T) {
 
 func TestTheFireworksBurstOneColourAfterAnother(t *testing.T) {
 	colours := map[int]bool{}
-	for after := 100 * time.Millisecond; after < time.Duration(fireworksDuration*float64(time.Second)); after += 150 * time.Millisecond {
+	for after := 100 * time.Millisecond; after < time.Duration(displayFor(world.NoMilestone).duration()*float64(time.Second)); after += 150 * time.Millisecond {
 		c := newRenderer(levelledUp(t, 75, after), "L’Après-Règne").render(100, 27, 0)
 		for _, p := range c.pixels {
 			for _, ink := range fireworkInks {
@@ -53,18 +57,104 @@ func TestTheFireworksBurstOneColourAfterAnother(t *testing.T) {
 			}
 		}
 	}
-	if len(colours) != len(fireworkInks) {
-		t.Fatalf("the bursts showed %d colours, want all %d", len(colours), len(fireworkInks))
+	if want := len(displayFor(world.NoMilestone).inks); len(colours) != want {
+		t.Fatalf("the bursts showed %d colours, want all %d", len(colours), want)
 	}
 }
 
 func TestTheFireworksDieDownWhileTheBannerStillShows(t *testing.T) {
-	after := time.Duration((fireworksDuration + 0.1) * float64(time.Second))
+	ordinary := displayFor(world.NoMilestone)
+	after := time.Duration((ordinary.duration() + 0.1) * float64(time.Second))
 	c := newRenderer(levelledUp(t, 75, after), "L’Après-Règne").render(100, 27, 0)
 	if xs, _ := fireworkPixels(c); len(xs) != 0 {
 		t.Fatalf("%d firework pixels after the display, want none", len(xs))
 	}
-	if fireworksDuration >= bannerFadeIn+bannerRest {
-		t.Fatalf("the fireworks last %.1f s, want them over before the banner fades", fireworksDuration)
+	if ordinary.duration() >= bannerFadeIn+bannerRest {
+		t.Fatalf("the fireworks last %.1f s, want them over before the banner fades", ordinary.duration())
+	}
+}
+
+// displayColours and displayWidth watch a display over its whole run on a bare canvas around a
+// hero at the origin: every colour it shows, and the widest it spreads.
+func displayColours(display fireworksDisplay) (colours map[int]bool, widest int) {
+	colours = map[int]bool{}
+	for since := 0.05; since < display.duration(); since += 0.1 {
+		c := &forestCanvas{width: 400, height: 300, scale: forestScale}
+		c.turnTo(0)
+		c.pixels = make([]forestPixel, c.width*c.height)
+		for i := range c.pixels {
+			c.pixels[i].depth = math.Inf(1)
+		}
+		drawDisplay(c, display, 7, since, 0, 0, func(level, burst int, salt uint64) float64 {
+			return world.New(7).Random(level, burst, salt)
+		})
+		xs, _ := fireworkPixels(c)
+		left, right := c.width, 0
+		for _, x := range xs {
+			left, right = min(left, x), max(right, x)
+		}
+		widest = max(widest, right-left)
+		for _, p := range c.pixels {
+			if p.ink != 0 {
+				colours[p.ink] = true
+			}
+		}
+	}
+	return colours, widest
+}
+
+func TestA99SetsOffBiggerMoreColourfulFireworks(t *testing.T) {
+	plainColours, plainWidth := displayColours(displayFor(world.NoMilestone))
+	masteryColours, masteryWidth := displayColours(displayFor(world.SkillMastered))
+	if len(masteryColours) <= len(plainColours) {
+		t.Fatalf("a 99 shows %d colours, an ordinary level %d; want more", len(masteryColours), len(plainColours))
+	}
+	if masteryWidth <= plainWidth*3/2 {
+		t.Fatalf("a 99 spreads %d pixels wide, an ordinary level %d; want it much bigger", masteryWidth, plainWidth)
+	}
+	mastery, plain := displayFor(world.SkillMastered), displayFor(world.NoMilestone)
+	if mastery.activeBursts(2) <= plain.activeBursts(2) {
+		t.Fatalf("%d bursts in the air at a 99, %d at an ordinary level; want more at once", mastery.activeBursts(2), plain.activeBursts(2))
+	}
+}
+
+func TestTheMaxTotalLevelSetsOffRedAndGoldFireworksForLonger(t *testing.T) {
+	maxed := displayFor(world.TotalMaxed)
+	if maxed.duration() <= displayFor(world.SkillMastered).duration() || maxed.duration() <= bannerFadeIn+bannerRest+bannerFadeOut {
+		t.Fatalf("the max total display lasts %.1f s, want it to outlast a 99's and the banner", maxed.duration())
+	}
+	// Level 99 in the only skill is the max total level.
+	for _, after := range []time.Duration{500 * time.Millisecond, 3 * time.Second, 6500 * time.Millisecond} {
+		c := newRenderer(levelledUp(t, 13034420, after), "L’Après-Règne").render(100, 27, 0)
+		xs, _ := fireworkPixels(c)
+		if len(xs) == 0 {
+			t.Fatalf("no fireworks %v after reaching the max total level", after)
+		}
+		for _, p := range c.pixels {
+			if slices.Contains(fireworkInks[:], p.ink) && p.ink != redFireworks && p.ink != goldFireworks {
+				t.Fatalf("a spark of ink %d %v after the max total level, want only red and gold", p.ink, after)
+			}
+		}
+	}
+}
+
+func TestTheBurstsFitAboveTheHerosHead(t *testing.T) {
+	w := levelledUp(t, 13034420, 0)
+	w.ZoomBy(7)
+	r := newRenderer(w, "L’Après-Règne")
+	sparks := 0
+	for range 28 {
+		w.Advance(0, 0, 250*time.Millisecond, false)
+		c := r.render(100, 27, 0)
+		_, ys := fireworkPixels(c)
+		sparks += len(ys)
+		for _, y := range ys {
+			if y < 2 {
+				t.Fatalf("a spark at canvas row %d; want the bursts to fit below the top edge", y)
+			}
+		}
+	}
+	if sparks == 0 {
+		t.Fatal("want fireworks after reaching the max total level")
 	}
 }
