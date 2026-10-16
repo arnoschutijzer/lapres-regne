@@ -85,17 +85,29 @@ func leavesOf(kind world.TreeKind) foliageInks {
 	return foliageInks{2, 3}
 }
 
-// drawTree draws a tree; shake leans its top sideways as an axe strikes it.
+// drawTree draws a tree in its species' silhouette; shake leans its top sideways as an axe strikes it.
 func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
-	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	if tree.Stump {
 		drawStump(c, tree)
 		return
 	}
-	leaves := leavesOf(tree.Kind)
-	for _, offset := range []float64{-tree.Trunk, 0, tree.Trunk} {
-		c.line(x+offset, 0, z, x+offset*0.6+shake, h, z, 0.62, 4)
+	switch tree.Kind {
+	case world.Oak:
+		r.drawOak(c, tree, shake)
+	case world.Willow:
+		r.drawWillow(c, tree, shake)
+	case world.Yew:
+		r.drawYew(c, tree, shake)
+	default:
+		r.drawCommonTree(c, tree, shake)
 	}
+}
+
+// drawCommonTree raises three rounded crowns around a taller top crown.
+func (r *renderer) drawCommonTree(c *forestCanvas, tree world.Tree, shake float64) {
+	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
+	leaves := leavesOf(tree.Kind)
+	drawTrunk(c, tree, tree.Trunk, h, shake)
 	a := tree.Variation * 6.28
 	for i := range 3 {
 		angle := a + float64(i)*2.094
@@ -104,18 +116,64 @@ func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
 		r.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, radius*0.72, radius*0.57, radius*0.72, leaves)
 	}
 	r.crown(c, x+shake, h+0.3, z, radius*0.83, radius*0.70, radius*0.83, leaves)
-	if tree.Kind == world.Willow {
-		drawWillowStrands(c, tree, shake)
+}
+
+// drawOak spreads a thick, short trunk into a broad, flat-topped canopy of many lobes.
+func (r *renderer) drawOak(c *forestCanvas, tree world.Tree, shake float64) {
+	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
+	leaves := leavesOf(tree.Kind)
+	drawTrunk(c, tree, tree.Trunk*1.5, h*0.85, shake)
+	a := tree.Variation * 6.28
+	for i := range 5 {
+		angle := a + float64(i)*1.257
+		reach := radius * (0.9 + 0.15*math.Sin(angle*3))
+		dx, dz := math.Cos(angle)*reach+shake*0.8, math.Sin(angle)*reach*0.45
+		c.line(x+shake*0.4, h*0.6, z, x+dx*0.85, h*0.88, z+dz*0.85, 0.66, 4)
+		r.crown(c, x+dx, h*(0.92+float64(i%2)*0.06), z+dz, radius*0.62, radius*0.42, radius*0.62, leaves)
+	}
+	r.crown(c, x+shake, h*1.08, z, radius*1.05, radius*0.5, radius*0.95, leaves)
+}
+
+// drawWillow hangs a curtain of leafy strands from a rounded dome nearly to the ground.
+func (r *renderer) drawWillow(c *forestCanvas, tree world.Tree, shake float64) {
+	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
+	leaves := leavesOf(tree.Kind)
+	drawTrunk(c, tree, tree.Trunk, h*0.9, shake)
+	r.crown(c, x+shake, h*0.9, z, radius*0.9, radius*0.62, radius*0.9, leaves)
+	for i := range 26 {
+		angle := tree.Variation*6.28 + float64(i)*0.2417
+		cos, sin := math.Cos(angle), math.Sin(angle)
+		// Strands arch out past the dome's rim, then fall straight down at varied lengths.
+		rimX, rimZ := x+shake+cos*radius*0.7, z+sin*radius*0.7
+		archX, archZ := x+shake*0.8+cos*radius*1.02, z+sin*radius*1.02
+		end := h * (0.08 + 0.18*math.Abs(math.Sin(float64(i)*2.3+tree.Variation*9)))
+		ink := leaves.shaded
+		if cos < 0.2 && i%2 == 0 {
+			ink = leaves.sunlit
+		}
+		c.line(rimX, h*1.05, rimZ, archX, h*0.8, archZ, 0.5, ink)
+		c.line(archX, h*0.8, archZ, archX+shake*0.3, end, archZ, 0.45, ink)
 	}
 }
 
-// drawWillowStrands hangs thin strands of leaves from the rim of a willow's crown.
-func drawWillowStrands(c *forestCanvas, tree world.Tree, shake float64) {
+// drawYew stacks dark tiers of needles that narrow toward a tall, pointed top.
+func (r *renderer) drawYew(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
-	for i := range 9 {
-		angle := tree.Variation*6.28 + float64(i)*0.698
-		rimX, rimZ := x+shake+math.Cos(angle)*radius*0.95, z+math.Sin(angle)*radius*0.95
-		c.line(rimX, h*0.8, rimZ, rimX+shake*0.5, h*0.3, rimZ, 0.45, 11)
+	leaves := leavesOf(tree.Kind)
+	drawTrunk(c, tree, tree.Trunk*1.2, h, shake)
+	const tiers = 5
+	for i := range tiers {
+		rise := float64(i) / (tiers - 1)
+		width := radius * (1.05 - 0.75*rise)
+		lean := shake * (0.4 + 0.6*rise)
+		r.crown(c, x+lean, h*(0.55+0.75*rise), z, width, width*0.5, width, leaves)
+	}
+}
+
+// drawTrunk raises a trunk of three bark strands, its top leaning with shake.
+func drawTrunk(c *forestCanvas, tree world.Tree, thickness, height, shake float64) {
+	for _, offset := range []float64{-thickness, 0, thickness} {
+		c.line(tree.X+offset, 0, tree.Z, tree.X+offset*0.6+shake, height, tree.Z, 0.62, 4)
 	}
 }
 

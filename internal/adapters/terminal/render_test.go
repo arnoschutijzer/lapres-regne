@@ -328,3 +328,39 @@ func TestADroppedLogLiesOnTheGround(t *testing.T) {
 		t.Fatalf("ink at the dropped log = %d (was %d), want bark or its pale cut end", ink, inkBefore)
 	}
 }
+
+// leafBounds draws one tree of a kind alone and measures the canvas box its leaves cover.
+func leafBounds(kind world.TreeKind) (width, height, lowest int) {
+	r := newRenderer(world.New(7), "L’Après-Règne")
+	c := &forestCanvas{width: 120, height: 120, x: 1000, scale: 3.6}
+	c.pixels = make([]forestPixel, c.width*c.height)
+	for i := range c.pixels {
+		c.pixels[i].depth = math.Inf(1)
+	}
+	r.drawTree(c, world.Tree{X: 1000, Height: 6, Radius: 2.4, Trunk: 0.25, Kind: kind}, 0)
+	left, right, top := c.width, -1, c.height
+	leaves := leavesOf(kind)
+	for y := range c.height {
+		for x := range c.width {
+			if ink := c.pixels[y*c.width+x].ink; ink == leaves.shaded || ink == leaves.sunlit {
+				left, right, top, lowest = min(left, x), max(right, x), min(top, y), max(lowest, y)
+			}
+		}
+	}
+	return right - left, lowest - top, lowest
+}
+
+func TestEachKindOfTreeHasItsOwnSilhouette(t *testing.T) {
+	oakWidth, oakHeight, oakLowest := leafBounds(world.Oak)
+	if oakWidth <= oakHeight*3/2 {
+		t.Errorf("an oak's canopy is %d wide and %d tall, want it spreading wide and flat", oakWidth, oakHeight)
+	}
+	yewWidth, yewHeight, _ := leafBounds(world.Yew)
+	if yewHeight <= yewWidth {
+		t.Errorf("a yew is %d wide and %d tall, want it taller than wide", yewWidth, yewHeight)
+	}
+	_, _, willowLowest := leafBounds(world.Willow)
+	if willowLowest <= oakLowest+10 {
+		t.Errorf("a willow's leaves reach row %d, want them hanging well below an oak's at row %d", willowLowest, oakLowest)
+	}
+}
