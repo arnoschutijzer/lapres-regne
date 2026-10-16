@@ -116,6 +116,10 @@ var forestPalette = [...][3]int{
 	{176, 172, 160}, // undershirt
 	{96, 100, 112},  // shorts
 	{30, 26, 24},    // eyes
+	{246, 212, 104}, // gold fireworks
+	{124, 232, 168}, // green fireworks
+	{238, 236, 226}, // white fireworks
+	{238, 116, 60},  // ember fireworks
 }
 
 // foremost marks the inks of the hero, their axe and flying chips.
@@ -256,6 +260,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	}
 	r.drawCharacter(c, seconds)
 	r.drawGrass(c, left, right, back, front, seconds)
+	r.drawFireworks(c)
 	return c
 }
 
