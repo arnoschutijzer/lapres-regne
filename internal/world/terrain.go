@@ -7,6 +7,7 @@ const TreeSpacing = 4.7
 type Tree struct {
 	X, Z, Height, Radius, Trunk float64
 	Variation                   float64
+	Kind                        TreeKind
 	// Stump marks a felled tree.
 	Stump bool
 	cell  cell
@@ -83,5 +84,16 @@ func (w *World) TreeAt(gx, gz int) (Tree, bool) {
 	if w.Random(gx, gz, 3) > probability || distance < width+1.0 || math.Hypot(x, z) < 3.5 {
 		return Tree{}, false
 	}
-	return Tree{x, z, 4.5 + w.Random(gx, gz, 4)*3, 2.0 + w.Random(gx, gz, 5)*1.35, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), w.felled[cell{gx, gz}], cell{gx, gz}}, true
+	kind := w.treeKind(gx, gz, x, z)
+	height, radius := 4.5+w.Random(gx, gz, 4)*3, 2.0+w.Random(gx, gz, 5)*1.35
+	// Oaks spread low and wide, willows broaden, and yews grow tall and narrow.
+	switch kind {
+	case Oak:
+		height, radius = height*0.85, radius*1.2
+	case Willow:
+		height, radius = height*0.9, radius*1.15
+	case Yew:
+		height, radius = height*1.15, radius*0.85
+	}
+	return Tree{x, z, height, radius, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), kind, w.felled[cell{gx, gz}], cell{gx, gz}}, true
 }

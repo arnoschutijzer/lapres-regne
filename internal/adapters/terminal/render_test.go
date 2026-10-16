@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -209,5 +210,64 @@ func TestTheWoodcuttingSkillShowsOnTheTitleRow(t *testing.T) {
 	chopUntilFelled(t, w)
 	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "woodcutting 1 · 25 xp") {
 		t.Fatal("the title row must update with gained xp")
+	}
+}
+
+// besideWillow stands the hero facing seed 7's riverside willow at x 11.0, z -3.6 with the camera on the hero.
+func besideWillow() *world.World {
+	w := world.New(7)
+	for range 6 {
+		w.Walk(0, -1, false)
+	}
+	for range 18 {
+		w.Walk(1, 0, false)
+	}
+	w.Follow(time.Second)
+	return w
+}
+
+// nearFirst moves the hero and camera beside the nearest tree of a kind.
+func nearFirst(t *testing.T, kind world.TreeKind) *world.World {
+	t.Helper()
+	w := world.New(7)
+	for radius := 0; radius < 40; radius++ {
+		for gz := -radius; gz <= radius; gz++ {
+			for gx := -radius; gx <= radius; gx++ {
+				if tree, ok := w.TreeAt(gx, gz); ok && tree.Kind == kind {
+					// Walking speed is 9 per second, so one long frame carries the hero there.
+					distance := math.Hypot(tree.X-1, tree.Z)
+					w.Advance(tree.X-1, tree.Z, time.Duration(distance/9*float64(time.Second)), false)
+					w.Follow(time.Second)
+					return w
+				}
+			}
+		}
+	}
+	t.Fatalf("no %v within 40 cells", kind)
+	return nil
+}
+
+func TestWillowsAndYewsHaveTheirOwnLeaves(t *testing.T) {
+	willow := newRenderer(besideWillow(), "L’Après-Règne")
+	if countInk(willow.render(100, 27, 0), 11, 12) == 0 {
+		t.Fatal("a willow must draw pale willow leaves")
+	}
+	yew := newRenderer(nearFirst(t, world.Yew), "L’Après-Règne")
+	if countInk(yew.render(100, 27, 0), 13, 14) == 0 {
+		t.Fatal("a yew must draw dark yew needles")
+	}
+}
+
+func TestTheMenuNamesTheTreeAndMessagesShowOnTheHintLine(t *testing.T) {
+	w := besideWillow()
+	r := newRenderer(w, "L’Après-Règne")
+	r.menuTitle, r.menu = "willow", []string{"Chop down"}
+	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "willow:  1 Chop down") {
+		t.Fatal("the menu must name the tree it acts on")
+	}
+	r.menuTitle, r.menu = "", nil
+	w.Chop()
+	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "You need woodcutting level 30 to chop this willow.") {
+		t.Fatal("the game's message must show on the hint line")
 	}
 }

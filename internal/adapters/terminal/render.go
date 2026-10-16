@@ -26,8 +26,9 @@ type renderer struct {
 	screenWidth, screenHeight int
 	lastStatus, lastHint      string
 	lastSkill                 string
-	// menu lists the actions offered for the tree in reach; nil when closed.
-	menu []string
+	// menu lists the actions offered for the tree in reach, named by menuTitle; nil when closed.
+	menu      []string
+	menuTitle string
 }
 
 func newRenderer(world *world.World, title string) *renderer {
@@ -63,6 +64,10 @@ var forestPalette = [][3]int{
 	{236, 185, 105}, // character
 	{205, 214, 218}, // axe head
 	{214, 184, 136}, // wood chips
+	{96, 112, 70},   // shaded willow leaves
+	{170, 176, 112}, // sunlit willow leaves
+	{40, 58, 46},    // shaded yew needles
+	{74, 98, 66},    // sunlit yew needles
 }
 
 func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
@@ -271,8 +276,11 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	if width >= 62 {
 		hint += " · N/P tracks"
 	}
+	if message := r.world.Message(); message != "" {
+		hint = "  " + message
+	}
 	if r.menu != nil {
-		hint = "  tree:"
+		hint = "  " + r.menuTitle + ":"
 		for i, entry := range r.menu {
 			hint += fmt.Sprintf("  %d %s", i+1, entry)
 		}
@@ -298,7 +306,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
 			bits, ink := 0, 0
-			var votes [11]int
+			var votes [15]int
 			mapping := [4][2]int{{0, 3}, {1, 4}, {2, 5}, {6, 7}}
 			for dy := range 4 {
 				for dx := range 2 {
@@ -312,7 +320,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			}
 			for i := range votes {
 				// The hero, their axe and flying chips stay visible over anything else in the cell.
-				if votes[i] > votes[ink] || i >= 8 && votes[i] > 0 {
+				if votes[i] > votes[ink] || i >= 8 && i <= 10 && votes[i] > 0 {
 					ink = i
 				}
 			}

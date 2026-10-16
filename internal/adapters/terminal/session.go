@@ -142,8 +142,8 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 		}
 		if event.action == interact {
 			// E opens the action menu for the tree in reach, or closes an open menu.
-			if _, reachable := world.TreeInReach(); reachable && view.menu == nil && !event.repeat {
-				view.menu = []string{"Chop down"}
+			if tree, reachable := world.TreeInReach(); reachable && view.menu == nil && !event.repeat {
+				view.menuTitle, view.menu = tree.Kind.String(), []string{"Chop down"}
 			} else if !event.repeat {
 				view.menu = nil
 			}

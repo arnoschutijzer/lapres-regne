@@ -349,6 +349,22 @@ func TestTerminal(t *testing.T) {
 		s.send("q")
 		s.restored()
 	})
+	t.Run("tree types", func(t *testing.T) {
+		s := openTestTerminal(t, binary, "--mute")
+		s.until("logs 0")
+		// Seed 7 grows a willow by the river at x 11.0, z -3.6; stop beside it, facing it.
+		s.send(strings.Repeat("w", 6) + strings.Repeat("d", 18))
+		s.until("x 9.9  z -3.3  |  steps 24  |  facing right")
+		s.send("e")
+		s.until("willow:  1 Chop down")
+		s.send("1")
+		s.until("You need woodcutting level 30 to chop this willow.")
+		terminalCheck(t, !strings.Contains(s.readFor(time.Second), "chopping"), "a willow must not be chopped below level 30")
+		s.send("a")
+		s.until("arrows/WASD")
+		s.send("q")
+		s.restored()
+	})
 	t.Run("woodcutting by clicking", func(t *testing.T) {
 		// From the spawn point, the crown of seed 7's tree at x 6.0, z 1.7 fills column 61, row 15.
 		const clickTree = "\x1b[<0;61;15M\x1b[<0;61;15m"

@@ -14,6 +14,7 @@ type World struct {
 	felled   map[cell]bool
 	approach approach
 	chop     chop
+	message  string
 	sounds   Sounds
 }
 

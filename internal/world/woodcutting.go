@@ -1,6 +1,7 @@
 package world
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -9,19 +10,8 @@ import (
 const reach = 2.5
 
 // chopTick is one woodcutting attempt. The axe lands as chopping starts and again on every
-// tick, and each tick rolls for a log; a normal tree falls with its first log.
+// tick, and each tick rolls for a log; a log may fell the tree, depending on its species.
 const chopTick = 600 * time.Millisecond
-
-// normalLogXP is the experience a normal tree's log gives.
-const normalLogXP = 25.0
-
-// logChance is the chance one tick cuts a normal log, as Old School RuneScape rolls it
-// for a bronze axe: 65 in 256 at level 1, rising to 201 in 256 at level 99.
-func logChance(level int) float64 {
-	const low, high = 64.0, 200.0
-	l := float64(level)
-	return (1 + math.Floor(low*(maxLevel-l)/(maxLevel-1)+high*(l-1)/(maxLevel-1)+0.5)) / 256
-}
 
 // arrival is how close to a trunk an approach ends, comfortably within reach.
 const arrival = 1.2
@@ -37,6 +27,7 @@ type approach struct {
 type chop struct {
 	active  bool
 	tree    cell
+	kind    TreeKind
 	elapsed time.Duration
 	ticks   int
 }
@@ -76,23 +67,33 @@ func (w *World) treeInReach() (Tree, cell, bool) {
 	return nearest, nearestCell, found
 }
 
-// Chop turns the hero toward the tree in reach and starts chopping it, reporting whether there was one.
+// Chop turns the hero toward the tree in reach and starts chopping it, reporting whether
+// chopping started. A tree above the hero's level leaves a message instead.
 func (w *World) Chop() bool {
 	tree, _, ok := w.treeInReach()
 	if !ok {
 		return false
 	}
-	w.startChop(tree)
-	return true
+	return w.startChop(tree)
 }
 
-func (w *World) startChop(tree Tree) {
+func (w *World) startChop(tree Tree) bool {
 	x, z := w.hero.Position()
 	w.hero.Face(FacingToward(tree.X-x, tree.Z-z))
 	w.approach = approach{}
-	w.chop = chop{active: true, tree: tree.cell}
+	w.chop = chop{}
+	if required := species[tree.Kind].level; w.hero.woodcutting.Level() < required {
+		w.message = fmt.Sprintf("You need woodcutting level %d to chop this %s.", required, tree.Kind)
+		return false
+	}
+	w.message = ""
+	w.chop = chop{active: true, tree: tree.cell, kind: tree.Kind}
 	w.sounds.Chop()
+	return true
 }
+
+// Message is the game's reply to the hero's latest action, or empty when there is none.
+func (w *World) Message() string { return w.message }
 
 // Approach walks the hero straight to a standing tree and chops it on arrival,
 // reporting whether the tree still stands.
@@ -102,14 +103,16 @@ func (w *World) Approach(tree Tree) bool {
 		return false
 	}
 	w.chop = chop{}
+	w.message = ""
 	w.approach = approach{active: true, tree: tree.cell}
 	return true
 }
 
-// Stop cancels walking to a tree and chopping one.
+// Stop cancels walking to a tree and chopping one, and clears the last message.
 func (w *World) Stop() {
 	w.approach = approach{}
 	w.chop = chop{}
+	w.message = ""
 }
 
 // approachFor walks toward the approached tree and starts chopping once beside it.
@@ -156,7 +159,7 @@ func (w *World) ChoppedTree() (Tree, bool) {
 	return w.TreeAt(w.chop.tree.gx, w.chop.tree.gz)
 }
 
-// chopFor strikes the chopped tree on every tick and rolls for a log; the first log fells it.
+// chopFor strikes the chopped tree on every tick and rolls for a log, until a log fells it.
 func (w *World) chopFor(dt time.Duration) {
 	if !w.chop.active {
 		return
@@ -165,27 +168,30 @@ func (w *World) chopFor(dt time.Duration) {
 	for w.chop.active && w.chop.elapsed >= time.Duration(w.chop.ticks+1)*chopTick {
 		w.chop.ticks++
 		w.sounds.Chop()
-		if w.rollForLog() {
-			w.fell(w.chop.tree)
+		if w.roll(0x10c5) < species[w.chop.kind].chance(w.hero.woodcutting.Level()) {
+			w.cutLog()
 		}
 	}
 }
 
-// rollForLog draws this attempt's roll from the world seed and the tree being chopped.
-func (w *World) rollForLog() bool {
-	const salt = 0x10c5
+// roll draws this attempt's random number from the world seed, the tree being chopped and a salt.
+func (w *World) roll(salt uint64) float64 {
 	roll := w.Random(w.chop.tree.gx, w.chop.tree.gz, salt+uint64(w.hero.attempts))
 	w.hero.attempts++
-	return roll < logChance(w.hero.woodcutting.Level())
+	return roll
 }
 
-// fell turns a tree into a stump and gives the hero its log.
-func (w *World) fell(tree cell) {
+// cutLog gives the hero a log and its experience, and may fell the tree into a stump.
+func (w *World) cutLog() {
+	kind := species[w.chop.kind]
+	w.hero.logs++
+	w.hero.woodcutting.gain(kind.xp)
+	if !kind.fallsWithFirstLog && w.roll(0xfa11) >= fallChance {
+		return
+	}
 	if w.felled == nil {
 		w.felled = make(map[cell]bool)
 	}
-	w.felled[tree] = true
-	w.hero.logs++
-	w.hero.woodcutting.gain(normalLogXP)
+	w.felled[w.chop.tree] = true
 	w.chop = chop{}
 }

@@ -30,7 +30,7 @@ func (c *forestCanvas) shadow(tree world.Tree) {
 }
 
 // Ray/ellipsoid intersections provide rounded crowns with real depth and lighting.
-func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
+func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves foliageInks) {
 	f := r.world
 	heroWorldX, heroWorldZ := f.Hero().Position()
 	sx, sy, depth := c.project(x, y, z)
@@ -55,9 +55,9 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 			normal := vec{u / (rx * rx), localY / (ry * ry), localZ / (rz * rz)}.unit()
 			light := 0.20 + 0.68*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
 			light += 0.04 * math.Sin(u*11+localY*8+localZ*7)
-			ink := 2
+			ink := leaves.shaded
 			if light > 0.58 {
-				ink = 3
+				ink = leaves.sunlit
 			}
 			// A small cutaway keeps the traveler readable under overlapping crowns.
 			hx, hy := (float64(px)-heroX)/7, (float64(py)-heroY)/9
@@ -71,6 +71,20 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 	}
 }
 
+// foliageInks are the palette entries a crown uses in shade and in sunlight.
+type foliageInks struct{ shaded, sunlit int }
+
+// leavesOf gives willows pale, soft leaves and yews dark needles; oaks share the common green.
+func leavesOf(kind world.TreeKind) foliageInks {
+	switch kind {
+	case world.Willow:
+		return foliageInks{11, 12}
+	case world.Yew:
+		return foliageInks{13, 14}
+	}
+	return foliageInks{2, 3}
+}
+
 // drawTree draws a tree; shake leans its top sideways as an axe strikes it.
 func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
@@ -78,6 +92,7 @@ func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
 		drawStump(c, tree)
 		return
 	}
+	leaves := leavesOf(tree.Kind)
 	for _, offset := range []float64{-tree.Trunk, 0, tree.Trunk} {
 		c.line(x+offset, 0, z, x+offset*0.6+shake, h, z, 0.62, 4)
 	}
@@ -86,9 +101,22 @@ func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
 		angle := a + float64(i)*2.094
 		dx, dz := math.Cos(angle)*radius*0.62+shake, math.Sin(angle)*radius*0.62
 		c.line(x+shake*0.45, h*0.45, z, x+dx, h*0.92, z+dz, 0.7, 4)
-		r.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, radius*0.72, radius*0.57, radius*0.72)
+		r.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, radius*0.72, radius*0.57, radius*0.72, leaves)
 	}
-	r.crown(c, x+shake, h+0.3, z, radius*0.83, radius*0.70, radius*0.83)
+	r.crown(c, x+shake, h+0.3, z, radius*0.83, radius*0.70, radius*0.83, leaves)
+	if tree.Kind == world.Willow {
+		drawWillowStrands(c, tree, shake)
+	}
+}
+
+// drawWillowStrands hangs thin strands of leaves from the rim of a willow's crown.
+func drawWillowStrands(c *forestCanvas, tree world.Tree, shake float64) {
+	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
+	for i := range 9 {
+		angle := tree.Variation*6.28 + float64(i)*0.698
+		rimX, rimZ := x+shake+math.Cos(angle)*radius*0.95, z+math.Sin(angle)*radius*0.95
+		c.line(rimX, h*0.8, rimZ, rimX+shake*0.5, h*0.3, rimZ, 0.45, 11)
+	}
 }
 
 // stumpHeight keeps a stump a few braille dots tall.
