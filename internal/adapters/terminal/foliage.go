@@ -76,8 +76,8 @@ func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px,
 // leafClumps is a 0 to 1 pattern of rounded clumps of leaves about a world unit across, with
 // finer leaves within each clump.
 func leafClumps(x, y, z float64) float64 {
-	broad := math.Sin(3.7*x+1.3*y) * math.Sin(2.9*y+3.3*z) * math.Sin(3.1*z+2.3*x)
-	fine := math.Sin(11*x+5*y) * math.Sin(9*y+12*z) * math.Sin(10*z+7*x)
+	broad := wave(3.7*x+1.3*y) * wave(2.9*y+3.3*z) * wave(3.1*z+2.3*x)
+	fine := wave(11*x+5*y) * wave(9*y+12*z) * wave(10*z+7*x)
 	return math.Min(1, math.Max(0, 0.5+0.75*broad+0.3*fine))
 }
 
@@ -98,7 +98,7 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 	heroWorldX, heroWorldZ := f.Hero().Position()
 	heroX, heroY, _ := c.project(heroWorldX, 0.9, heroWorldZ)
 	ellipsoid(c, x, y, z, rx, ry, rz, 0, func(px, py int, depth float64, point, normal vec) {
-		light := (sunlight(normal) + 0.04*math.Sin(point.x*11+point.y*8+point.z*7)) * c.rim(normal)
+		light := (sunlight(normal) + 0.04*wave(point.x*11+point.y*8+point.z*7)) * c.rim(normal)
 		// Up close the crown breaks into clumps of leaves, with gaps showing what lies behind.
 		if c.scale >= detailScale {
 			clump := leafClumps(x+point.x, y+point.y, z+point.z)
@@ -303,7 +303,7 @@ func wood(c *forestCanvas, x1, y1, z1, x2, y2, z2, fromRadius, toRadius float64)
 				normal = vec{sphere.x - axis.x*along, sphere.y - axis.y*along, sphere.z - axis.z*along}.unit()
 			}
 			// Deep, slightly wandering furrows run along the bark between raised ridges.
-			ridge := math.Sin(math.Atan2(normal.x, normal.z)*11 + math.Sin((y+point.y)*2.3)*1.2)
+			ridge := wave(math.Atan2(normal.x, normal.z)*11 + wave((y+point.y)*2.3)*1.2)
 			furrows := 0.45 + 0.55*math.Sqrt(math.Max(0, ridge*0.5+0.5))
 			// Light wraps around the bark from the sun's side, so upright wood is never left unlit.
 			side := 0.5 + 0.5*normal.dot(vec{-0.87, 0.2, -0.45})

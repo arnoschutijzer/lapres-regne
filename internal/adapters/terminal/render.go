@@ -218,7 +218,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 				ink, light = 1, 0.21+n*0.24
 			}
 			// Diagonal pools of sunlight survive only where the canopy opens.
-			beam := math.Max(0, math.Sin(wx*0.28-wz*0.19+f.Noise(wx/9, wz/9, 81)*2)-0.45)
+			beam := math.Max(0, wave(wx*0.28-wz*0.19+f.Noise(wx/9, wz/9, 81)*2)-0.45)
 			sun := beam * math.Max(0, 1-cover*1.3)
 			light += sun * 0.8
 			if sun > 0.24 {
@@ -227,7 +227,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 			distance, width := world.NearestRiver(r.rivers.at(wz), wx)
 			if distance < width {
 				ink, light = 5, 0.28+n*0.3
-				if math.Sin(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
+				if wave(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
 					ink, light = 6, 0.8
 				}
 			} else if distance < width+0.65 {
