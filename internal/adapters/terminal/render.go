@@ -155,8 +155,13 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 			c.shadow(tree)
 		}
 	}
+	chopped, chopping := f.ChoppedTree()
 	for _, tree := range trees {
-		r.drawTree(c, tree)
+		shake := 0.0
+		if chopping && tree == chopped {
+			shake = math.Sin(seconds*33) * 0.15
+		}
+		r.drawTree(c, tree, shake)
 	}
 	r.drawCharacter(c, seconds)
 	r.drawGrass(c, left, right, back, front, seconds)

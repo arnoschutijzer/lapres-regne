@@ -57,6 +57,14 @@ func (w *World) Chop() bool {
 
 func (w *World) Chopping() bool { return w.chop.active }
 
+// ChoppedTree is the tree being chopped, if any.
+func (w *World) ChoppedTree() (Tree, bool) {
+	if !w.chop.active {
+		return Tree{}, false
+	}
+	return w.TreeAt(w.chop.tree.gx, w.chop.tree.gz)
+}
+
 // chopFor works on the chopped tree until it falls, leaving a stump and a log.
 func (w *World) chopFor(dt time.Duration) {
 	if !w.chop.active {

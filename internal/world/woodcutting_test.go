@@ -78,3 +78,19 @@ func TestATreeCanBeChoppedFromTheEdgeOfItsCrown(t *testing.T) {
 		t.Fatal("a tree 2.2 ahead must be within reach")
 	}
 }
+
+func TestTheChoppedTreeIsKnownWhileChopping(t *testing.T) {
+	w := besideTree()
+	if _, ok := w.ChoppedTree(); ok {
+		t.Fatal("no tree is chopped before chopping starts")
+	}
+	faced, _ := w.FacedTree()
+	w.Chop()
+	if chopped, ok := w.ChoppedTree(); !ok || chopped != faced {
+		t.Fatalf("chopped tree = %+v, %v; want the faced tree %+v", chopped, ok, faced)
+	}
+	w.Advance(0, 0, time.Second, false)
+	if _, ok := w.ChoppedTree(); ok {
+		t.Fatal("no tree is chopped once it falls")
+	}
+}

@@ -71,23 +71,24 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 	}
 }
 
-func (r *renderer) drawTree(c *forestCanvas, tree world.Tree) {
+// drawTree draws a tree; shake sways its top sideways while it is being chopped.
+func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	if tree.Stump {
 		drawStump(c, tree)
 		return
 	}
 	for _, offset := range []float64{-tree.Trunk, 0, tree.Trunk} {
-		c.line(x+offset, 0, z, x+offset*0.6, h, z, 0.62, 4)
+		c.line(x+offset, 0, z, x+offset*0.6+shake, h, z, 0.62, 4)
 	}
 	a := tree.Variation * 6.28
 	for i := range 3 {
 		angle := a + float64(i)*2.094
-		dx, dz := math.Cos(angle)*radius*0.62, math.Sin(angle)*radius*0.62
-		c.line(x, h*0.45, z, x+dx, h*0.92, z+dz, 0.7, 4)
+		dx, dz := math.Cos(angle)*radius*0.62+shake, math.Sin(angle)*radius*0.62
+		c.line(x+shake*0.45, h*0.45, z, x+dx, h*0.92, z+dz, 0.7, 4)
 		r.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, radius*0.72, radius*0.57, radius*0.72)
 	}
-	r.crown(c, x, h+0.3, z, radius*0.83, radius*0.70, radius*0.83)
+	r.crown(c, x+shake, h+0.3, z, radius*0.83, radius*0.70, radius*0.83)
 }
 
 // stumpHeight keeps a stump a few braille dots tall.

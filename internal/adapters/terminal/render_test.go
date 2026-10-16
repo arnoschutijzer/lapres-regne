@@ -124,3 +124,30 @@ func TestTheActionMenuAndLogsShowOnScreen(t *testing.T) {
 		t.Fatal("chopping must show in the status line and a closed menu must restore the controls")
 	}
 }
+
+// leavesMoved reports whether leaf pixels differ between two seconds, ignoring the axe.
+func leavesMoved(r *renderer, first, second float64) bool {
+	before := append([]forestPixel(nil), r.render(100, 27, first).pixels...)
+	after := r.render(100, 27, second).pixels
+	for i, p := range after {
+		if p.ink == 9 || before[i].ink == 9 {
+			continue
+		}
+		if (p.ink == 2 || p.ink == 3) != (before[i].ink == 2 || before[i].ink == 3) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestTheChoppedTreeShakes(t *testing.T) {
+	w := besideTree()
+	r := newRenderer(w, "L’Après-Règne")
+	if leavesMoved(r, 0, 0.05) {
+		t.Fatal("crowns must stand still while nobody chops")
+	}
+	w.Chop()
+	if !leavesMoved(r, 0, 0.05) {
+		t.Fatal("the chopped tree's crown must shake")
+	}
+}
