@@ -74,3 +74,13 @@ func TestXDropsALog(t *testing.T) {
 		t.Fatalf("event = %+v, want X to drop a log", event)
 	}
 }
+
+func TestBracketsMoveBetweenInventorySlots(t *testing.T) {
+	var d keyDecoder
+	if event := d.feed('['); event.action != previousSlot {
+		t.Fatalf("event = %+v, want [ to select the previous slot", event)
+	}
+	if event := d.feed(']'); event.action != nextSlot {
+		t.Fatalf("event = %+v, want ] to select the next slot", event)
+	}
+}

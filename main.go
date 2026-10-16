@@ -24,7 +24,7 @@ func main() {
 	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
 	savePath := flag.String("save", "", "file keeping progress between sessions (default in the user config folder)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute] [--save file]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on a tree within reach (1 chops it down)\n  Tab                   show or hide the inventory\n  X                     drop a log\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute] [--save file]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on a tree within reach (1 chops it down)\n  Tab                   show or hide the inventory\n  [ / ]                 highlight the previous / next inventory slot (or click one)\n  X                     drop the highlighted log, or the first one\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

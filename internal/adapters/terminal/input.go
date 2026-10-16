@@ -20,6 +20,8 @@ const (
 	firstChoice
 	toggleInventory
 	dropLog
+	previousSlot
+	nextSlot
 )
 
 type keyEvent struct {
@@ -83,6 +85,10 @@ func keyAction(key int) action {
 		return toggleInventory
 	case 'x', 'X':
 		return dropLog
+	case '[':
+		return previousSlot
+	case ']':
+		return nextSlot
 	}
 	return none
 }

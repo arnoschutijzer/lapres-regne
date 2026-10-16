@@ -30,8 +30,16 @@ const (
 	emptySlot = "\x1b[38;2;58;72;62m" + emptyGlyph
 )
 
+// Slots sit four cells apart from slotIndent on: a bracket or space, the glyph, a bracket or space.
+const (
+	slotIndent = 2
+	slotPitch  = 4
+	// slotLine is the panel line holding the first row of slots.
+	slotLine = 3
+)
+
 // inventoryPanel lays out the panel's lines, each padded to panelWidth visible cells.
-func inventoryPanel(inventory world.Inventory) []string {
+func inventoryPanel(inventory world.Inventory, cursor slotCursor) []string {
 	pad := func(text string, visible int) string {
 		return text + strings.Repeat(" ", max(0, panelWidth-visible))
 	}
@@ -39,15 +47,62 @@ func inventoryPanel(inventory world.Inventory) []string {
 	lines := []string{pad("", 0), pad(panelText+title, len(title)), pad("", 0)}
 	slots := inventory.Slots()
 	for row := range world.InventorySize / panelColumns {
-		line := "   "
+		line := strings.Repeat(" ", slotIndent)
 		for column := range panelColumns {
-			if slot := slots[row*panelColumns+column]; slot.Filled {
-				line += logTint[slot.Kind] + logGlyph + "  "
+			index := row*panelColumns + column
+			glyph := emptySlot
+			if slots[index].Filled {
+				glyph = logTint[slots[index].Kind] + logGlyph
+			}
+			if cursor.active && cursor.slot == index {
+				line += "[" + glyph + panelText + "]"
 			} else {
-				line += emptySlot + "  "
+				line += " " + glyph + " "
 			}
 		}
-		lines = append(lines, pad(line, 3+panelColumns*4))
+		lines = append(lines, pad(line, slotIndent+panelColumns*slotPitch))
 	}
 	return append(lines, pad("", 0))
+}
+
+// slotCursor is the highlighted inventory slot, chosen with [ and ] or a click.
+type slotCursor struct {
+	active bool
+	slot   int
+}
+
+// move steps the highlight through the slots in reading order, wrapping at the ends.
+func (s *slotCursor) move(step int) {
+	if !s.active {
+		s.active = true
+		s.slot = 0
+		if step < 0 {
+			s.slot = world.InventorySize - 1
+		}
+		return
+	}
+	s.slot = (s.slot + step + world.InventorySize) % world.InventorySize
+}
+
+// drop drops the highlighted log, or the first log when no log is highlighted, then
+// highlights the next log so repeated presses empty the inventory in order.
+func (s *slotCursor) drop(w *world.World) {
+	slots := w.Hero().Inventory().Slots()
+	slot := s.slot
+	if !s.active || !slots[slot].Filled {
+		first, filled := w.Hero().Inventory().FirstFilled()
+		if !filled {
+			return
+		}
+		slot = first
+	}
+	w.Drop(slot)
+	s.active, s.slot = true, slot
+	slots = w.Hero().Inventory().Slots()
+	for step := 1; step < world.InventorySize; step++ {
+		if next := (slot + step) % world.InventorySize; slots[next].Filled {
+			s.slot = next
+			return
+		}
+	}
 }

@@ -112,6 +112,10 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			return false
 		}
 		if event.click {
+			if slot, ok := view.slotAt(event.column, event.row); ok {
+				view.cursor = slotCursor{active: true, slot: slot}
+				return false
+			}
 			// Clicking a tree walks there to chop it; clicking anything else stops.
 			view.menu = nil
 			if tree, ok := view.treeAt(event.column, event.row); ok {
@@ -151,8 +155,16 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 		}
 		if event.action == dropLog {
 			// Holding X keeps dropping, one log per repeat.
-			if slot, filled := world.Hero().Inventory().FirstFilled(); filled {
-				world.Drop(slot)
+			view.cursor.drop(world)
+			return false
+		}
+		if event.action == previousSlot || event.action == nextSlot {
+			// Choosing a slot shows the inventory, so the highlight is never hidden.
+			view.inventoryOpen = true
+			if event.action == previousSlot {
+				view.cursor.move(-1)
+			} else {
+				view.cursor.move(1)
 			}
 			return false
 		}

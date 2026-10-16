@@ -29,6 +29,7 @@ type renderer struct {
 	// inventoryOpen shows the inventory panel; panelShown and lastPanel remember the last one drawn.
 	inventoryOpen, panelShown bool
 	lastPanel                 string
+	cursor                    slotCursor
 	// menu lists the actions offered for the tree in reach, named by menuTitle; nil when closed.
 	menu      []string
 	menuTitle string
@@ -258,6 +259,20 @@ func (r *renderer) treeAt(column, row int) (world.Tree, bool) {
 	return world.Tree{}, false
 }
 
+// slotAt finds the inventory slot under a 1-based terminal cell of the open panel.
+func (r *renderer) slotAt(column, row int) (int, bool) {
+	if !r.inventoryOpen || r.screenWidth == 0 || r.canvas.width == 0 {
+		return 0, false
+	}
+	cols := r.canvas.width / 2
+	panelColumn := column - 1 - (r.screenWidth-cols)/2 - max(0, cols-panelWidth)
+	slotRow := row - 2 - slotLine
+	if panelColumn < slotIndent || panelColumn >= slotIndent+panelColumns*slotPitch || slotRow < 0 || slotRow >= world.InventorySize/panelColumns {
+		return 0, false
+	}
+	return slotRow*panelColumns + (panelColumn-slotIndent)/slotPitch, true
+}
+
 func (r *renderer) frame(width, height int, seconds float64) string {
 	var out strings.Builder
 	out.WriteString("\x1b[H\x1b[0m\x1b[48;2;9;15;14m\x1b[38;2;147;166;130m")
@@ -379,7 +394,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 	}
 	if r.inventoryOpen {
-		lines := inventoryPanel(r.world.Hero().Inventory())
+		lines := inventoryPanel(r.world.Hero().Inventory(), r.cursor)
 		panel := strings.Join(lines, "\n")
 		if full || !r.panelShown || panel != r.lastPanel {
 			for i, line := range lines[:min(len(lines), rows)] {
