@@ -69,6 +69,14 @@ func (w *World) Chop() bool {
 
 func (w *World) Chopping() bool { return w.chop.active }
 
+// AimAt faces the hero toward a world position, except while a chop holds them toward the tree.
+func (w *World) AimAt(x, z float64) {
+	if w.chop.active {
+		return
+	}
+	w.hero.AimAt(x, z)
+}
+
 // ChoppedTree is the tree being chopped, if any.
 func (w *World) ChoppedTree() (Tree, bool) {
 	if !w.chop.active {

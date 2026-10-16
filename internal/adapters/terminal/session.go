@@ -196,7 +196,7 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			world.Advance(dx, dz, dt, held.sprinting())
 			world.Follow(dt)
 			if x, z, ok := view.groundAt(cursorColumn, cursorRow); ok {
-				world.Hero().AimAt(x, z)
+				world.AimAt(x, z)
 			}
 			dirty = true
 			if dirty {

@@ -108,3 +108,17 @@ func TestTheChoppedTreeIsKnownWhileChopping(t *testing.T) {
 		t.Fatal("no tree is chopped once it falls")
 	}
 }
+
+func TestAChopHoldsTheFacingUntilTheTreeFalls(t *testing.T) {
+	w := besideTree()
+	w.Chop()
+	w.AimAt(0, 0)
+	if facing := w.Hero().Facing(); facing != world.FacingRight {
+		t.Fatalf("facing = %v, want right toward the tree while chopping", facing)
+	}
+	w.Advance(0, 0, time.Second, false)
+	w.AimAt(0, 0)
+	if facing := w.Hero().Facing(); facing != world.FacingLeft {
+		t.Fatalf("facing = %v, want aiming to work again once the tree falls", facing)
+	}
+}
