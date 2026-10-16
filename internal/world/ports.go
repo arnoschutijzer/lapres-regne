@@ -26,9 +26,10 @@ type Snapshot struct {
 	Seed          uint64
 	X, Z          float64
 	WoodcuttingXP float64
-	Logs          int
-	Stumps        []Stump
-	SavedAt       time.Time
+	// Inventory lists the logs carried, by the tree they came from, slot by slot.
+	Inventory []TreeKind
+	Stumps    []Stump
+	SavedAt   time.Time
 }
 
 // Stump is a felled tree on the tree grid and how long it still takes to regrow.

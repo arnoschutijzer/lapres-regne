@@ -2,6 +2,7 @@ package world_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -132,5 +133,30 @@ func TestKeepingReportsProgressThatCannotBeSaved(t *testing.T) {
 	broken := errors.New("disk full")
 	if err := besideTree().Keep(&memoryProgress{err: broken}, quitAt); !errors.Is(err, broken) {
 		t.Fatalf("err = %v, want the save failure", err)
+	}
+}
+
+func TestKeepingAndResumingCarryTheInventoryKindByKind(t *testing.T) {
+	carried := []world.TreeKind{world.Oak, world.Willow, world.NormalTree, world.Yew}
+	progress := &memoryProgress{snapshot: world.Snapshot{Seed: 7, Inventory: carried, SavedAt: quitAt}, saved: true}
+	w, err := world.Resume(7, progress, quitAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slots := w.Hero().Inventory().Slots(); !reflect.DeepEqual(slots, carried) {
+		t.Fatalf("slots = %v, want %v", slots, carried)
+	}
+	w.Keep(progress, quitAt)
+	if !reflect.DeepEqual(progress.snapshot.Inventory, carried) {
+		t.Fatalf("kept inventory = %v, want %v", progress.snapshot.Inventory, carried)
+	}
+}
+
+func TestResumingNeverOverfillsTheInventory(t *testing.T) {
+	overfull := make([]world.TreeKind, world.InventorySize+5)
+	progress := &memoryProgress{snapshot: world.Snapshot{Seed: 7, Inventory: overfull}, saved: true}
+	w, _ := world.Resume(7, progress, quitAt)
+	if w.Hero().Inventory().Len() != world.InventorySize {
+		t.Fatalf("slots = %d, want at most %d", w.Hero().Inventory().Len(), world.InventorySize)
 	}
 }

@@ -12,7 +12,7 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 		X:             w.hero.x,
 		Z:             w.hero.z,
 		WoodcuttingXP: w.hero.woodcutting.XP(),
-		Logs:          w.hero.inventory.Len(),
+		Inventory:     w.hero.inventory.Slots(),
 		SavedAt:       now,
 	}
 	for tree, regrow := range w.felled {
@@ -24,7 +24,7 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 	return nil
 }
 
-// Resume builds a world from a seed and the saved progress. The hero's skills and logs travel
+// Resume builds a world from a seed and the saved progress. The hero's skills and inventory travel
 // to any world; their position and stumps return only to the world they were saved in, with the
 // time away since saving counted toward regrowth.
 func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
@@ -37,9 +37,8 @@ func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 		return w, nil
 	}
 	w.hero.woodcutting.gain(snapshot.WoodcuttingXP)
-	// Saves before typed inventories counted only normal logs.
-	for range min(snapshot.Logs, InventorySize) {
-		w.hero.inventory.add(NormalTree)
+	for _, kind := range snapshot.Inventory {
+		w.hero.inventory.add(kind)
 	}
 	if snapshot.Seed != seed {
 		return w, nil

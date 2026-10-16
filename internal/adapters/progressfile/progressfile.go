@@ -17,17 +17,25 @@ type File struct {
 	Path string
 }
 
-// version marks the file layout so later layouts can still read older saves.
-const version = 1
+// version marks the file layout so later layouts can still read older saves. Version 1
+// counted logs; version 2 lists each log in the inventory by the tree it came from.
+const version = 2
+
+// logNames spell each kind of log in the file, independent of how the domain names them.
+var logNames = map[world.TreeKind]string{
+	world.NormalTree: "normal", world.Oak: "oak", world.Willow: "willow", world.Yew: "yew",
+}
 
 type progressJSON struct {
-	Version     int         `json:"version"`
-	Seed        uint64      `json:"seed"`
-	SavedAt     time.Time   `json:"savedAt"`
-	Hero        heroJSON    `json:"hero"`
-	Woodcutting skillJSON   `json:"woodcutting"`
-	Logs        int         `json:"logs"`
-	Stumps      []stumpJSON `json:"stumps"`
+	Version     int       `json:"version"`
+	Seed        uint64    `json:"seed"`
+	SavedAt     time.Time `json:"savedAt"`
+	Hero        heroJSON  `json:"hero"`
+	Woodcutting skillJSON `json:"woodcutting"`
+	// Logs is the log count of version 1 saves.
+	Logs      int         `json:"logs,omitempty"`
+	Inventory []string    `json:"inventory"`
+	Stumps    []stumpJSON `json:"stumps"`
 }
 
 type heroJSON struct {
@@ -57,12 +65,23 @@ func (f File) Load() (world.Snapshot, bool, error) {
 	if err := json.Unmarshal(data, &saved); err != nil {
 		return world.Snapshot{}, false, fmt.Errorf("read %s: %w", f.Path, err)
 	}
-	if saved.Version != version {
+	if saved.Version != 1 && saved.Version != version {
 		return world.Snapshot{}, false, fmt.Errorf("read %s: unknown version %d", f.Path, saved.Version)
 	}
 	snapshot := world.Snapshot{
 		Seed: saved.Seed, X: saved.Hero.X, Z: saved.Hero.Z,
-		WoodcuttingXP: saved.Woodcutting.XP, Logs: saved.Logs, SavedAt: saved.SavedAt,
+		WoodcuttingXP: saved.Woodcutting.XP, SavedAt: saved.SavedAt,
+	}
+	// Version 1 counted logs before they had kinds; they were all normal logs.
+	for range saved.Logs {
+		snapshot.Inventory = append(snapshot.Inventory, world.NormalTree)
+	}
+	for _, name := range saved.Inventory {
+		kind, known := kindNamed(name)
+		if !known {
+			return world.Snapshot{}, false, fmt.Errorf("read %s: unknown log %q", f.Path, name)
+		}
+		snapshot.Inventory = append(snapshot.Inventory, kind)
 	}
 	for _, stump := range saved.Stumps {
 		snapshot.Stumps = append(snapshot.Stumps, world.Stump{GX: stump.GX, GZ: stump.GZ, Regrow: time.Duration(stump.RegrowMillis) * time.Millisecond})
@@ -77,8 +96,11 @@ func (f File) Save(snapshot world.Snapshot) error {
 		Version: version, Seed: snapshot.Seed, SavedAt: snapshot.SavedAt,
 		Hero:        heroJSON{X: snapshot.X, Z: snapshot.Z},
 		Woodcutting: skillJSON{XP: snapshot.WoodcuttingXP},
-		Logs:        snapshot.Logs,
+		Inventory:   []string{},
 		Stumps:      []stumpJSON{},
+	}
+	for _, kind := range snapshot.Inventory {
+		saved.Inventory = append(saved.Inventory, logNames[kind])
 	}
 	for _, stump := range snapshot.Stumps {
 		saved.Stumps = append(saved.Stumps, stumpJSON{GX: stump.GX, GZ: stump.GZ, RegrowMillis: stump.Regrow.Milliseconds()})
@@ -108,4 +130,13 @@ func (f File) Save(snapshot world.Snapshot) error {
 		return err
 	}
 	return os.Rename(temporary.Name(), f.Path)
+}
+
+func kindNamed(name string) (world.TreeKind, bool) {
+	for kind, spelled := range logNames {
+		if spelled == name {
+			return kind, true
+		}
+	}
+	return 0, false
 }
