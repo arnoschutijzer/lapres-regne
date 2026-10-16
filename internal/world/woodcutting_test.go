@@ -64,3 +64,17 @@ func TestChoppingANormalTreeTakesOneTickAndLeavesAStump(t *testing.T) {
 		t.Fatal("a stump must not be chopped")
 	}
 }
+
+func TestATreeCanBeChoppedFromTheEdgeOfItsCrown(t *testing.T) {
+	w := world.New(7)
+	for range 3 {
+		w.Walk(0, 1, false)
+	}
+	// Seven steps right leaves the trunk 2.2 ahead, under the edge of the crown.
+	for range 7 {
+		w.Walk(1, 0, false)
+	}
+	if _, ok := w.FacedTree(); !ok {
+		t.Fatal("a tree 2.2 ahead must be within reach")
+	}
+}

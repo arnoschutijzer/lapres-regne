@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// reach is how far a trunk may stand from the hero to be chopped.
-const reach = 1.5
+// reach is how far a trunk may stand from the hero to be chopped: about the edge of its crown.
+const reach = 2.5
 
 // chopTick is one woodcutting attempt; a normal tree falls on the first.
 const chopTick = 600 * time.Millisecond
