@@ -29,12 +29,14 @@ type Character struct {
 	facing       Facing
 	aimed        bool
 	lastWalk     time.Time
+	logs         int
 }
 
 func (c *Character) Position() (x, z float64) { return c.x, c.z }
 func (c *Character) Steps() int               { return c.steps }
 func (c *Character) Facing() Facing           { return c.facing }
 func (c *Character) LastWalk() time.Time      { return c.lastWalk }
+func (c *Character) Logs() int                { return c.logs }
 
 // Face turns the character without moving it.
 func (c *Character) Face(facing Facing) { c.facing = facing }

@@ -23,7 +23,9 @@ type renderer struct {
 	trees                     []world.Tree
 	cells                     []forestCell
 	screenWidth, screenHeight int
-	lastStatus                string
+	lastStatus, lastHint      string
+	// menu lists the actions offered for the faced tree; nil when closed.
+	menu []string
 }
 
 func newRenderer(world *world.World, title string) *renderer {
@@ -57,6 +59,7 @@ var forestPalette = [][3]int{
 	{156, 195, 179}, // ripples
 	{198, 187, 120}, // sunlight
 	{236, 185, 105}, // character
+	{205, 214, 218}, // axe head
 }
 
 func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
@@ -148,7 +151,9 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		}
 	}
 	for _, tree := range trees {
-		c.shadow(tree)
+		if !tree.Stump {
+			c.shadow(tree)
+		}
 	}
 	for _, tree := range trees {
 		r.drawTree(c, tree)
@@ -177,6 +182,28 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 		a := float64(i) * math.Pi / 4
 		c.line(x, 1.48, z, x+math.Cos(a)*0.28, 1.48, z+math.Sin(a)*0.28, 1, 8)
 	}
+	if r.world.Chopping() {
+		drawAxe(c, x, z, r.world.Hero().Facing(), seconds)
+	}
+}
+
+// drawAxe swings an axe from the hero's hands toward the faced tree.
+func drawAxe(c *forestCanvas, x, z float64, facing world.Facing, seconds float64) {
+	dx, dz := 0.0, 1.0
+	switch facing {
+	case world.FacingLeft:
+		dx, dz = -1, 0
+	case world.FacingRight:
+		dx, dz = 1, 0
+	case world.FacingUp:
+		dx, dz = 0, -1
+	}
+	// The swing runs from raised overhead down to level with the trunk.
+	angle := 0.2 + 1.1*(0.5+0.5*math.Sin(seconds*10))
+	reachOut, lift := math.Cos(angle)*0.75, math.Sin(angle)*0.75
+	headX, headY, headZ := x+dx*reachOut, 1.0+lift, z+dz*reachOut
+	c.line(x, 1.0, z, headX, headY, headZ, 0.62, 4)
+	c.line(headX, headY-0.18, headZ, headX+dx*0.08, headY+0.18, headZ+dz*0.08, 1, 9)
 }
 
 // groundAt finds the world position under a 1-based terminal cell of the last frame.
@@ -214,19 +241,28 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			r.cells = make([]forestCell, cols*rows)
 		}
 		out.WriteString("\x1b[2J\x1b[1;1H  " + r.title)
-		hint := "  arrows/WASD/IJKL · shift run · Q quit"
-		if width >= 54 {
-			hint += " · N/P tracks"
+	}
+	hint := "  arrows/WASD/IJKL · shift run · E act · Q quit"
+	if width >= 62 {
+		hint += " · N/P tracks"
+	}
+	if r.menu != nil {
+		hint = "  tree:"
+		for i, entry := range r.menu {
+			hint += fmt.Sprintf("  %d %s", i+1, entry)
 		}
+	}
+	if full || hint != r.lastHint {
 		controls := []rune(hint)
-		fmt.Fprintf(&out, "\x1b[%d;1H%s", height-1, string(controls[:min(width-1, len(controls))]))
+		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height-1, string(controls[:min(width-1, len(controls))]))
+		r.lastHint = hint
 	}
 	lastInk := -1
 	for row := range rows {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
 			bits, ink := 0, 0
-			var votes [9]int
+			var votes [10]int
 			mapping := [4][2]int{{0, 3}, {1, 4}, {2, 5}, {6, 7}}
 			for dy := range 4 {
 				for dx := range 2 {
@@ -239,7 +275,8 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 				}
 			}
 			for i := range votes {
-				if votes[i] > votes[ink] || i == 8 && votes[i] > 0 {
+				// The hero and their axe stay visible over anything else in the cell.
+				if votes[i] > votes[ink] || i >= 8 && votes[i] > 0 {
 					ink = i
 				}
 			}
@@ -279,7 +316,11 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 	}
 	x, z := r.world.Hero().Position()
-	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  facing %s  |  %s  |  seed %d", x, z, r.world.Hero().Steps(), r.world.Hero().Facing(), r.world.Region(), r.world.Seed())
+	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  facing %s  |  %s  |  logs %d", x, z, r.world.Hero().Steps(), r.world.Hero().Facing(), r.world.Region(), r.world.Hero().Logs())
+	if r.world.Chopping() {
+		status += "  |  chopping"
+	}
+	status += fmt.Sprintf("  |  seed %d", r.world.Seed())
 	if full || status != r.lastStatus {
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height, status[:min(width-1, len(status))])
 		r.lastStatus = status

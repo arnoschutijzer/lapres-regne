@@ -10,6 +10,9 @@ type World struct {
 	seed             uint64
 	hero             Character
 	cameraX, cameraZ float64
+	// felled holds the cells whose tree is a stump.
+	felled map[cell]bool
+	chop   chop
 }
 
 func New(seed uint64) *World {
@@ -58,6 +61,7 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 		speed *= 2
 	}
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
+	w.chopFor(dt)
 }
 
 // wading halves the distance while the hero stands in a river.

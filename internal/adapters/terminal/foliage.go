@@ -73,6 +73,10 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 
 func (r *renderer) drawTree(c *forestCanvas, tree world.Tree) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
+	if tree.Stump {
+		drawStump(c, tree)
+		return
+	}
 	for _, offset := range []float64{-tree.Trunk, 0, tree.Trunk} {
 		c.line(x+offset, 0, z, x+offset*0.6, h, z, 0.62, 4)
 	}
@@ -84,6 +88,18 @@ func (r *renderer) drawTree(c *forestCanvas, tree world.Tree) {
 		r.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, radius*0.72, radius*0.57, radius*0.72)
 	}
 	r.crown(c, x, h+0.3, z, radius*0.83, radius*0.70, radius*0.83)
+}
+
+// stumpHeight keeps a stump a few braille dots tall.
+const stumpHeight = 1.1
+
+// drawStump leaves a short trunk with a pale, freshly cut top.
+func drawStump(c *forestCanvas, tree world.Tree) {
+	x, z, trunk := tree.X, tree.Z, tree.Trunk*1.3
+	for _, offset := range []float64{-trunk, 0, trunk} {
+		c.line(x+offset, 0, z, x+offset, stumpHeight, z, 0.62, 4)
+	}
+	c.line(x-trunk, stumpHeight, z, x+trunk, stumpHeight, z, 0.9, 7)
 }
 
 func (r *renderer) drawGrass(c *forestCanvas, left, right, back, front, seconds float64) {

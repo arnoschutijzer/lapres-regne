@@ -35,3 +35,16 @@ func TestKeysStillDecodeAfterMouseInput(t *testing.T) {
 		t.Fatalf("event = %+v, want D to walk right", last)
 	}
 }
+
+func TestEOpensTheActionMenuAndDigitsChoose(t *testing.T) {
+	var d keyDecoder
+	if event := d.feed('e'); event.action != interact {
+		t.Fatalf("event = %+v, want E to interact", event)
+	}
+	if events := feed(&d, "\x1b[101;1u"); events[len(events)-1].action != interact {
+		t.Fatalf("event = %+v, want an encoded E to interact", events[len(events)-1])
+	}
+	if event := d.feed('1'); event.action != firstChoice {
+		t.Fatalf("event = %+v, want 1 to pick the first menu entry", event)
+	}
+}

@@ -130,6 +130,22 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			}
 			return false
 		}
+		if event.action == interact {
+			// E opens the action menu for the faced tree, or closes an open menu.
+			if _, faced := world.FacedTree(); faced && view.menu == nil && !event.repeat {
+				view.menu = []string{"Chop down"}
+			} else if !event.repeat {
+				view.menu = nil
+			}
+			return false
+		}
+		if event.action == firstChoice {
+			if view.menu != nil && !event.repeat {
+				world.Chop()
+				view.menu = nil
+			}
+			return false
+		}
 		if !event.enhanced {
 			dx, dz := event.action.vector()
 			world.Walk(dx, dz, event.shift)

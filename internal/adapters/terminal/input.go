@@ -16,6 +16,8 @@ const (
 	quit
 	nextTrack
 	previousTrack
+	interact
+	firstChoice
 )
 
 type keyEvent struct {
@@ -70,6 +72,10 @@ func keyAction(key int) action {
 		return nextTrack
 	case 'p', 'P':
 		return previousTrack
+	case 'e', 'E':
+		return interact
+	case '1':
+		return firstChoice
 	}
 	return none
 }
