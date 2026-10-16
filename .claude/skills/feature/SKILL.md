@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Build a new feature outside-in through the walking skeleton using test-driven development and hexagonal architecture. Use for any new behavior exposed through the CLI.
+description: Build a new feature through the walking skeleton using test-driven development and hexagonal architecture. Use for any new behavior exposed through the CLI.
 ---
 
 # Build a feature through the walking skeleton
@@ -9,12 +9,10 @@ Input: a feature description.
 
 1. Follow the paths and commands in `CLAUDE.md`.
 2. Restate the feature as observable behaviors at the entry point (keys or flags sent to the CLI and the expected terminal output or side effect).
-3. Write a failing acceptance test in `terminal_test.go` that runs the compiled binary in a pseudo-terminal and uses the real outbound adapters. Run it and confirm it fails for the expected reason.
-4. Stop and show me the acceptance test. Wait for approval. Leave the test failing; do not skip it. The stop hook lets the turn end while the only failures are new `TestTerminal` subtests that are not committed yet.
-5. Define or extend the port.
-6. Write failing unit tests for the domain logic.
-7. Implement the domain logic until unit tests pass.
-8. Implement or extend the adapter.
-9. Wire the new code in the composition root (`main.go`).
-10. Run `go vet ./... && go test ./...`. Fix failures until it passes.
-11. Report: files changed, the acceptance test name and confirmation that the new code is reachable from the composition root.
+3. Define or extend the port.
+4. Write failing unit tests for the domain logic.
+5. Implement the domain logic until unit tests pass.
+6. Write failing unit tests for the adapter, then implement or extend it until they pass.
+7. Wire the new code in the composition root (`main.go`).
+8. Run `go vet ./... && go test ./...`. Fix failures until it passes.
+9. Report: files changed, the tests added and confirmation that the new code is reachable from the composition root.
