@@ -71,13 +71,11 @@ go build -o dither-cli .
 ./dither-cli
 ```
 
-Run the application-level terminal checks with Python 3:
+Run all tests, including the application-level terminal checks, with Go:
 
 ```sh
-python3 tests/terminal.py
+go test ./...
 ```
-
-Run the soundtrack and shuffle checks with `go test ./...`.
 
 Benchmark animated rendering at three terminal sizes:
 
