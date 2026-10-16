@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/verify_on_stop.py\"",
+            "timeout": 300,
+            "statusMessage": "Verifying the walking skeleton"
+          }
+        ]
+      }
+    ]
+  }
+}
