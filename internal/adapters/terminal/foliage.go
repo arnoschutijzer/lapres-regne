@@ -29,14 +29,12 @@ func (c *forestCanvas) shadow(tree world.Tree) {
 	}
 }
 
-// Ray/ellipsoid intersections provide rounded crowns with real depth and lighting.
-func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves foliageInks) {
-	f := r.world
-	heroWorldX, heroWorldZ := f.Hero().Position()
+// ellipsoid ray-casts an ellipsoid onto the canvas and visits each pixel where its front surface
+// is nearer than what is already drawn, with that surface point relative to the centre and its normal.
+func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz float64, visit func(px, py int, depth float64, point, normal vec)) {
 	sx, sy, depth := c.project(x, y, z)
 	boundX := rx * c.scale
 	boundY := math.Sqrt(ry*ry*0.69*0.69+rz*rz*0.72*0.72) * c.scale
-	heroX, heroY, _ := c.project(heroWorldX, 0.9, heroWorldZ)
 	a := 0.72*0.72/(ry*ry) + 0.69*0.69/(rz*rz)
 	for py := max(0, int(sy-boundY)-1); py <= min(c.height-1, int(sy+boundY)+1); py++ {
 		for px := max(0, int(sx-boundX)-1); px <= min(c.width-1, int(sx+boundX)+1); px++ {
@@ -51,27 +49,44 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 			if depth-t > c.pixels[py*c.width+px].depth {
 				continue
 			}
-			localY, localZ := -v*0.69+t*0.72, v*0.72+t*0.69
-			normal := vec{u / (rx * rx), localY / (ry * ry), localZ / (rz * rz)}.unit()
-			light := 0.34 + 0.6*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
-			light += 0.04 * math.Sin(u*11+localY*8+localZ*7)
-			// Darkening toward the rim leaves a dotless outline, so each crown's shape reads in braille.
-			facing := math.Abs(normal.dot(vec{0, 0.72, 0.69}))
-			light *= math.Min(1, math.Max(0, (facing-0.12)/0.3))
-			ink := leaves.shaded
-			if light > 0.58 {
-				ink = leaves.sunlit
-			}
-			// A small cutaway keeps the traveler readable under overlapping crowns.
-			hx, hy := (float64(px)-heroX)/(7*c.scale/forestScale), (float64(py)-heroY)/(9*c.scale/forestScale)
-			if distance := hx*hx + hy*hy; distance < 1 {
-				if distance < 0.13 || f.Random(int(math.Floor(x+u*3)), int(math.Floor(z+localZ*3)), 83) > 0.18 {
-					continue
-				}
-			}
-			c.plot(px, py, depth-t, light, ink)
+			point := vec{u, -v*0.69 + t*0.72, v*0.72 + t*0.69}
+			normal := vec{point.x / (rx * rx), point.y / (ry * ry), point.z / (rz * rz)}.unit()
+			visit(px, py, depth-t, point, normal)
 		}
 	}
+}
+
+// sunlight is how brightly the sun lights a surface facing along normal.
+func sunlight(normal vec) float64 {
+	return 0.34 + 0.6*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
+}
+
+// rim fades a surface toward its silhouette, leaving a dotless outline so each shape reads in braille.
+func rim(normal vec) float64 {
+	facing := math.Abs(normal.dot(vec{0, 0.72, 0.69}))
+	return math.Min(1, math.Max(0, (facing-0.12)/0.3))
+}
+
+// crown draws a rounded crown of leaves with real depth and lighting.
+func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves foliageInks) {
+	f := r.world
+	heroWorldX, heroWorldZ := f.Hero().Position()
+	heroX, heroY, _ := c.project(heroWorldX, 0.9, heroWorldZ)
+	ellipsoid(c, x, y, z, rx, ry, rz, func(px, py int, depth float64, point, normal vec) {
+		light := (sunlight(normal) + 0.04*math.Sin(point.x*11+point.y*8+point.z*7)) * rim(normal)
+		ink := leaves.shaded
+		if light > 0.58 {
+			ink = leaves.sunlit
+		}
+		// A small cutaway keeps the traveler readable under overlapping crowns.
+		hx, hy := (float64(px)-heroX)/(7*c.scale/forestScale), (float64(py)-heroY)/(9*c.scale/forestScale)
+		if distance := hx*hx + hy*hy; distance < 1 {
+			if distance < 0.13 || f.Random(int(math.Floor(x+point.x*3)), int(math.Floor(z+point.z*3)), 83) > 0.18 {
+				return
+			}
+		}
+		c.plot(px, py, depth, light, ink)
+	})
 }
 
 // foliageInks are the palette entries a crown uses in shade and in sunlight.
