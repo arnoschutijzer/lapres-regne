@@ -1,4 +1,4 @@
-package main
+package soundtrack
 
 import (
 	"encoding/binary"
@@ -6,16 +6,13 @@ import (
 	"io"
 	"math"
 	"math/rand/v2"
-	"time"
-
-	"github.com/ebitengine/oto/v3"
 )
 
 const (
-	musicSampleRate    = 44100
-	musicChannels      = 2
-	musicFadeFrames    = 3 * musicSampleRate
-	musicSilenceFrames = musicSampleRate / 4
+	SampleRate           = 44100
+	Channels             = 2
+	defaultFadeFrames    = 3 * SampleRate
+	defaultSilenceFrames = SampleRate / 4
 )
 
 // Selection is independent of decoding and crossfading. A trigger-based selector
@@ -71,15 +68,15 @@ func (h *songHistory) Previous() string {
 	return h.songs[h.index]
 }
 
-type musicTrack struct {
-	samples          interface{ Read([]float32) (int, error) }
-	frames, position int64
-	closer           io.Closer
+type Track struct {
+	Samples          Samples
+	Frames, position int64
+	Closer           io.Closer
 }
 
-func (t *musicTrack) Close() {
-	if t.closer != nil {
-		t.closer.Close()
+func (t *Track) Close() {
+	if t.Closer != nil {
+		t.Closer.Close()
 	}
 }
 
@@ -92,11 +89,11 @@ const (
 	musicSilence
 )
 
-// musicStream produces sequential fades on the audio thread, without
+// Stream produces sequential fades on the audio thread, without
 // timers on the rendering thread or decoding entire songs into memory.
-type musicStream struct {
-	selectTrack                func(direction int) (*musicTrack, error)
-	current                    *musicTrack
+type Stream struct {
+	selectTrack                func(direction int) (*Track, error)
+	current                    *Track
 	fadeFrames, silenceFrames  int64
 	phase                      musicPhase
 	phasePosition, phaseLength int64
@@ -109,11 +106,11 @@ type musicStream struct {
 	err                        error
 }
 
-func newMusicStream(selectTrack func(int) (*musicTrack, error), fadeFrames, silenceFrames int64) (*musicStream, error) {
+func newStream(selectTrack func(int) (*Track, error), fadeFrames, silenceFrames int64) (*Stream, error) {
 	if fadeFrames < 1 || silenceFrames < 1 {
 		return nil, fmt.Errorf("fade and silence durations must be positive")
 	}
-	m := &musicStream{selectTrack: selectTrack, fadeFrames: fadeFrames, silenceFrames: silenceFrames, direction: 1, requests: make(chan int, 1)}
+	m := &Stream{selectTrack: selectTrack, fadeFrames: fadeFrames, silenceFrames: silenceFrames, direction: 1, requests: make(chan int, 1)}
 	var err error
 	m.current, err = m.loadTrack(1)
 	if err == nil {
@@ -122,12 +119,12 @@ func newMusicStream(selectTrack func(int) (*musicTrack, error), fadeFrames, sile
 	return m, err
 }
 
-func (m *musicStream) loadTrack(direction int) (*musicTrack, error) {
+func (m *Stream) loadTrack(direction int) (*Track, error) {
 	track, err := m.selectTrack(direction)
 	if err != nil {
 		return nil, err
 	}
-	if track.frames < 2 {
+	if track.Frames < 2 {
 		track.Close()
 		return nil, fmt.Errorf("song must contain at least two audio frames")
 	}
@@ -136,7 +133,7 @@ func (m *musicStream) loadTrack(direction int) (*musicTrack, error) {
 
 // Skip is nonblocking. While fading out, the latest request chooses which song
 // starts after the silence, so rapid navigation never builds up a queue.
-func (m *musicStream) Skip(direction int) {
+func (m *Stream) Skip(direction int) {
 	if direction == 0 {
 		return
 	}
@@ -150,9 +147,9 @@ func (m *musicStream) Skip(direction int) {
 	}
 }
 
-func readSamples(track *musicTrack, samples []float32) error {
+func readSamples(track *Track, samples []float32) error {
 	for len(samples) > 0 {
-		n, err := track.samples.Read(samples)
+		n, err := track.Samples.Read(samples)
 		samples = samples[n:]
 		if len(samples) == 0 {
 			return nil
@@ -170,7 +167,7 @@ func readSamples(track *musicTrack, samples []float32) error {
 	return nil
 }
 
-func (m *musicStream) mix() (int, error) {
+func (m *Stream) mix() (int, error) {
 	select {
 	case direction := <-m.requests:
 		m.direction = direction
@@ -179,23 +176,23 @@ func (m *musicStream) mix() (int, error) {
 		}
 	default:
 	}
-	frames := int64(len(m.a) / musicChannels)
+	frames := int64(len(m.a) / Channels)
 	if m.phase == musicSilence {
 		frames = min(frames, m.phaseLength-m.phasePosition)
-		clear(m.a[:int(frames)*musicChannels])
+		clear(m.a[:int(frames)*Channels])
 	} else {
-		fadeStart := m.current.frames - min(m.fadeFrames, m.current.frames/2)
+		fadeStart := m.current.Frames - min(m.fadeFrames, m.current.Frames/2)
 		if m.phase == musicPlaying && m.current.position >= fadeStart {
 			m.direction = 1
 			m.beginFadeOut()
 		}
-		frames = min(frames, m.current.frames-m.current.position)
+		frames = min(frames, m.current.Frames-m.current.position)
 		if m.phase == musicPlaying {
 			frames = min(frames, fadeStart-m.current.position)
 		} else {
 			frames = min(frames, m.phaseLength-m.phasePosition)
 		}
-		if err := readSamples(m.current, m.a[:int(frames)*musicChannels]); err != nil {
+		if err := readSamples(m.current, m.a[:int(frames)*Channels]); err != nil {
 			return 0, err
 		}
 		for frame := range int(frames) {
@@ -211,8 +208,8 @@ func (m *musicStream) mix() (int, error) {
 				}
 			}
 			m.gain = gain
-			for channel := range musicChannels {
-				m.a[frame*musicChannels+channel] *= float32(gain)
+			for channel := range Channels {
+				m.a[frame*Channels+channel] *= float32(gain)
 			}
 		}
 		m.current.position += frames
@@ -225,22 +222,22 @@ func (m *musicStream) mix() (int, error) {
 			}
 		}
 	}
-	return int(frames) * musicChannels, nil
+	return int(frames) * Channels, nil
 }
 
-func (m *musicStream) beginFadeIn() {
+func (m *Stream) beginFadeIn() {
 	m.phase, m.phasePosition = musicFadeIn, 0
-	m.phaseLength = min(m.fadeFrames, m.current.frames/2)
+	m.phaseLength = min(m.fadeFrames, m.current.Frames/2)
 	m.gain = 0
 }
 
-func (m *musicStream) beginFadeOut() {
+func (m *Stream) beginFadeOut() {
 	m.phase, m.phasePosition = musicFadeOut, 0
-	m.phaseLength = min(m.fadeFrames, m.current.frames-m.current.position)
+	m.phaseLength = min(m.fadeFrames, m.current.Frames-m.current.position)
 	m.fadeOutGain = m.gain
 }
 
-func (m *musicStream) finishPhase() error {
+func (m *Stream) finishPhase() error {
 	switch m.phase {
 	case musicFadeIn:
 		m.phase = musicPlaying
@@ -259,7 +256,7 @@ func (m *musicStream) finishPhase() error {
 	return nil
 }
 
-func (m *musicStream) Read(p []byte) (int, error) {
+func (m *Stream) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -282,68 +279,20 @@ func (m *musicStream) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-type musicPlayback struct {
-	context *oto.Context
-	player  *oto.Player
-	stream  *musicStream
-}
-
-func startMusic(directory string) (*musicPlayback, error) {
-	songs, err := songsInFolder(directory)
-	if err != nil || len(songs) == 0 {
-		return nil, err
-	}
+// Shuffle streams the songs in shuffled order, opening each through the decoder.
+func Shuffle(songs []string, decoder Decoder) (*Stream, error) {
 	history := &songHistory{shuffle: shuffledSongs{songs: songs}}
-	stream, err := newMusicStream(func(direction int) (*musicTrack, error) {
+	return newStream(func(direction int) (*Track, error) {
 		if direction < 0 {
-			return openSong(history.Previous())
+			return decoder.Open(history.Previous())
 		}
-		return openSong(history.Next())
-	}, musicFadeFrames, musicSilenceFrames)
-	if err != nil {
-		return nil, err
-	}
-	context, ready, err := oto.NewContext(&oto.NewContextOptions{
-		SampleRate: musicSampleRate, ChannelCount: musicChannels,
-		Format: oto.FormatFloat32LE, BufferSize: 100 * time.Millisecond,
-	})
-	if err != nil {
-		stream.current.Close()
-		return nil, err
-	}
-	select {
-	case <-ready:
-	case <-time.After(5 * time.Second):
-		stream.current.Close()
-		return nil, fmt.Errorf("audio device initialization timed out")
-	}
-	if err := context.Err(); err != nil {
-		stream.current.Close()
-		return nil, err
-	}
-	player := context.NewPlayer(stream)
-	// Avoid half a second of decoded audio delaying navigation requests.
-	player.SetBufferSize(musicSampleRate * musicChannels * 4 / 10)
-	player.SetVolume(0.35)
-	player.Play()
-	return &musicPlayback{context: context, player: player, stream: stream}, nil
+		return decoder.Open(history.Next())
+	}, defaultFadeFrames, defaultSilenceFrames)
 }
 
-func (m *musicPlayback) Skip(direction int) {
-	m.stream.Skip(direction)
-}
-
-func (m *musicPlayback) Err() error {
-	if err := m.context.Err(); err != nil {
-		return err
+// Close releases the current song. Call it only after the audio device stops reading.
+func (m *Stream) Close() {
+	if m.current != nil {
+		m.current.Close()
 	}
-	return m.player.Err()
-}
-
-func (m *musicPlayback) Close() {
-	m.player.PauseAndStopReading()
-	if m.stream.current != nil {
-		m.stream.current.Close()
-	}
-	m.context.Suspend()
 }

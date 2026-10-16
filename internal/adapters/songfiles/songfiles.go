@@ -1,4 +1,4 @@
-package main
+package songfiles
 
 import (
 	"errors"
@@ -13,9 +13,12 @@ import (
 	"github.com/gopxl/beep/mp3"
 	"github.com/gopxl/beep/vorbis"
 	"github.com/gopxl/beep/wav"
+
+	"dither-cli/internal/soundtrack"
 )
 
-func songsInFolder(directory string) ([]string, error) {
+// List returns the songs directly inside the folder. A missing folder has no songs.
+func List(directory string) ([]string, error) {
 	entries, err := os.ReadDir(directory)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -36,7 +39,10 @@ func songsInFolder(directory string) ([]string, error) {
 	return songs, nil
 }
 
-func openSong(path string) (*musicTrack, error) {
+// Decoder opens MP3, OGG/Vorbis, WAV and FLAC files by path.
+type Decoder struct{}
+
+func (Decoder) Open(path string) (*soundtrack.Track, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -60,11 +66,11 @@ func openSong(path string) (*musicTrack, error) {
 		return nil, fmt.Errorf("decode %s: %w", path, err)
 	}
 	var stream beep.Streamer = decoder
-	if format.SampleRate != musicSampleRate {
-		stream = beep.Resample(4, format.SampleRate, musicSampleRate, stream)
+	if format.SampleRate != soundtrack.SampleRate {
+		stream = beep.Resample(4, format.SampleRate, soundtrack.SampleRate, stream)
 	}
-	frames := int64(decoder.Len()) * musicSampleRate / int64(format.SampleRate)
-	return &musicTrack{samples: &decodedSamples{stream: stream}, frames: frames, closer: decoder}, nil
+	frames := int64(decoder.Len()) * soundtrack.SampleRate / int64(format.SampleRate)
+	return &soundtrack.Track{Samples: &decodedSamples{stream: stream}, Frames: frames, Closer: decoder}, nil
 }
 
 // Beep decodes and resamples to stereo; the audio device consumes float32 PCM.
@@ -74,16 +80,16 @@ type decodedSamples struct {
 }
 
 func (s *decodedSamples) Read(p []float32) (int, error) {
-	frames := min(len(p)/musicChannels, len(s.buffer))
+	frames := min(len(p)/soundtrack.Channels, len(s.buffer))
 	n, ok := s.stream.Stream(s.buffer[:frames])
 	for i, sample := range s.buffer[:n] {
 		p[i*2], p[i*2+1] = float32(sample[0]), float32(sample[1])
 	}
 	if !ok {
 		if err := s.stream.Err(); err != nil {
-			return n * musicChannels, err
+			return n * soundtrack.Channels, err
 		}
-		return n * musicChannels, io.EOF
+		return n * soundtrack.Channels, io.EOF
 	}
-	return n * musicChannels, nil
+	return n * soundtrack.Channels, nil
 }

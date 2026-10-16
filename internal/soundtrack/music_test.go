@@ -1,4 +1,4 @@
-package main
+package soundtrack
 
 import (
 	"bytes"
@@ -29,6 +29,15 @@ func TestPlaylistShuffle(t *testing.T) {
 	}
 }
 
+func TestSingleSongLoops(t *testing.T) {
+	playlist := &shuffledSongs{songs: []string{"only"}}
+	for range 3 {
+		if playlist.Next() != "only" {
+			t.Fatal("single-track folders should loop")
+		}
+	}
+}
+
 func TestSongHistoryNavigation(t *testing.T) {
 	history := &songHistory{shuffle: shuffledSongs{songs: []string{"a", "b", "c"}}}
 	first, second, third := history.Next(), history.Next(), history.Next()
@@ -44,7 +53,7 @@ func TestSongHistoryNavigation(t *testing.T) {
 type stereoTone struct{ left, right float32 }
 
 func (s stereoTone) Read(p []float32) (int, error) {
-	for i := 0; i < len(p); i += musicChannels {
+	for i := 0; i < len(p); i += Channels {
 		p[i], p[i+1] = s.left, s.right
 	}
 	return len(p), nil
@@ -52,7 +61,7 @@ func (s stereoTone) Read(p []float32) (int, error) {
 
 func readMusic(t *testing.T, stream io.Reader, frames int) []byte {
 	t.Helper()
-	pcm := make([]byte, frames*musicChannels*4)
+	pcm := make([]byte, frames*Channels*4)
 	if _, err := io.ReadFull(stream, pcm); err != nil {
 		t.Fatal(err)
 	}
@@ -64,16 +73,16 @@ func sampleAt(pcm []byte, frame int) (float32, float32) {
 		math.Float32frombits(binary.LittleEndian.Uint32(pcm[frame*8+4:]))
 }
 
-func musicFixture(t *testing.T, frames int64) *musicStream {
+func musicFixture(t *testing.T, frames int64) *Stream {
 	t.Helper()
 	index := -1
-	stream, err := newMusicStream(func(direction int) (*musicTrack, error) {
+	stream, err := newStream(func(direction int) (*Track, error) {
 		index = max(0, index+direction)
 		tone := stereoTone{left: 1}
 		if index%2 == 1 {
 			tone = stereoTone{right: 1}
 		}
-		return &musicTrack{samples: tone, frames: frames}, nil
+		return &Track{Samples: tone, Frames: frames}, nil
 	}, 4, 2)
 	if err != nil {
 		t.Fatal(err)

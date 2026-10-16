@@ -1,4 +1,4 @@
-package main
+package songfiles
 
 import (
 	"encoding/binary"
@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"dither-cli/internal/soundtrack"
 )
 
 func writeWAV(t *testing.T, path string) {
@@ -36,9 +38,9 @@ func writeWAV(t *testing.T, path string) {
 func TestMusicFolder(t *testing.T) {
 	directory := t.TempDir()
 	for _, folder := range []string{directory, filepath.Join(directory, "missing")} {
-		playback, err := startMusic(folder)
-		if err != nil || playback != nil {
-			t.Fatalf("missing or empty folder should be silent: %v", err)
+		songs, err := List(folder)
+		if err != nil || len(songs) != 0 {
+			t.Fatalf("missing or empty folder should have no songs: %v, %v", songs, err)
 		}
 	}
 	writeWAV(t, filepath.Join(directory, "My song.WAV"))
@@ -48,15 +50,9 @@ func TestMusicFolder(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(directory, "nested.wav"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	songs, err := songsInFolder(directory)
+	songs, err := List(directory)
 	if err != nil || len(songs) != 1 || filepath.Base(songs[0]) != "My song.WAV" {
 		t.Fatalf("discover user audio files only: %v, %v", songs, err)
-	}
-	playlist := &shuffledSongs{songs: songs}
-	for range 3 {
-		if playlist.Next() != songs[0] {
-			t.Fatal("single-track folders should loop")
-		}
 	}
 }
 
@@ -65,14 +61,21 @@ func TestUserSongFormats(t *testing.T) {
 	writeWAV(t, wav)
 	for _, path := range []string{wav, "testdata/music/tone.mp3", "testdata/music/tone.ogg", "testdata/music/tone.flac"} {
 		t.Run(filepath.Ext(path), func(t *testing.T) {
-			track, err := openSong(path)
+			track, err := Decoder{}.Open(path)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer track.Close()
-			samples := make([]float32, track.frames*musicChannels)
-			if err := readSamples(track, samples); err != nil {
-				t.Fatal(err)
+			samples := make([]float32, track.Frames*soundtrack.Channels)
+			for filled := 0; filled < len(samples); {
+				n, err := track.Samples.Read(samples[filled:])
+				filled += n
+				if err != nil && filled < len(samples) {
+					t.Fatal(err)
+				}
+				if n == 0 && err == nil {
+					t.Fatal("decoder made no progress")
+				}
 			}
 			peak := 0.0
 			for _, sample := range samples {

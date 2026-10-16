@@ -11,6 +11,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"dither-cli/internal/adapters/songfiles"
+	"dither-cli/internal/adapters/speaker"
+	"dither-cli/internal/soundtrack"
 )
 
 const appTitle = "L’Après-Règne"
@@ -32,6 +36,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, "dither-cli:", err)
 		os.Exit(1)
 	}
+}
+
+func startMusic(directory string) (*speaker.Playback, error) {
+	songs, err := songfiles.List(directory)
+	if err != nil || len(songs) == 0 {
+		return nil, err
+	}
+	stream, err := soundtrack.Shuffle(songs, songfiles.Decoder{})
+	if err != nil {
+		return nil, err
+	}
+	return speaker.Start(stream)
 }
 
 // stty keeps terminal handling dependency-free on both macOS and Linux.
@@ -74,7 +90,7 @@ func run(seed uint64, mute bool, musicDir string) error {
 	resize := make(chan os.Signal, 1)
 	signal.Notify(resize, syscall.SIGWINCH)
 	defer signal.Stop(resize)
-	var music *musicPlayback
+	var music *speaker.Playback
 	if !mute {
 		music, err = startMusic(musicDir)
 		if err != nil {
