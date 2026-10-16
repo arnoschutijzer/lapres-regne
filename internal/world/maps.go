@@ -37,6 +37,9 @@ type Map struct {
 	Trees  []PlantedTree
 	// StartCol and StartRow are the tile the hero starts on.
 	StartCol, StartRow int
+	// Areas names the part of the map each tile belongs to, row by row as Ground, such as a castle
+	// or a village; "" for none.
+	Areas [][]string
 }
 
 // PlantedTree is a tree of a kind growing on a tile of a map.
@@ -55,13 +58,14 @@ const (
 // terrain answers questions about the tiles of a map.
 type terrain struct {
 	ground [][]Ground
+	areas  [][]string
 	trees  map[cell]TreeKind
 	// cover is the canopy over each tile, row by row.
 	cover [][]float64
 }
 
 func newTerrain(m Map) *terrain {
-	t := &terrain{ground: m.Ground, trees: make(map[cell]TreeKind), cover: make([][]float64, len(m.Ground))}
+	t := &terrain{ground: m.Ground, areas: m.Areas, trees: make(map[cell]TreeKind), cover: make([][]float64, len(m.Ground))}
 	for row, tiles := range m.Ground {
 		t.cover[row] = make([]float64, len(tiles))
 		for col := range tiles {
@@ -92,6 +96,15 @@ func (t *terrain) tile(col, row int) (Ground, bool) {
 		return 0, false
 	}
 	return t.ground[row][col], true
+}
+
+// area names the part of the map a world position belongs to, or "" for none.
+func (t *terrain) area(x, z float64) string {
+	col, row := int(math.Floor(x/TileSize)), int(math.Floor(z/TileSize))
+	if row < 0 || row >= len(t.areas) || col < 0 || col >= len(t.areas[row]) {
+		return ""
+	}
+	return t.areas[row][col]
 }
 
 // at is the ground at a world position, or false beyond the map's edges.

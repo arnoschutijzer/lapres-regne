@@ -65,7 +65,13 @@ func NearestRiver(channels []RiverChannel, x float64) (distance, width float64) 
 	return distance, width
 }
 
+// Region names where the hero stands: the area of the map, or else the lay of the land.
 func (w *World) Region() string {
+	if w.terrain != nil {
+		if area := w.terrain.area(w.hero.x, w.hero.z); area != "" {
+			return area
+		}
+	}
 	distance, width := w.River(w.hero.x, w.hero.z)
 	if distance < width {
 		return "river / wading"

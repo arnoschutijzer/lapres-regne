@@ -246,3 +246,20 @@ func TestApproachingATreeBeyondAWallGoesAroundToChopIt(t *testing.T) {
 		t.Fatalf("hero at %v, %v is not chopping; want them round the wall and at the tree", x, z)
 	}
 }
+
+func TestTheRegionNamesTheAreaTheHeroStandsIn(t *testing.T) {
+	m := courtyard()
+	m.Areas = [][]string{
+		{"", "", "", "", "", "", "", "", ""},
+		{"", "Keep", "Keep", "Keep"},
+	}
+	w := world.NewOnMap(7, m)
+	if region := w.Region(); region != "Keep" {
+		t.Fatalf("region = %q, want Keep", region)
+	}
+	w.WalkTo(11, 3)
+	walkFor(w, 10*time.Second)
+	if region := w.Region(); region != "tall-grass clearing" {
+		t.Fatalf("region = %q outside any area, want the lay of the land", region)
+	}
+}

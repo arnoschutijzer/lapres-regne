@@ -81,6 +81,17 @@ WY...
 | `G`  | gate    | `+`  | grave   |
 | `@`  | where the hero starts | | |
 
+Name parts of the map with `area <letter> <name>` settings and an `areas`
+grid laid over the terrain, using `.` for none; the status line names the area
+the hero stands in.
+
+```text
+area C Lumbridge Castle
+
+areas
+CCC..
+```
+
 Walls, fences, gates and graves block the way, and nothing beyond the map's
 edges can be walked on. Clicking the ground or a tree walks round whatever
 blocks the way, or as close as the hero can get. Progress keeps the map's name,

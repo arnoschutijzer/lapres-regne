@@ -92,3 +92,32 @@ func TestAMapFileLoadsBuiltGroundAndStructures(t *testing.T) {
 		t.Fatalf("ground = %v, want %v", loaded.Ground, want)
 	}
 }
+
+func TestAMapFileNamesItsAreas(t *testing.T) {
+	loaded, err := Load(write(t, "village.map", `area C Lumbridge Castle
+area g Graveyard
+
+terrain
+#_#..
+#@#++
+
+areas
+CCC.g
+CCC
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	castle, yard := "Lumbridge Castle", "Graveyard"
+	want := [][]string{{castle, castle, castle, "", yard}, {castle, castle, castle}}
+	if !reflect.DeepEqual(loaded.Areas, want) {
+		t.Fatalf("areas = %q, want %q", loaded.Areas, want)
+	}
+}
+
+func TestAnAreaMustBeNamedBeforeItIsDrawn(t *testing.T) {
+	_, err := Load(write(t, "village.map", "terrain\n.@\n\nareas\n.x\n"))
+	if err == nil || !strings.Contains(err.Error(), "line 5: unnamed area 'x'") {
+		t.Fatalf("load = %v, want the unnamed area reported", err)
+	}
+}

@@ -105,3 +105,11 @@ func TestStructureInksNeverOutrankTheHeroInACell(t *testing.T) {
 		t.Fatal("structures and built ground must not outrank what stands in front of them")
 	}
 }
+
+func TestTheStatusLineNamesTheAreaTheHeroStandsIn(t *testing.T) {
+	ground := [][]world.Ground{{world.Grass, world.Grass}}
+	w := world.NewOnMap(7, world.Map{Name: "Lumbridge", Ground: ground, Areas: [][]string{{"Lumbridge Castle"}}})
+	if frame := newRenderer(w, "L’Après-Règne").frame(120, 30, 0); !strings.Contains(frame, "Lumbridge Castle") {
+		t.Fatal("the status line must name the area the hero stands in")
+	}
+}
