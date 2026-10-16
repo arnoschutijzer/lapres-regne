@@ -50,8 +50,14 @@ func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px,
 	// The view ray (0, 0.72, 0.69) in the ellipsoid's own frame, scaled by its radii.
 	dx, dy, dz := -0.69*sin/rx, 0.72/ry, 0.69*cos/rz
 	a := dx*dx + dy*dy + dz*dz
+	// No point of the surface is nearer than this, so a pixel already holding something nearer is
+	// skipped before any ray casting.
+	nearest := depth - max(rx, ry, rz)
 	for py := max(0, int(sy-boundY)-1); py <= min(c.height-1, int(sy+boundY)+1); py++ {
 		for px := max(0, int(sx-boundX)-1); px <= min(c.width-1, int(sx+boundX)+1); px++ {
+			if c.pixels[py*c.width+px].depth < nearest {
+				continue
+			}
 			u, v := (float64(px)-sx)/c.scale, (float64(py)-sy)/c.scale
 			ox, oy, oz := (u*cos-0.72*v*sin)/rx, -0.69*v/ry, (u*sin+0.72*v*cos)/rz
 			b := 2 * (ox*dx + oy*dy + oz*dz)
