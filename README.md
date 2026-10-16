@@ -9,6 +9,12 @@ patches of sunlight reach the ground.
 go run .
 ```
 
+The embedded soundtrack shuffles **Harmony**, **Newbie Melody**, **Autumn Voyage**,
+**Adventure**, and **Scape Soft**, with three-second crossfades. Each shuffle plays
+all five songs and avoids immediate repeats between cycles. Playback is built in;
+you do not need `ffplay` or a separate music player. Use `go run . --mute` for
+silent play. Music stops when you quit.
+
 Walk with the **arrow keys**, **WASD**, or **IJKL** (I up, J left, K down,
 L right). Hold a key to keep walking. Press **Q** or **Ctrl-C** to quit.
 Hold **Shift** to run at **2× speed**; release Shift to return to walking
@@ -38,7 +44,7 @@ go run . --seed 42
 The original 3D tree and its underscore camera slider are available with
 `go run . --tree`. Use **← / →** or **J / L** to orbit it.
 
-Requires Go 1.22+, macOS or Linux with `stty`, and a UTF-8 terminal with
+Requires Go 1.25+, macOS or Linux with `stty`, and a UTF-8 terminal with
 true color and a font that supports Unicode braille. Use at least 40 columns
 and 14 rows; a larger window gives the dithering more detail.
 
@@ -54,6 +60,8 @@ Run the application-level terminal checks with Python 3:
 ```sh
 python3 tests/terminal.py
 ```
+
+Run the soundtrack and shuffle checks with `go test ./...`.
 
 Benchmark animated rendering at three terminal sizes:
 

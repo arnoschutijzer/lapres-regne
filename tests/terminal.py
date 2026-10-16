@@ -24,7 +24,7 @@ class Terminal:
         self.resize(100, 30)
         self.original = termios.tcgetattr(self.slave)
         self.process = subprocess.Popen(
-            [binary, *args], stdin=self.slave, stdout=self.slave, stderr=self.slave
+            [binary, "--mute", *args], stdin=self.slave, stdout=self.slave, stderr=self.slave
         )
 
     def resize(self, width, height):
