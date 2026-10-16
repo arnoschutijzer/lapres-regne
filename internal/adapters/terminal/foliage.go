@@ -66,6 +66,14 @@ func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px,
 	}
 }
 
+// leafClumps is a 0 to 1 pattern of rounded clumps of leaves about a world unit across, with
+// finer leaves within each clump.
+func leafClumps(x, y, z float64) float64 {
+	broad := math.Sin(3.7*x+1.3*y) * math.Sin(2.9*y+3.3*z) * math.Sin(3.1*z+2.3*x)
+	fine := math.Sin(11*x+5*y) * math.Sin(9*y+12*z) * math.Sin(10*z+7*x)
+	return math.Min(1, math.Max(0, 0.5+0.75*broad+0.3*fine))
+}
+
 // sunlight is how brightly the sun lights a surface facing along normal.
 func sunlight(normal vec) float64 {
 	return 0.34 + 0.6*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
@@ -84,6 +92,14 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 	heroX, heroY, _ := c.project(heroWorldX, 0.9, heroWorldZ)
 	ellipsoid(c, x, y, z, rx, ry, rz, 0, func(px, py int, depth float64, point, normal vec) {
 		light := (sunlight(normal) + 0.04*math.Sin(point.x*11+point.y*8+point.z*7)) * rim(normal)
+		// Up close the crown breaks into clumps of leaves, with gaps showing what lies behind.
+		if c.scale >= detailScale {
+			clump := leafClumps(x+point.x, y+point.y, z+point.z)
+			if clump < 0.2 {
+				return
+			}
+			light *= 0.5 + 0.65*clump
+		}
 		ink := leaves.shaded
 		if light > 0.58 {
 			ink = leaves.sunlit
@@ -143,7 +159,7 @@ func (r *renderer) drawCommonTree(c *forestCanvas, tree world.Tree, shake float6
 	for i := range 3 {
 		angle := a + float64(i)*2.094
 		dx, dz := math.Cos(angle)*radius*0.62+shake, math.Sin(angle)*radius*0.62
-		c.line(x+shake*0.45, h*0.45, z, x+dx, h*0.92, z+dz, 0.7, 4)
+		branch(c, x+shake*0.45, h*0.45, z, x+dx, h*0.92, z+dz, 0.7, tree.Trunk*0.55)
 		r.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, radius*0.72, radius*0.57, radius*0.72, leaves)
 	}
 	r.crown(c, x+shake, h+0.3, z, radius*0.83, radius*0.70, radius*0.83, leaves)
@@ -159,7 +175,7 @@ func (r *renderer) drawOak(c *forestCanvas, tree world.Tree, shake float64) {
 		angle := a + float64(i)*1.257
 		reach := radius * (0.9 + 0.15*math.Sin(angle*3))
 		dx, dz := math.Cos(angle)*reach+shake*0.8, math.Sin(angle)*reach*0.45
-		c.line(x+shake*0.4, h*0.6, z, x+dx*0.85, h*0.88, z+dz*0.85, 0.66, 4)
+		branch(c, x+shake*0.4, h*0.6, z, x+dx*0.85, h*0.88, z+dz*0.85, 0.66, tree.Trunk*0.7)
 		r.crown(c, x+dx, h*(0.92+float64(i%2)*0.06), z+dz, radius*0.62, radius*0.42, radius*0.62, leaves)
 	}
 	r.crown(c, x+shake, h*1.08, z, radius*1.05, radius*0.5, radius*0.95, leaves)
@@ -175,7 +191,7 @@ func (r *renderer) drawWillow(c *forestCanvas, tree world.Tree, shake float64) {
 	for i := range 4 {
 		angle := a + float64(i)*1.571
 		tipX, tipZ := x+shake+math.Cos(angle)*radius*0.4, z+math.Sin(angle)*radius*0.4
-		c.line(x+shake*0.6, h*0.6, z, tipX, h, tipZ, 0.7, 4)
+		branch(c, x+shake*0.6, h*0.6, z, tipX, h, tipZ, 0.7, tree.Trunk*0.6)
 	}
 	const strands = 34
 	for i := range strands {
@@ -195,9 +211,28 @@ func (r *renderer) drawWillow(c *forestCanvas, tree world.Tree, shake float64) {
 		crestX, crestZ := x+shake+cos*(start+radius*0.18), z+sin*(start+radius*0.18)
 		bendX, bendZ := x+shake*0.8+cos*(start+radius*0.3), z+sin*(start+radius*0.3)
 		footX, footZ := x+shake*0.3+cos*(start+radius*0.38), z+sin*(start+radius*0.38)
-		c.line(fromX, top-h*0.03, fromZ, crestX, top+h*0.03, crestZ, 0.95, ink)
-		c.line(crestX, top+h*0.03, crestZ, bendX, top-h*0.1, bendZ, 0.95, ink)
-		c.line(bendX, top-h*0.1, bendZ, footX, end, footZ, 0.95, ink)
+		vine(c, fromX, top-h*0.03, fromZ, crestX, top+h*0.03, crestZ, ink)
+		vine(c, crestX, top+h*0.03, crestZ, bendX, top-h*0.1, bendZ, ink)
+		vine(c, bendX, top-h*0.1, bendZ, footX, end, footZ, ink)
+	}
+}
+
+// vine hangs a willow strand between two points: a line of leaves in the forest view, and up close
+// a string of small, sunlit leaves that alternate from side to side.
+func vine(c *forestCanvas, x1, y1, z1, x2, y2, z2 float64, ink int) {
+	if c.scale < detailScale {
+		c.line(x1, y1, z1, x2, y2, z2, 0.95, ink)
+		return
+	}
+	length := math.Sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) + (z2-z1)*(z2-z1))
+	steps := max(1, int(math.Ceil(length/0.08)))
+	for i := range steps + 1 {
+		u := float64(i) / float64(steps)
+		sway := 0.035 * float64(1-2*(i%2))
+		x, y, z := x1+(x2-x1)*u+sway, y1+(y2-y1)*u, z1+(z2-z1)*u
+		ellipsoid(c, x, y, z, 0.035, 0.06, 0.035, 0, func(px, py int, depth float64, _, normal vec) {
+			c.plot(px, py, depth, 0.45+0.55*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29})), ink)
+		})
 	}
 }
 
@@ -215,10 +250,58 @@ func (r *renderer) drawYew(c *forestCanvas, tree world.Tree, shake float64) {
 	}
 }
 
-// drawTrunk raises a trunk of three bark strands, its top leaning with shake.
+// drawTrunk raises a trunk, its top leaning with shake: three bark strands in the forest view,
+// and up close solid, furrowed wood flaring into roots at the ground.
 func drawTrunk(c *forestCanvas, tree world.Tree, thickness, height, shake float64) {
-	for _, offset := range []float64{-thickness, 0, thickness} {
-		c.line(tree.X+offset, 0, tree.Z, tree.X+offset*0.6+shake, height, tree.Z, 0.62, 4)
+	if c.scale < detailScale {
+		for _, offset := range []float64{-thickness, 0, thickness} {
+			c.line(tree.X+offset, 0, tree.Z, tree.X+offset*0.6+shake, height, tree.Z, 0.62, 4)
+		}
+		return
+	}
+	x, z := tree.X, tree.Z
+	wood(c, x, 0, z, x+shake, height, z, thickness*1.15, thickness*0.6)
+	wood(c, x, 0.12, z, x, 0.45, z, thickness*1.6, thickness*1.15)
+	for i := range 4 {
+		angle := tree.Variation*6.28 + float64(i)*1.571 + 0.4
+		reach := thickness * (2.6 + 0.8*math.Sin(float64(i)*2.1+tree.Variation*7))
+		wood(c, x, 0.3, z, x+math.Cos(angle)*reach, 0.02, z+math.Sin(angle)*reach, thickness*0.55, thickness*0.2)
+	}
+}
+
+// branch reaches from one point to another: a bark stroke in the forest view, and up close a
+// limb of wood tapering from thickness to half of it.
+func branch(c *forestCanvas, x1, y1, z1, x2, y2, z2, light, thickness float64) {
+	if c.scale < detailScale {
+		c.line(x1, y1, z1, x2, y2, z2, light, 4)
+		return
+	}
+	wood(c, x1, y1, z1, x2, y2, z2, thickness, thickness*0.5)
+}
+
+// wood tapers a chain of overlapping spheres between two points into a solid, sunlit limb, its
+// bark furrowed lengthwise.
+func wood(c *forestCanvas, x1, y1, z1, x2, y2, z2, fromRadius, toRadius float64) {
+	length := math.Sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) + (z2-z1)*(z2-z1))
+	axis := vec{x2 - x1, y2 - y1, z2 - z1}.mul(1 / length)
+	steps := max(1, int(math.Ceil(length/(math.Min(fromRadius, toRadius)*0.5))))
+	for i := range steps + 1 {
+		u := float64(i) / float64(steps)
+		r := fromRadius + (toRadius-fromRadius)*u
+		x, y, z := x1+(x2-x1)*u, y1+(y2-y1)*u, z1+(z2-z1)*u
+		ellipsoid(c, x, y, z, r, r, r, 0, func(px, py int, depth float64, point, sphere vec) {
+			// Shade the chain as one smooth limb: its normal points straight out from the axis.
+			normal := sphere
+			if along := sphere.dot(axis); along < 0.98 && along > -0.98 {
+				normal = vec{sphere.x - axis.x*along, sphere.y - axis.y*along, sphere.z - axis.z*along}.unit()
+			}
+			// Deep, slightly wandering furrows run along the bark between raised ridges.
+			ridge := math.Sin(math.Atan2(normal.x, normal.z)*11 + math.Sin((y+point.y)*2.3)*1.2)
+			furrows := 0.45 + 0.55*math.Sqrt(math.Max(0, ridge*0.5+0.5))
+			// Light wraps around the bark from the sun's side, so upright wood is never left unlit.
+			side := 0.5 + 0.5*normal.dot(vec{-0.87, 0.2, -0.45})
+			c.plot(px, py, depth, (0.25+0.75*side)*furrows, 4)
+		})
 	}
 }
 
@@ -228,6 +311,15 @@ const stumpHeight = 1.1
 // drawStump leaves a short trunk with a pale, freshly cut top.
 func drawStump(c *forestCanvas, tree world.Tree) {
 	x, z, trunk := tree.X, tree.Z, tree.Trunk*1.3
+	if c.scale >= detailScale {
+		drawTrunk(c, tree, tree.Trunk, stumpHeight, 0)
+		// Growth rings show faintly across the cut.
+		ellipsoid(c, x, stumpHeight, z, tree.Trunk*0.66, 0.03, tree.Trunk*0.66, 0, func(px, py int, depth float64, point, _ vec) {
+			rings := 0.8 + 0.15*math.Sin(math.Hypot(point.x, point.z)/tree.Trunk*28)
+			c.plot(px, py, depth, rings, 7)
+		})
+		return
+	}
 	for _, offset := range []float64{-trunk, 0, trunk} {
 		c.line(x+offset, 0, z, x+offset, stumpHeight, z, 0.62, 4)
 	}

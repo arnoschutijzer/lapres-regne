@@ -431,3 +431,34 @@ func TestAnEllipsoidTurnsAboutItsUprightAxis(t *testing.T) {
 		t.Fatalf("a long ellipsoid covers %d columns across the view and %d turned toward it, want it much narrower turned", across, along)
 	}
 }
+
+// barkAcross draws one tree of a kind alone at a scale and counts the bark pixels across its trunk
+// just above the ground.
+func barkAcross(kind world.TreeKind, scale float64) int {
+	r := newRenderer(world.New(7), "L’Après-Règne")
+	c := &forestCanvas{width: 400, height: 400, x: 1000, scale: scale}
+	c.pixels = make([]forestPixel, c.width*c.height)
+	for i := range c.pixels {
+		c.pixels[i].depth = math.Inf(1)
+	}
+	tree := world.Tree{X: 1000, Height: 6, Radius: 2.4, Trunk: 0.25, Kind: kind}
+	r.drawTree(c, tree, 0)
+	_, y, _ := c.project(tree.X, 0.25, tree.Z)
+	bark := 0
+	for x := range c.width {
+		if c.pixels[int(y)*c.width+x].ink == 4 {
+			bark++
+		}
+	}
+	return bark
+}
+
+func TestUpCloseTrunksAreSolidWood(t *testing.T) {
+	for _, kind := range []world.TreeKind{world.NormalTree, world.Oak, world.Willow, world.Yew} {
+		// A trunk at least as thick as its strands are spread, across at the close-up scale.
+		want := int(2 * 0.25 * closeUpScale * 0.8)
+		if got := barkAcross(kind, closeUpScale); got < want {
+			t.Errorf("a %v trunk is %d bark pixels across up close, want a solid trunk of at least %d", kind, got, want)
+		}
+	}
+}
