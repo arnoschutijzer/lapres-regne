@@ -284,6 +284,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	}
 	r.drawCharacter(c, seconds)
 	r.drawGrass(c, left, right, back, front, seconds)
+	c.halo(r.world.Hero().Position())
 	r.drawFireworks(c)
 	return c
 }
@@ -554,6 +555,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 // groundRow lights the ground of one canvas row: grass, canopy shade, pools of sunlight and rivers.
 func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 	f := r.world
+	quiet := c.quiet()
 	// Every pixel of a row shows ground equally far toward the viewer.
 	toward := (float64(y) - float64(c.height)*0.57) / (0.72 * c.scale)
 	// The canopy and its pools of light change over many pixels, so they are worked out every
@@ -613,7 +615,7 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 		} else if bank {
 			ink, light = 7, 0.32+n*0.25
 		}
-		c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light, ink, 0}
+		c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light * quiet, ink, 0}
 	}
 }
 
@@ -644,4 +646,45 @@ func (s *riverSamples) at(z float64) []world.RiverChannel {
 	depths := len(s.channels) / s.bands
 	i := min(depths-1, max(0, int(math.Round((z-s.back)/s.step))))
 	return s.channels[i*s.bands : (i+1)*s.bands]
+}
+
+// quiet is how strongly the ground shows, from half when zoomed all the way out up to full from
+// the zoom where trees show their detail, so figures and structures stand out of a calm ground
+// when the view takes in a lot.
+func (c *forestCanvas) quiet() float64 {
+	return 0.5 + 0.5*min(1, max(0, (c.scale-forestScale)/(detailScale-forestScale)))
+}
+
+// halo leaves a dark ring a pixel wide around the figure standing at x, z, so their silhouette
+// reads against whatever lies behind them.
+func (c *forestCanvas) halo(x, z float64) {
+	footX, footY, _ := c.project(x, 0, z)
+	_, headY, _ := c.project(x, 2.4, z)
+	reach := 1.5 * c.scale
+	left, right := max(1, int(footX-reach)), min(c.width-2, int(footX+reach))
+	top, bottom := max(1, int(headY-reach)), min(c.height-2, int(footY+reach))
+	if left > right || top > bottom {
+		return
+	}
+	figure := func(px, py int) bool {
+		p := c.pixels[py*c.width+px]
+		return foremost(p.ink) && p.light > 0
+	}
+	var ring []int
+	for py := top; py <= bottom; py++ {
+		for px := left; px <= right; px++ {
+			if figure(px, py) {
+				continue
+			}
+			for _, step := range [8][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}} {
+				if figure(px+step[0], py+step[1]) {
+					ring = append(ring, py*c.width+px)
+					break
+				}
+			}
+		}
+	}
+	for _, i := range ring {
+		c.pixels[i].light = 0
+	}
 }

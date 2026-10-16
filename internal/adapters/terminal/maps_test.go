@@ -150,3 +150,58 @@ func TestFencesKeepTheirColorWhenZoomedOut(t *testing.T) {
 		t.Fatalf("cells inked as fence = %d, want the fence to show at the forest view", fence)
 	}
 }
+
+// meadow is an open map of grass with the hero in its middle and nothing else on it.
+func meadow() *world.World {
+	ground := make([][]world.Ground, 60)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 80)
+	}
+	return world.NewOnMap(7, world.Map{Name: "Meadow", Ground: ground, StartCol: 40, StartRow: 30})
+}
+
+// groundLight is the mean light of the canvas's ground pixels, away from the hero.
+func groundLight(c *forestCanvas) float64 {
+	total, count := 0.0, 0
+	for _, p := range c.pixels {
+		if !foremost(p.ink) {
+			total += p.light
+			count++
+		}
+	}
+	return total / float64(count)
+}
+
+func TestTheGroundQuietsWhenZoomedOut(t *testing.T) {
+	r := newRenderer(meadow(), "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	near := groundLight(r.render(100, 27, 0))
+	r.zoom = zoom{current: 0}
+	far := groundLight(r.render(100, 27, 0))
+	if far > near*0.75 {
+		t.Fatalf("ground light = %.3f zoomed out, %.3f zoomed in; want the far ground clearly quieter", far, near)
+	}
+}
+
+func TestADarkHaloSetsTheHeroApartFromTheGround(t *testing.T) {
+	r := newRenderer(meadow(), "L’Après-Règne")
+	c := r.render(100, 27, 0)
+	hero := 0
+	for y := 1; y < c.height-1; y++ {
+		for x := 1; x < c.width-1; x++ {
+			if p := c.pixels[y*c.width+x]; !foremost(p.ink) || p.light == 0 {
+				continue
+			}
+			hero++
+			for _, step := range [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+				beside := c.pixels[(y+step[1])*c.width+x+step[0]]
+				if !foremost(beside.ink) && beside.light != 0 && beside.tree == 0 {
+					t.Fatalf("ground beside the hero at %d, %d is lit %.2f, want a dark halo", x+step[0], y+step[1], beside.light)
+				}
+			}
+		}
+	}
+	if hero == 0 {
+		t.Fatal("the hero must be drawn")
+	}
+}

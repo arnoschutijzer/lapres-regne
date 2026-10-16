@@ -404,6 +404,10 @@ func (r *renderer) drawGrass(c *forestCanvas, left, right, back, front, seconds 
 	f := r.world
 	for gz := int(math.Floor(back)); gz <= int(math.Ceil(front)); gz++ {
 		for gx := int(math.Floor(left)); gx <= int(math.Ceil(right)); gx++ {
+			// Zoomed out, fewer blades sway, keeping the ground calm.
+			if f.Random(gx, gz, 35) > c.quiet() {
+				continue
+			}
 			chance := f.Random(gx, gz, 31)
 			x := float64(gx) + f.Random(gx, gz, 32)
 			z := float64(gz) + f.Random(gx, gz, 33)
