@@ -22,6 +22,7 @@ type renderer struct {
 	title                     string
 	canvas                    forestCanvas
 	trees                     []world.Tree
+	rivers                    riverSamples
 	cells                     []forestCell
 	screenWidth, screenHeight int
 	lastStatus, lastHint      string
@@ -34,14 +35,15 @@ type renderer struct {
 	menu      []string
 	menuTitle string
 	zoom      zoom
+	turn      turning
 	gait      gait
 	// lastSeconds is when the last frame was rendered, so the gait can follow the time between frames.
 	lastSeconds float64
 }
 
-// newRenderer opens the view at the camera's zoom, so a resumed session starts where it was left.
+// newRenderer opens the view at the camera's zoom and yaw, so a resumed session starts where it was left.
 func newRenderer(world *world.World, title string) *renderer {
-	return &renderer{world: world, title: title, zoom: zoom{current: float64(world.Zoom())}}
+	return &renderer{world: world, title: title, zoom: zoom{current: float64(world.Zoom())}, turn: turning{current: world.Yaw()}}
 }
 
 type forestPixel struct {
@@ -78,6 +80,15 @@ type forestCanvas struct {
 	width, height int
 	pixels        []forestPixel
 	x, z, scale   float64
+	// yaw turns the world about the upright axis through x, z; at 0 north is up the canvas.
+	// yawSin and yawCos keep its sine and cosine for the many points projected each frame.
+	yaw, yawSin, yawCos float64
+}
+
+// turnTo sets the canvas's yaw.
+func (c *forestCanvas) turnTo(yaw float64) {
+	c.yaw = yaw
+	c.yawSin, c.yawCos = math.Sincos(yaw)
 }
 
 var forestPalette = [...][3]int{
@@ -110,16 +121,35 @@ func foremost(ink int) bool {
 	return ink >= 8 && ink <= 10 || ink >= defaultLook.skin
 }
 
+// toView turns a world position into the view's frame: across the canvas, and toward the viewer.
+func (c *forestCanvas) toView(x, z float64) (across, toward float64) {
+	sin, cos := c.yawSin, c.yawCos
+	x, z = x-c.x, z-c.z
+	return x*cos + z*sin, -x*sin + z*cos
+}
+
+// fromView turns an offset in the view's frame back into a world position.
+func (c *forestCanvas) fromView(across, toward float64) (x, z float64) {
+	sin, cos := c.yawSin, c.yawCos
+	return c.x + across*cos - toward*sin, c.z + across*sin + toward*cos
+}
+
 func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
-	return float64(c.width)/2 + (x-c.x)*c.scale,
-		float64(c.height)*0.57 + ((z-c.z)*0.72-y*0.69)*c.scale,
-		-(z-c.z)*0.69 - y*0.72
+	across, toward := c.toView(x, z)
+	return float64(c.width)/2 + across*c.scale,
+		float64(c.height)*0.57 + (toward*0.72-y*0.69)*c.scale,
+		-toward*0.69 - y*0.72
 }
 
 // ground inverts the projection at ground level for the canvas pixel x, y.
 func (c *forestCanvas) ground(x, y float64) (float64, float64) {
-	return c.x + (x-float64(c.width)/2)/c.scale,
-		c.z + (y-float64(c.height)*0.57)/(0.72*c.scale)
+	return c.fromView((x-float64(c.width)/2)/c.scale, (y-float64(c.height)*0.57)/(0.72*c.scale))
+}
+
+// viewer is the direction from the ground toward the viewer, in the world.
+func (c *forestCanvas) viewer() vec {
+	sin, cos := c.yawSin, c.yawCos
+	return vec{-0.69 * sin, 0.72, 0.69 * cos}
 }
 
 func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
@@ -147,13 +177,19 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	c := &r.canvas
 	cameraX, cameraZ := f.Camera()
 	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
+	c.turnTo(r.turn.current)
 	if len(c.pixels) != c.width*c.height {
 		c.pixels = make([]forestPixel, c.width*c.height)
 	}
-	left := c.x - float64(c.width)/c.scale/2 - 5
-	right := c.x + float64(c.width)/c.scale/2 + 5
-	back := c.z - float64(c.height)/c.scale - 5
-	front := c.z + float64(c.height)/c.scale + 12
+	// The world area to draw holds the view, with room for trees and grass that reach into it.
+	halfAcross := float64(c.width)/c.scale/2 + 5
+	far, near := -float64(c.height)/c.scale-5, float64(c.height)/c.scale+12
+	left, right, back, front := math.Inf(1), math.Inf(-1), math.Inf(1), math.Inf(-1)
+	for _, corner := range [4][2]float64{{-halfAcross, far}, {halfAcross, far}, {-halfAcross, near}, {halfAcross, near}} {
+		x, z := c.fromView(corner[0], corner[1])
+		left, right = math.Min(left, x), math.Max(right, x)
+		back, front = math.Min(back, z), math.Max(front, z)
+	}
 	trees := r.trees[:0]
 	for gz := int(math.Floor(back / world.TreeSpacing)); gz <= int(math.Ceil(front/world.TreeSpacing)); gz++ {
 		for gx := int(math.Floor(left / world.TreeSpacing)); gx <= int(math.Ceil(right/world.TreeSpacing)); gx++ {
@@ -165,14 +201,16 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	r.trees = trees
 	// Front-to-back drawing lets hidden crown pixels skip lighting calculations.
 	sort.Slice(trees, func(i, j int) bool {
-		return trees[i].Z*0.69+trees[i].Height*0.72 > trees[j].Z*0.69+trees[j].Height*0.72
+		_, towardI := c.toView(trees[i].X, trees[i].Z)
+		_, towardJ := c.toView(trees[j].X, trees[j].Z)
+		return towardI*0.69+trees[i].Height*0.72 > towardJ*0.69+trees[j].Height*0.72
 	})
-	channels := make([]world.RiverChannel, 0, 6)
+	r.rivers.sample(f, back, front, left, right, 1/c.scale)
 	for y := range c.height {
-		wz := (float64(y)-float64(c.height)*0.57)/(c.scale*0.72) + c.z
-		channels = f.RiverChannels(channels[:0], wz, left, right)
+		// Every pixel of a row shows ground equally far toward the viewer.
+		toward := (float64(y) - float64(c.height)*0.57) / (0.72 * c.scale)
 		for x := range c.width {
-			wx := (float64(x)-float64(c.width)/2)/c.scale + c.x
+			wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
 			n := f.Noise(wx*0.65, wz*0.65, 19)
 			cover := f.Cover(wx, wz)
 			ink, light := 0, 0.13+n*0.23
@@ -186,7 +224,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 			if sun > 0.24 {
 				ink = 7
 			}
-			distance, width := world.NearestRiver(channels, wx)
+			distance, width := world.NearestRiver(r.rivers.at(wz), wx)
 			if distance < width {
 				ink, light = 5, 0.28+n*0.3
 				if math.Sin(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
@@ -195,7 +233,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 			} else if distance < width+0.65 {
 				ink, light = 7, 0.32+n*0.25
 			}
-			c.pixels[y*c.width+x] = forestPixel{-(wz - c.z) * 0.69, light, ink}
+			c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light, ink}
 		}
 	}
 	for _, tree := range trees {
@@ -474,4 +512,30 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		r.lastStatus = status
 	}
 	return out.String()
+}
+
+// riverSamples holds the river channels at depths a step apart across the drawn area, so each
+// ground pixel looks up its rivers instead of working them out again.
+type riverSamples struct {
+	back, step float64
+	// bands is how many channels each depth holds.
+	bands    int
+	channels []world.RiverChannel
+}
+
+func (s *riverSamples) sample(f *world.World, back, front, left, right, step float64) {
+	s.back, s.step = back, step
+	s.channels = s.channels[:0]
+	for z := back; z <= front+step; z += step {
+		before := len(s.channels)
+		s.channels = f.RiverChannels(s.channels, z, left, right)
+		s.bands = len(s.channels) - before
+	}
+}
+
+// at finds the river channels at the sampled depth nearest z.
+func (s *riverSamples) at(z float64) []world.RiverChannel {
+	depths := len(s.channels) / s.bands
+	i := min(depths-1, max(0, int(math.Round((z-s.back)/s.step))))
+	return s.channels[i*s.bands : (i+1)*s.bands]
 }

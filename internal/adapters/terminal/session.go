@@ -115,6 +115,10 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			world.ZoomBy(event.zoom)
 			return false
 		}
+		if event.turn != 0 {
+			world.TurnBy(event.turn)
+			return false
+		}
 		if event.panRight != 0 || event.panDown != 0 {
 			distance := view.zoom.panDistance()
 			world.PanBy(float64(event.panRight)*distance, float64(event.panDown)*distance)
@@ -243,6 +247,7 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			world.Advance(dx, dz, dt, held.sprinting())
 			world.Follow(dt)
 			view.zoom.step(world.Zoom(), dt)
+			view.turn.step(world.Yaw(), dt)
 			if x, z, ok := view.groundAt(cursorColumn, cursorRow); ok {
 				world.AimAt(x, z)
 			}

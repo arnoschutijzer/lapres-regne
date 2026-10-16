@@ -12,6 +12,8 @@ type World struct {
 	cameraX, cameraZ float64
 	// panX and panZ are how far the camera looks away from the hero, until the hero walks.
 	panX, panZ float64
+	// yaw is how far the camera has turned about the upright axis, in radians.
+	yaw float64
 	// zoom is how many steps the camera has moved in from the forest view toward a close-up.
 	zoom int
 	// felled holds the cells whose tree is a stump, with the time left until it regrows.
@@ -60,11 +62,12 @@ func (w *World) Noise(x, z float64, salt uint64) float64 {
 // walkingSpeed is how far the hero walks per second.
 const walkingSpeed = 4.5
 
-// Walk takes one step in a direction, as triggered by a single key press.
+// Walk takes one step in a direction on the screen, as triggered by a single key press.
 func (w *World) Walk(dx, dz float64, sprinting bool) {
 	if dx == 0 && dz == 0 {
 		return
 	}
+	dx, dz = w.fromView(dx, dz)
 	w.Stop()
 	w.panX, w.panZ = 0, 0
 	distance := stride
@@ -74,12 +77,14 @@ func (w *World) Walk(dx, dz float64, sprinting bool) {
 	w.hero.walk(dx, dz, w.wading(distance))
 }
 
-// Advance by elapsed time, independently of terminal key-repeat timing.
+// Advance by elapsed time, independently of terminal key-repeat timing, walking in a direction on
+// the screen.
 func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	if dx != 0 || dz != 0 {
 		w.Stop()
 		w.panX, w.panZ = 0, 0
 	}
+	dx, dz = w.fromView(dx, dz)
 	speed := walkingSpeed
 	if sprinting {
 		speed *= 2
@@ -114,10 +119,29 @@ func (w *World) ZoomBy(steps int) {
 	w.zoom = min(CloseUp, max(0, w.zoom+steps))
 }
 
-// PanBy moves the camera away from the hero by dx, dz world units.
+// PanBy moves the camera away from the hero by dx, dz world units along the screen.
 func (w *World) PanBy(dx, dz float64) {
+	dx, dz = w.fromView(dx, dz)
 	w.panX += dx
 	w.panZ += dz
+}
+
+// QuarterTurn is how many of the camera's turning steps make a quarter turn.
+const QuarterTurn = 24
+
+// Yaw is how far the camera has turned about the upright axis, in radians. At 0 north is up the
+// screen; at π/2 east is.
+func (w *World) Yaw() float64 { return w.yaw }
+
+// TurnBy turns the camera by steps, each a small part of a quarter turn.
+func (w *World) TurnBy(steps int) {
+	w.yaw += float64(steps) * math.Pi / 2 / QuarterTurn
+}
+
+// fromView turns a direction on the screen, with dz pointing down it, into the world.
+func (w *World) fromView(dx, dz float64) (float64, float64) {
+	sin, cos := math.Sincos(w.yaw)
+	return dx*cos - dz*sin, dx*sin + dz*cos
 }
 
 func (w *World) Follow(dt time.Duration) {

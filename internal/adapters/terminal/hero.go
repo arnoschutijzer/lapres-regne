@@ -82,7 +82,9 @@ func (b heroBody) eye(side float64) {
 	// The head's surface normal at the eye, turned into the world, must face the camera.
 	normalSide, normalForward := side/(0.085*0.085), forward/(0.095*0.095)
 	length := math.Hypot(normalSide, normalForward)
-	if (normalSide*b.sideZ+normalForward*b.forwardZ)/length < 0.15 {
+	normalX, normalZ := normalSide*b.sideX+normalForward*b.forwardX, normalSide*b.sideZ+normalForward*b.forwardZ
+	viewer := b.c.viewer()
+	if (normalX*viewer.x+normalZ*viewer.z)/(0.69*length) < 0.15 {
 		return
 	}
 	y, carried := b.carry(1.54, forward)

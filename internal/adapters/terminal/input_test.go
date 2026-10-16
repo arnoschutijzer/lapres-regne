@@ -115,3 +115,15 @@ func TestTheWheelWithOptionPans(t *testing.T) {
 		}
 	}
 }
+
+func TestTheWheelScrollingSidewaysTurnsTheCamera(t *testing.T) {
+	var d keyDecoder
+	events := feed(&d, "\x1b[<66;12;7M")
+	if toLeft := events[len(events)-1]; toLeft.turn != -1 || toLeft.panRight != 0 || toLeft.zoom != 0 {
+		t.Fatalf("event = %+v, want scrolling left to turn the camera back", toLeft)
+	}
+	events = feed(&d, "\x1b[<67;12;7M")
+	if toRight := events[len(events)-1]; toRight.turn != 1 {
+		t.Fatalf("event = %+v, want scrolling right to turn the camera on", toRight)
+	}
+}

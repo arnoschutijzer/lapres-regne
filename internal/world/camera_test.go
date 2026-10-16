@@ -77,3 +77,38 @@ func TestWalkingBringsThePannedCameraBackToTheHero(t *testing.T) {
 		t.Fatalf("camera = (%v, %v) after walking, want it back on the hero at (%v, %v)", x, z, heroX, heroZ)
 	}
 }
+
+func TestTheCameraTurnsInStepsAroundTheView(t *testing.T) {
+	w := world.New(7)
+	if w.Yaw() != 0 {
+		t.Fatalf("yaw = %v in a new world, want the camera facing north", w.Yaw())
+	}
+	w.TurnBy(world.QuarterTurn)
+	if math.Abs(w.Yaw()-math.Pi/2) > 1e-9 {
+		t.Fatalf("yaw = %v after a quarter turn of steps, want π/2", w.Yaw())
+	}
+	w.TurnBy(-2 * world.QuarterTurn)
+	if math.Abs(w.Yaw()+math.Pi/2) > 1e-9 {
+		t.Fatalf("yaw = %v after turning back half a turn, want -π/2", w.Yaw())
+	}
+}
+
+func TestWalkingFollowsTheTurnedView(t *testing.T) {
+	w := world.New(7)
+	w.TurnBy(world.QuarterTurn)
+	// A quarter turn shows the world's south on the screen's right.
+	w.Advance(1, 0, time.Second, false)
+	if x, z := w.Hero().Position(); math.Abs(x) > 1e-9 || z <= 0 {
+		t.Fatalf("hero at (%v, %v) after walking right, want them south of the start", x, z)
+	}
+}
+
+func TestPanningFollowsTheTurnedView(t *testing.T) {
+	w := world.New(7)
+	w.TurnBy(world.QuarterTurn)
+	w.PanBy(0, -2)
+	settle(w)
+	if x, z := w.Camera(); math.Abs(x-2) > 1e-6 || math.Abs(z) > 1e-6 {
+		t.Fatalf("camera = (%v, %v) after panning up, want 2 units east of the hero", x, z)
+	}
+}

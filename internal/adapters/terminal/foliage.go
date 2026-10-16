@@ -31,12 +31,16 @@ func (c *forestCanvas) shadow(tree world.Tree) {
 
 // ellipsoid ray-casts an ellipsoid, turned by yaw about its upright axis, onto the canvas and visits
 // each pixel where its front surface is nearer than what is already drawn, with that surface point
-// relative to the centre and its normal. At yaw 0, rx lies along x and rz along z.
+// relative to the centre and its normal, both in the world. At yaw 0, rx lies along x and rz along z.
 func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px, py int, depth float64, point, normal vec)) {
 	sx, sy, depth := c.project(x, y, z)
-	cos, sin := math.Cos(yaw), math.Sin(yaw)
+	// The ray cast works in the view's frame, where the ellipsoid is turned by the camera too.
+	turned := yaw + c.yaw
+	sin, cos := math.Sincos(turned)
+	ownSin, ownCos := math.Sincos(yaw)
+	viewSin, viewCos := c.yawSin, c.yawCos
 	reach := rx
-	if yaw != 0 {
+	if turned != 0 {
 		reach = math.Max(rx, rz)
 	}
 	boundX := reach * c.scale
@@ -60,8 +64,11 @@ func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px,
 			}
 			// The gradient in the ellipsoid's frame, turned back into the world.
 			lx, ly, lz := (ox+t*dx)/rx, (oy+t*dy)/ry, (oz+t*dz)/rz
-			normal := vec{lx*cos + lz*sin, ly, -lx*sin + lz*cos}.unit()
-			visit(px, py, depth-t, vec{u, -v*0.69 + t*0.72, v*0.72 + t*0.69}, normal)
+			normal := vec{lx*ownCos + lz*ownSin, ly, -lx*ownSin + lz*ownCos}.unit()
+			// The surface point across and toward the viewer, turned back into the world.
+			across, toward := u, v*0.72+t*0.69
+			point := vec{across*viewCos - toward*viewSin, -v*0.69 + t*0.72, across*viewSin + toward*viewCos}
+			visit(px, py, depth-t, point, normal)
 		}
 	}
 }
@@ -80,8 +87,8 @@ func sunlight(normal vec) float64 {
 }
 
 // rim fades a surface toward its silhouette, leaving a dotless outline so each shape reads in braille.
-func rim(normal vec) float64 {
-	facing := math.Abs(normal.dot(vec{0, 0.72, 0.69}))
+func (c *forestCanvas) rim(normal vec) float64 {
+	facing := math.Abs(normal.dot(c.viewer()))
 	return math.Min(1, math.Max(0, (facing-0.12)/0.3))
 }
 
@@ -91,7 +98,7 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 	heroWorldX, heroWorldZ := f.Hero().Position()
 	heroX, heroY, _ := c.project(heroWorldX, 0.9, heroWorldZ)
 	ellipsoid(c, x, y, z, rx, ry, rz, 0, func(px, py int, depth float64, point, normal vec) {
-		light := (sunlight(normal) + 0.04*math.Sin(point.x*11+point.y*8+point.z*7)) * rim(normal)
+		light := (sunlight(normal) + 0.04*math.Sin(point.x*11+point.y*8+point.z*7)) * c.rim(normal)
 		// Up close the crown breaks into clumps of leaves, with gaps showing what lies behind.
 		if c.scale >= detailScale {
 			clump := leafClumps(x+point.x, y+point.y, z+point.z)

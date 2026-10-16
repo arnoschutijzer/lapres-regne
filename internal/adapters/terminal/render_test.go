@@ -333,6 +333,7 @@ func TestADroppedLogLiesOnTheGround(t *testing.T) {
 func leafBounds(kind world.TreeKind) (width, height, lowest int) {
 	r := newRenderer(world.New(7), "L’Après-Règne")
 	c := &forestCanvas{width: 120, height: 120, x: 1000, scale: 3.6}
+	c.turnTo(0)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)
@@ -412,6 +413,7 @@ func TestTheHeroShowsTheirFaceOnlyWhenFacingTheViewer(t *testing.T) {
 // ellipsoidWidth measures how many canvas columns a long, thin ellipsoid covers when turned by yaw.
 func ellipsoidWidth(yaw float64) int {
 	c := &forestCanvas{width: 120, height: 120, scale: 10}
+	c.turnTo(0)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)
@@ -435,6 +437,7 @@ func TestAnEllipsoidTurnsAboutItsUprightAxis(t *testing.T) {
 func barkAcross(kind world.TreeKind, scale float64) int {
 	r := newRenderer(world.New(7), "L’Après-Règne")
 	c := &forestCanvas{width: 400, height: 400, x: 1000, scale: scale}
+	c.turnTo(0)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)
