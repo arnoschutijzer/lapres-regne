@@ -263,6 +263,65 @@ func TestTheWoodcuttingSkillShowsOnTheTitleRow(t *testing.T) {
 	}
 }
 
+// titleRow plays frames onto an empty screen of a width and reads back the text of its first row.
+func titleRow(width int, frames ...string) string {
+	row := []rune(strings.Repeat(" ", width))
+	line, column := 1, 1
+	for _, frame := range frames {
+		input := []rune(frame)
+		for i := 0; i < len(input); i++ {
+			if input[i] != '\x1b' {
+				if line == 1 && column <= width {
+					row[column-1] = input[i]
+				}
+				column++
+				continue
+			}
+			// A control sequence runs from ESC [ to its final letter.
+			end := i + 2
+			for end < len(input) && (input[end] < 0x40 || input[end] > 0x7e) {
+				end++
+			}
+			params, final := string(input[i+2:end]), input[end]
+			i = end
+			switch {
+			case final == 'H':
+				line, column = 1, 1
+				if params != "" {
+					fmt.Sscanf(params, "%d;%d", &line, &column)
+				}
+			case final == 'J' && params == "2":
+				row = []rune(strings.Repeat(" ", width))
+			case final == 'K' && line == 1 && params == "2":
+				row = []rune(strings.Repeat(" ", width))
+			case final == 'K' && line == 1:
+				for c := column; c <= width; c++ {
+					row[c-1] = ' '
+				}
+			}
+		}
+	}
+	return string(row)
+}
+
+func TestAShorterSkillLeavesNothingOfTheLastOneOnTheTitleRow(t *testing.T) {
+	resumed := func(xp float64) *world.World {
+		w, err := world.Resume(7, savedProgress{world.Snapshot{Seed: 1, WoodcuttingXP: xp}}, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return w
+	}
+	r := newRenderer(resumed(2462.5), "L’Après-Règne")
+	before := r.frame(100, 30, 0)
+	// An oak's 37.5 xp makes the right-aligned skill one character shorter.
+	r.world = resumed(2500)
+	after := r.frame(100, 30, 0)
+	if row := titleRow(100, before, after); !strings.HasSuffix(row, " woodcutting 15 · 2500 xp  ") {
+		t.Fatalf("title row = %q, want it to end in just the new skill", row)
+	}
+}
+
 // besideWillow stands the hero facing seed 7's riverside willow at x 11.0, z -3.6 with the camera on the hero.
 func besideWillow() *world.World {
 	w := world.New(7)
