@@ -121,3 +121,16 @@ func TestAnAreaMustBeNamedBeforeItIsDrawn(t *testing.T) {
 		t.Fatalf("load = %v, want the unnamed area reported", err)
 	}
 }
+
+func TestTheLumbridgeMapLoadsWithTheHeroInTheCastleCourtyard(t *testing.T) {
+	lumbridge, err := Load(filepath.Join("..", "..", "..", "maps", "lumbridge.map"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lumbridge.Name != "Lumbridge" {
+		t.Fatalf("name = %q, want Lumbridge", lumbridge.Name)
+	}
+	if area := lumbridge.Areas[lumbridge.StartRow][lumbridge.StartCol]; area != "Castle courtyard" {
+		t.Fatalf("start area = %q, want the castle courtyard", area)
+	}
+}

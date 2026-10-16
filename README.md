@@ -55,8 +55,13 @@ go run . --seed 42
 Explore a hand-made map instead of the endless forest:
 
 ```sh
-go run . --map path/to/world.map
+go run . --map maps/lumbridge.map
 ```
+
+`maps/lumbridge.map` holds Lumbridge from the forest west of the castle to the
+Al Kharid toll gate: the castle and its courtyard, the village, Bob's axes, the
+church and graveyard, the River Lum and its bridge, Groats' farm, the goblins'
+fields round Lozar's house, and the swamp's northern edge.
 
 A map file is plain text: optional settings, then a `terrain` grid with one
 character per tile (two world units wide), rows running north to south.
