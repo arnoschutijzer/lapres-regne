@@ -412,7 +412,15 @@ func (r *renderer) drawGrass(c *forestCanvas, left, right, back, front, seconds 
 			if sx < -3 || sx > float64(c.width)+3 || sy < 0 || sy > float64(c.height)+12 {
 				continue
 			}
-			distance, width := world.NearestRiver(r.rivers.at(z), x)
+			// Grass grows on a map's grass tiles, and beside the endless forest's rivers.
+			distance, width := math.Inf(1), 0.0
+			if f.Mapped() {
+				if ground, onMap := f.GroundAt(x, z); !onMap || ground != world.Grass {
+					continue
+				}
+			} else {
+				distance, width = world.NearestRiver(r.rivers.at(z), x)
+			}
 			if distance < width {
 				continue
 			}

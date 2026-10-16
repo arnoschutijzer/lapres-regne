@@ -29,8 +29,10 @@ var itemNames = map[world.Item]string{
 }
 
 type progressJSON struct {
-	Version     int       `json:"version"`
-	Seed        uint64    `json:"seed"`
+	Version int    `json:"version"`
+	Seed    uint64 `json:"seed"`
+	// Map names the map the hero and stumps belong to; absent for the endless forest.
+	Map         string    `json:"map,omitempty"`
 	SavedAt     time.Time `json:"savedAt"`
 	Hero        heroJSON  `json:"hero"`
 	Woodcutting skillJSON `json:"woodcutting"`
@@ -78,7 +80,7 @@ func (f File) Load() (world.Snapshot, bool, error) {
 		return world.Snapshot{}, false, fmt.Errorf("read %s: unknown version %d", f.Path, saved.Version)
 	}
 	snapshot := world.Snapshot{
-		Seed: saved.Seed, X: saved.Hero.X, Z: saved.Hero.Z,
+		Seed: saved.Seed, Map: saved.Map, X: saved.Hero.X, Z: saved.Hero.Z,
 		WoodcuttingXP: saved.Woodcutting.XP, Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw, SavedAt: saved.SavedAt,
 	}
 	// Version 1 counted logs before they had kinds; they were all normal logs.
@@ -106,7 +108,7 @@ func (f File) Load() (world.Snapshot, bool, error) {
 // interrupted save never leaves a half-written file behind.
 func (f File) Save(snapshot world.Snapshot) error {
 	saved := progressJSON{
-		Version: version, Seed: snapshot.Seed, SavedAt: snapshot.SavedAt,
+		Version: version, Seed: snapshot.Seed, Map: snapshot.Map, SavedAt: snapshot.SavedAt,
 		Hero:        heroJSON{X: snapshot.X, Z: snapshot.Z},
 		Woodcutting: skillJSON{XP: snapshot.WoodcuttingXP},
 		Camera:      cameraJSON{Zoom: snapshot.Zoom, Yaw: snapshot.Yaw},

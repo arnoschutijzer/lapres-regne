@@ -33,6 +33,8 @@ type Character struct {
 	woodcutting  Skill
 	// attempts counts every roll for a log, so a restarted chop rolls afresh.
 	attempts int
+	// passable tells where the character may stand; nil lets them stand anywhere.
+	passable func(x, z float64) bool
 }
 
 func (c *Character) Position() (x, z float64) { return c.x, c.z }
@@ -75,13 +77,16 @@ func (c *Character) walk(dx, dz, distance float64) {
 	c.steps++
 }
 
-// advance moves continuously and counts a step for every stride covered.
-func (c *Character) advance(dx, dz, distance float64) {
-	c.stepDistance += c.move(dx, dz, distance)
+// advance moves continuously, counts a step for every stride covered and reports the distance
+// covered.
+func (c *Character) advance(dx, dz, distance float64) float64 {
+	moved := c.move(dx, dz, distance)
+	c.stepDistance += moved
 	for c.stepDistance >= stride {
 		c.steps++
 		c.stepDistance -= stride
 	}
+	return moved
 }
 
 func (c *Character) move(dx, dz, distance float64) float64 {
@@ -93,7 +98,43 @@ func (c *Character) move(dx, dz, distance float64) float64 {
 	if !c.aimed {
 		c.Face(FacingToward(dx, dz))
 	}
-	c.lastWalk = time.Now()
-	c.x, c.z = c.x+dx*distance, c.z+dz*distance
-	return distance
+	if c.passable == nil {
+		c.lastWalk = time.Now()
+		c.x, c.z = c.x+dx*distance, c.z+dz*distance
+		return distance
+	}
+	moved := 0.0
+	for moved < distance {
+		covered := c.slide(dx, dz, math.Min(collisionStep, distance-moved))
+		if covered == 0 {
+			break
+		}
+		moved += covered
+	}
+	if moved > 0 {
+		c.lastWalk = time.Now()
+	}
+	return moved
+}
+
+// collisionStep is the longest distance moved at once where the character may be blocked, so they
+// stop close against whatever blocks them.
+const collisionStep = 0.05
+
+// slide moves a short distance, sliding along whatever blocks the way, and reports the distance
+// covered.
+func (c *Character) slide(dx, dz, distance float64) float64 {
+	x, z := c.x+dx*distance, c.z+dz*distance
+	switch {
+	case c.passable(x, z):
+	case dx != 0 && c.passable(x, c.z):
+		z = c.z
+	case dz != 0 && c.passable(c.x, z):
+		x = c.x
+	default:
+		return 0
+	}
+	covered := math.Hypot(x-c.x, z-c.z)
+	c.x, c.z = x, z
+	return covered
 }

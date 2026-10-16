@@ -33,7 +33,9 @@ type Progress interface {
 // Snapshot is the progress kept between sessions.
 type Snapshot struct {
 	// Seed names the world the position and stumps belong to.
-	Seed          uint64
+	Seed uint64
+	// Map names the map the position and stumps belong to; empty for the endless forest.
+	Map           string
 	X, Z          float64
 	WoodcuttingXP float64
 	// Zoom is the camera's zoom, in steps in from the forest view.

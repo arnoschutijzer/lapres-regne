@@ -52,6 +52,35 @@ a place recreates the same forest. Choose another forest with a seed:
 go run . --seed 42
 ```
 
+Explore a hand-made map instead of the endless forest:
+
+```sh
+go run . --map path/to/world.map
+```
+
+A map file is plain text: optional settings, then a `terrain` grid with one
+character per tile (two world units wide), rows running north to south.
+Lines starting with `//` are comments.
+
+```text
+name The Pond
+
+terrain
+.T..~
+.@O~~
+WY...
+```
+
+| Tile | Meaning | Tile | Meaning |
+| ---- | ------- | ---- | ------- |
+| `.`  | grass   | `~`  | water (wade at half speed) |
+| `T`  | tree    | `O`  | oak     |
+| `W`  | willow  | `Y`  | yew     |
+| `@`  | where the hero starts | | |
+
+Nothing beyond the map's edges can be walked on. Progress keeps the map's name,
+so your position and stumps return only to the map they were saved on.
+
 Requires Go 1.25+, macOS or Linux with `stty`, and a UTF-8 terminal with
 true color and a font that supports Unicode braille. Use at least 40 columns
 and 14 rows; a larger window gives the dithering more detail.

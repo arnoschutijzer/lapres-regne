@@ -14,12 +14,23 @@ type Tree struct {
 }
 
 func (w *World) Cover(x, z float64) float64 {
+	if w.terrain != nil {
+		return w.terrain.coverAt(x, z)
+	}
 	// Broad patches blend from grassy clearings through loose to closed canopy.
 	cover := w.Noise(x/24, z/24, 91)
 	return math.Min(cover, 0.30+math.Hypot(x, z)*0.015)
 }
 
+// River finds the nearest river and its width; on a map, a water tile is a river underfoot and
+// every other tile lies far from any river.
 func (w *World) River(x, z float64) (distance, width float64) {
+	if w.terrain != nil {
+		if ground, _ := w.terrain.at(x, z); ground == Water {
+			return 0, 1
+		}
+		return math.Inf(1), 0
+	}
 	band := int(math.Floor((x + 30) / 110))
 	channels := [3]RiverChannel{w.riverChannel(band-1, z), w.riverChannel(band, z), w.riverChannel(band+1, z)}
 	return NearestRiver(channels[:], x)
@@ -73,6 +84,9 @@ func (w *World) Region() string {
 }
 
 func (w *World) TreeAt(gx, gz int) (Tree, bool) {
+	if w.terrain != nil {
+		return w.plantedTree(gx, gz)
+	}
 	x := (float64(gx) + 0.15 + w.Random(gx, gz, 1)*0.7) * TreeSpacing
 	z := (float64(gz) + 0.15 + w.Random(gx, gz, 2)*0.7) * TreeSpacing
 	cover := w.Cover(x, z)
@@ -84,7 +98,11 @@ func (w *World) TreeAt(gx, gz int) (Tree, bool) {
 	if w.Random(gx, gz, 3) > probability || distance < width+1.0 || math.Hypot(x, z) < 3.5 {
 		return Tree{}, false
 	}
-	kind := w.treeKind(gx, gz, x, z)
+	return w.grow(gx, gz, x, z, w.treeKind(gx, gz, x, z)), true
+}
+
+// grow sizes a tree of a kind standing at x, z in cell gx, gz.
+func (w *World) grow(gx, gz int, x, z float64, kind TreeKind) Tree {
 	height, radius := 4.5+w.Random(gx, gz, 4)*3, 2.0+w.Random(gx, gz, 5)*1.35
 	// Oaks spread low and wide, willows broaden, and yews grow tall and narrow.
 	switch kind {
@@ -95,5 +113,5 @@ func (w *World) TreeAt(gx, gz int) (Tree, bool) {
 	case Yew:
 		height, radius = height*1.15, radius*0.85
 	}
-	return Tree{x, z, height, radius, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), kind, w.felled[cell{gx, gz}] > 0, cell{gx, gz}}, true
+	return Tree{x, z, height, radius, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), kind, w.felled[cell{gx, gz}] > 0, cell{gx, gz}}
 }

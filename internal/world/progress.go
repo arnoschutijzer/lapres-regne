@@ -9,6 +9,7 @@ import (
 func (w *World) Keep(progress Progress, now time.Time) error {
 	snapshot := Snapshot{
 		Seed:          w.seed,
+		Map:           w.mapName,
 		X:             w.hero.x,
 		Z:             w.hero.z,
 		WoodcuttingXP: w.hero.woodcutting.XP(),
@@ -30,7 +31,10 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 // the camera's zoom and yaw, travel to any world; their position and stumps return only to the world they were saved in, with the
 // time away since saving counted toward regrowth.
 func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
-	w := New(seed)
+	return resume(New(seed), progress, now)
+}
+
+func resume(w *World, progress Progress, now time.Time) (*World, error) {
 	snapshot, saved, err := progress.Load()
 	if err != nil {
 		return nil, fmt.Errorf("load progress: %w", err)
@@ -44,7 +48,7 @@ func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 	for index, slot := range snapshot.Inventory[:min(len(snapshot.Inventory), InventorySize)] {
 		w.hero.inventory.slots[index] = slot
 	}
-	if snapshot.Seed != seed {
+	if snapshot.Seed != w.seed || snapshot.Map != w.mapName {
 		return w, nil
 	}
 	w.hero.x, w.hero.z = snapshot.X, snapshot.Z

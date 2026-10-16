@@ -214,8 +214,9 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		back, front = math.Min(back, z), math.Max(front, z)
 	}
 	trees := r.trees[:0]
-	for gz := int(math.Floor(back / world.TreeSpacing)); gz <= int(math.Ceil(front/world.TreeSpacing)); gz++ {
-		for gx := int(math.Floor(left / world.TreeSpacing)); gx <= int(math.Ceil(right/world.TreeSpacing)); gx++ {
+	spacing := f.TreeGrid()
+	for gz := int(math.Floor(back / spacing)); gz <= int(math.Ceil(front/spacing)); gz++ {
+		for gx := int(math.Floor(left / spacing)); gx <= int(math.Ceil(right/spacing)); gx++ {
 			if tree, exists := f.TreeAt(gx, gz); exists {
 				trees = append(trees, tree)
 			}
@@ -228,7 +229,10 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		_, towardJ := c.toView(trees[j].X, trees[j].Z)
 		return towardI*0.69+trees[i].Height*0.72 > towardJ*0.69+trees[j].Height*0.72
 	})
-	r.rivers.sample(f, back, front, left, right, 1/c.scale)
+	// A map's water lies in its tiles, so only the endless forest samples its rivers.
+	if !f.Mapped() {
+		r.rivers.sample(f, back, front, left, right, 1/c.scale)
+	}
 	// Each row of ground depends only on the world, so the rows are shared out across the cores,
 	// interleaved so rows crossing a river don't all land on one core.
 	var ground sync.WaitGroup
@@ -524,7 +528,11 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	if r.world.Chopping() {
 		status += "  |  chopping"
 	}
-	status += fmt.Sprintf("  |  seed %d", r.world.Seed())
+	if r.world.Mapped() {
+		status += "  |  " + r.world.MapName()
+	} else {
+		status += fmt.Sprintf("  |  seed %d", r.world.Seed())
+	}
 	if full || status != r.lastStatus {
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height, status[:min(width-1, len(status))])
 		r.lastStatus = status
@@ -566,13 +574,24 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 		if sun > 0.24 {
 			ink = 7
 		}
-		distance, width := world.NearestRiver(r.rivers.at(wz), wx)
-		if distance < width {
+		water, bank := false, false
+		if f.Mapped() {
+			ground, onMap := f.GroundAt(wx, wz)
+			if !onMap {
+				c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, 0, 0, 0}
+				continue
+			}
+			water = ground == world.Water
+		} else {
+			distance, width := world.NearestRiver(r.rivers.at(wz), wx)
+			water, bank = distance < width, distance < width+0.65
+		}
+		if water {
 			ink, light = 5, 0.28+n*0.3
 			if wave(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
 				ink, light = 6, 0.8
 			}
-		} else if distance < width+0.65 {
+		} else if bank {
 			ink, light = 7, 0.32+n*0.25
 		}
 		c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light, ink, 0}

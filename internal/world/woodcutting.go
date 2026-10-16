@@ -54,8 +54,9 @@ func (w *World) treeInReach() (Tree, cell, bool) {
 	var nearest Tree
 	var nearestCell cell
 	found, best := false, math.Inf(1)
-	for gz := int(math.Floor((z - reach) / TreeSpacing)); gz <= int(math.Floor((z+reach)/TreeSpacing)); gz++ {
-		for gx := int(math.Floor((x - reach) / TreeSpacing)); gx <= int(math.Floor((x+reach)/TreeSpacing)); gx++ {
+	spacing := w.TreeGrid()
+	for gz := int(math.Floor((z - reach) / spacing)); gz <= int(math.Floor((z+reach)/spacing)); gz++ {
+		for gx := int(math.Floor((x - reach) / spacing)); gx <= int(math.Floor((x+reach)/spacing)); gx++ {
 			tree, exists := w.TreeAt(gx, gz)
 			if !exists || tree.Stump {
 				continue
@@ -141,7 +142,11 @@ func (w *World) approachFor(dt time.Duration, speed float64) {
 	dx, dz := tree.X-x, tree.Z-z
 	remaining := math.Hypot(dx, dz) - arrival
 	if remaining > 0 {
-		w.hero.advance(dx, dz, math.Min(remaining, w.wading(speed*dt.Seconds())))
+		// A hero who cannot get any closer gives up on the tree.
+		if w.hero.advance(dx, dz, math.Min(remaining, w.wading(speed*dt.Seconds()))) == 0 {
+			w.approach = approach{}
+			return
+		}
 		remaining = math.Hypot(tree.X-w.hero.x, tree.Z-w.hero.z) - arrival
 	}
 	if remaining <= 1e-9 {

@@ -29,6 +29,9 @@ type World struct {
 	message     string
 	celebration celebration
 	sounds      Sounds
+	// terrain holds the map the world is built on; nil for the endless forest.
+	terrain *terrain
+	mapName string
 }
 
 func New(seed uint64) *World {
@@ -122,13 +125,16 @@ func (w *World) walkToFor(dt time.Duration, speed float64) {
 	dx, dz := w.destination.x-w.hero.x, w.destination.z-w.hero.z
 	remaining := math.Hypot(dx, dz)
 	step := w.wading(speed * dt.Seconds())
-	if remaining <= step {
+	if remaining <= step && w.passable(w.destination.x, w.destination.z) {
 		w.hero.advance(dx, dz, remaining)
 		w.hero.x, w.hero.z = w.destination.x, w.destination.z
 		w.destination = destination{}
 		return
 	}
-	w.hero.advance(dx, dz, step)
+	// A hero who cannot get any closer gives up on the destination.
+	if w.hero.advance(dx, dz, math.Min(remaining, step)) == 0 {
+		w.destination = destination{}
+	}
 }
 
 // wading halves the distance while the hero stands in a river.
