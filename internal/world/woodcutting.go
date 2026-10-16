@@ -9,9 +9,15 @@ import (
 // reach is how far a trunk may stand from the hero to be chopped: about the edge of its crown.
 const reach = 2.5
 
-// chopTick is one woodcutting attempt. The axe lands as chopping starts and again on every
-// tick, and each tick rolls for a log; a log may fell the tree, depending on its species.
-const chopTick = 600 * time.Millisecond
+// gameTick is Old School RuneScape's game tick.
+const gameTick = 600 * time.Millisecond
+
+// rollInterval is how often chopping rolls for a log: every 4 game ticks.
+const rollInterval = 4 * gameTick
+
+// StrikeInterval is the swing of the axe: it lands as chopping starts and again at this pace,
+// independently of the rolls for logs.
+const StrikeInterval = 800 * time.Millisecond
 
 // arrival is how close to a trunk an approach ends, comfortably within reach.
 const arrival = 1.2
@@ -29,7 +35,8 @@ type chop struct {
 	tree    cell
 	kind    TreeKind
 	elapsed time.Duration
-	ticks   int
+	strikes int
+	rolls   int
 }
 
 // TreeInReach finds the standing tree the hero acts on: the nearest one in front within reach,
@@ -148,7 +155,7 @@ func (w *World) LastStrike() (index int, since time.Duration, ok bool) {
 	if !w.chop.active {
 		return 0, 0, false
 	}
-	return int(w.chop.elapsed / chopTick), w.chop.elapsed % chopTick, true
+	return int(w.chop.elapsed / StrikeInterval), w.chop.elapsed % StrikeInterval, true
 }
 
 // ChoppedTree is the tree being chopped, if any.
@@ -159,17 +166,41 @@ func (w *World) ChoppedTree() (Tree, bool) {
 	return w.TreeAt(w.chop.tree.gx, w.chop.tree.gz)
 }
 
-// chopFor strikes the chopped tree on every tick and rolls for a log, until a log fells it.
+// chopFor swings the axe at its own pace and rolls for a log every four ticks. Trees that give
+// several logs wear down their depletion timer while chopped.
 func (w *World) chopFor(dt time.Duration) {
 	if !w.chop.active {
 		return
 	}
 	w.chop.elapsed += dt
-	for w.chop.active && w.chop.elapsed >= time.Duration(w.chop.ticks+1)*chopTick {
-		w.chop.ticks++
+	if !species[w.chop.kind].fallsWithFirstLog {
+		if w.depletion == nil {
+			w.depletion = make(map[cell]time.Duration)
+		}
+		w.depletion[w.chop.tree] += dt
+	}
+	for w.chop.elapsed >= time.Duration(w.chop.strikes+1)*StrikeInterval {
+		w.chop.strikes++
 		w.sounds.Chop()
+	}
+	for w.chop.active && w.chop.elapsed >= time.Duration(w.chop.rolls+1)*rollInterval {
+		w.chop.rolls++
 		if w.roll(0x10c5) < species[w.chop.kind].chance(w.hero.woodcutting.Level()) {
 			w.cutLog()
+		}
+	}
+}
+
+// recoverTimers lets every tree nobody is chopping regain its depletion timer as fast as it wore down.
+func (w *World) recoverTimers(dt time.Duration) {
+	for tree, worn := range w.depletion {
+		if w.chop.active && tree == w.chop.tree {
+			continue
+		}
+		if worn <= dt {
+			delete(w.depletion, tree)
+		} else {
+			w.depletion[tree] = worn - dt
 		}
 	}
 }
@@ -181,17 +212,19 @@ func (w *World) roll(salt uint64) float64 {
 	return roll
 }
 
-// cutLog gives the hero a log and its experience, and may fell the tree into a stump.
+// cutLog gives the hero a log and its experience. A normal tree falls with its first log; other
+// trees fall with the first log after their depletion timer runs out.
 func (w *World) cutLog() {
 	kind := species[w.chop.kind]
 	w.hero.logs++
 	w.hero.woodcutting.gain(kind.xp)
-	if !kind.fallsWithFirstLog && w.roll(0xfa11) >= fallChance {
+	if !kind.fallsWithFirstLog && w.depletion[w.chop.tree] < kind.lifetime {
 		return
 	}
 	if w.felled == nil {
 		w.felled = make(map[cell]bool)
 	}
 	w.felled[w.chop.tree] = true
+	delete(w.depletion, w.chop.tree)
 	w.chop = chop{}
 }

@@ -1,6 +1,9 @@
 package world
 
-import "math"
+import (
+	"math"
+	"time"
+)
 
 // TreeKind is a species of tree, each with its own woodcutting requirements and rewards.
 type TreeKind byte
@@ -22,19 +25,18 @@ type treeSpecies struct {
 	xp    float64
 	// low and high are the bronze-axe success rolls out of 256 at levels 1 and 99.
 	low, high float64
-	// fallsWithFirstLog marks trees that never give a second log.
+	// fallsWithFirstLog marks trees that never give a second log; the others fall with the
+	// first log after lifetime of chopping.
 	fallsWithFirstLog bool
+	lifetime          time.Duration
 }
 
 var species = [...]treeSpecies{
 	NormalTree: {level: 1, xp: 25, low: 64, high: 200, fallsWithFirstLog: true},
-	Oak:        {level: 15, xp: 37.5, low: 32, high: 100},
-	Willow:     {level: 30, xp: 67.5, low: 16, high: 50},
-	Yew:        {level: 60, xp: 175, low: 4, high: 12},
+	Oak:        {level: 15, xp: 37.5, low: 32, high: 100, lifetime: 45 * gameTick},
+	Willow:     {level: 30, xp: 67.5, low: 16, high: 50, lifetime: 50 * gameTick},
+	Yew:        {level: 60, xp: 175, low: 4, high: 12, lifetime: 190 * gameTick},
 }
-
-// fallChance is how often a tree that gives several logs falls after each one.
-const fallChance = 1.0 / 8
 
 // chance is the chance one tick cuts a log at a level, rolled as Old School RuneScape does.
 func (s treeSpecies) chance(level int) float64 {

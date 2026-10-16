@@ -3,6 +3,7 @@ package world
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func TestTheChanceToCutALogRisesWithLevel(t *testing.T) {
@@ -32,35 +33,69 @@ func standBeside(w *World, tree Tree, xp float64) {
 	w.hero.woodcutting.gain(xp)
 }
 
-func TestOaksGiveTheirXPAndMayGiveSeveralLogsBeforeFalling(t *testing.T) {
-	w := New(7)
-	oaks, logs := 0, 0
-	for gz := -20; gz <= 20 && oaks < 8; gz++ {
-		for gx := -20; gx <= 20 && oaks < 8; gx++ {
-			tree, ok := w.TreeAt(gx, gz)
-			if !ok || tree.Kind != Oak {
-				continue
-			}
-			oaks++
-			standBeside(w, tree, levelXP[15])
-			before, startXP := w.hero.logs, w.hero.woodcutting.XP()
-			if !w.Chop() {
-				t.Fatalf("a level 15 hero must chop the oak at x %.1f z %.1f: %s", tree.X, tree.Z, w.Message())
-			}
-			for range 2000 {
-				if !w.Chopping() {
-					break
+// nearestOaks finds the oaks closest to the spawn point.
+func nearestOaks(w *World, count int) []Tree {
+	var oaks []Tree
+	for radius := 0; len(oaks) < count; radius++ {
+		for gz := -radius; gz <= radius; gz++ {
+			for gx := -radius; gx <= radius; gx++ {
+				if max(abs(gx), abs(gz)) != radius {
+					continue
 				}
-				w.Advance(0, 0, chopTick, false)
+				if tree, ok := w.TreeAt(gx, gz); ok && tree.Kind == Oak && len(oaks) < count {
+					oaks = append(oaks, tree)
+				}
 			}
-			gained := w.hero.logs - before
-			if xp := w.hero.woodcutting.XP() - startXP; math.Abs(xp-37.5*float64(gained)) > 1e-9 {
-				t.Fatalf("xp = %v for %d oak logs, want 37.5 each", xp, gained)
-			}
-			logs += gained
 		}
 	}
-	if oaks < 8 || logs <= oaks {
-		t.Fatalf("oaks = %d gave logs = %d; want oaks often giving more than one log", oaks, logs)
+	return oaks
+}
+
+func abs(n int) int { return max(n, -n) }
+
+// chopFor keeps chopping in game ticks until the tree falls or a limit passes, returning the time spent.
+func chopFor(w *World, limit time.Duration) time.Duration {
+	elapsed := time.Duration(0)
+	for w.Chopping() && elapsed < limit {
+		w.Advance(0, 0, gameTick, false)
+		elapsed += gameTick
+	}
+	return elapsed
+}
+
+func TestOaksGiveTheirXPAndFallOnlyOnceTheirTimerRunsOut(t *testing.T) {
+	w := New(7)
+	oaks, logs := nearestOaks(w, 8), 0
+	for _, tree := range oaks {
+		standBeside(w, tree, levelXP[15])
+		before, startXP := w.hero.logs, w.hero.woodcutting.XP()
+		if !w.Chop() {
+			t.Fatalf("a level 15 hero must chop the oak at x %.1f z %.1f: %s", tree.X, tree.Z, w.Message())
+		}
+		if elapsed := chopFor(w, 10*time.Minute); elapsed < 27*time.Second {
+			t.Fatalf("the oak at x %.1f z %.1f fell after %v of chopping, want at least 27s", tree.X, tree.Z, elapsed)
+		}
+		gained := w.hero.logs - before
+		if xp := w.hero.woodcutting.XP() - startXP; math.Abs(xp-37.5*float64(gained)) > 1e-9 {
+			t.Fatalf("xp = %v for %d oak logs, want 37.5 each", xp, gained)
+		}
+		logs += gained
+	}
+	if logs <= len(oaks) {
+		t.Fatalf("%d oaks gave %d logs; want oaks often giving more than one log", len(oaks), logs)
+	}
+}
+
+func TestAnOaksTimerRecoversWhileNobodyChopsIt(t *testing.T) {
+	w := New(7)
+	tree := nearestOaks(w, 1)[0]
+	standBeside(w, tree, levelXP[15])
+	w.Chop()
+	chopFor(w, 20*time.Second)
+	w.Stop()
+	w.Advance(0, 0, 20*time.Second, false)
+	w.Chop()
+	if elapsed := chopFor(w, 10*time.Minute); elapsed < 27*time.Second {
+		t.Fatalf("the oak fell %v into a fresh chop, want its timer back to the full 27s", elapsed)
 	}
 }

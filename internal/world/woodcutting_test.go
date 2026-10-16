@@ -128,7 +128,7 @@ type recordedSounds struct{ chops int }
 
 func (s *recordedSounds) Chop() { s.chops++ }
 
-func TestTheAxeSoundsAsTheChopStartsAndOnEveryTick(t *testing.T) {
+func TestTheAxeLandsAsTheChopStartsAndEveryStrikeAfter(t *testing.T) {
 	w := besideTree()
 	sounds := &recordedSounds{}
 	w.SetSounds(sounds)
@@ -136,13 +136,13 @@ func TestTheAxeSoundsAsTheChopStartsAndOnEveryTick(t *testing.T) {
 	if sounds.chops != 1 {
 		t.Fatalf("chops = %d, want the axe to land as chopping starts", sounds.chops)
 	}
-	w.Advance(0, 0, 599*time.Millisecond, false)
+	w.Advance(0, 0, world.StrikeInterval-time.Millisecond, false)
 	if sounds.chops != 1 {
-		t.Fatalf("chops = %d, want no strike before the tick", sounds.chops)
+		t.Fatalf("chops = %d, want no strike before the interval", sounds.chops)
 	}
 	w.Advance(0, 0, time.Millisecond, false)
 	if sounds.chops != 2 {
-		t.Fatalf("chops = %d, want the felling strike on the tick", sounds.chops)
+		t.Fatalf("chops = %d, want the next strike after one interval", sounds.chops)
 	}
 }
 
@@ -242,14 +242,18 @@ func chopUntilFelled(t *testing.T, w *world.World) int {
 	return 0
 }
 
-func TestAChopRollsEveryTickUntilALogComes(t *testing.T) {
+func TestAChopRollsEveryFourTicksUntilALogComes(t *testing.T) {
 	w := besideTree()
 	sounds := &recordedSounds{}
 	w.SetSounds(sounds)
 	w.Chop()
 	ticks := chopUntilFelled(t, w)
-	if sounds.chops != ticks+1 {
-		t.Fatalf("chops = %d over %d ticks, want a strike as chopping starts and on every tick", sounds.chops, ticks)
+	if ticks%4 != 0 {
+		t.Fatalf("felled after %d ticks, want the log on a roll every 4 ticks", ticks)
+	}
+	elapsed := time.Duration(ticks) * 600 * time.Millisecond
+	if strikes := 1 + int(elapsed/world.StrikeInterval); sounds.chops != strikes {
+		t.Fatalf("chops = %d over %v, want %d strikes at their own pace", sounds.chops, elapsed, strikes)
 	}
 	if w.Hero().Logs() != 1 || w.Hero().Woodcutting().XP() != 25 {
 		t.Fatalf("logs = %d, xp = %v; want one log worth 25 xp", w.Hero().Logs(), w.Hero().Woodcutting().XP())

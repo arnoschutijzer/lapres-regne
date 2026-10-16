@@ -6,8 +6,8 @@ import (
 	"dither-cli/internal/world"
 )
 
-// strokePeriod is one unhurried axe stroke: the domain's chop tick in seconds.
-const strokePeriod = 0.6
+// strokePeriod is one unhurried axe stroke, in seconds.
+var strokePeriod = world.StrikeInterval.Seconds()
 
 // axeAngle eases the axe up overhead after it lands, then brings it down quickly onto the trunk.
 func axeAngle(sinceHit float64) float64 {
