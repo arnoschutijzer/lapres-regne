@@ -1,0 +1,128 @@
+"""Exercise the actual CLI in a pseudo-terminal using Python's standard library."""
+
+import fcntl
+import os
+from pathlib import Path
+import pty
+import select
+import signal
+import struct
+import subprocess
+import tempfile
+import termios
+import time
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class Terminal:
+    def __init__(self, binary):
+        self.master, self.slave = pty.openpty()
+        self.resize(100, 30)
+        self.original = termios.tcgetattr(self.slave)
+        self.process = subprocess.Popen(
+            [binary], stdin=self.slave, stdout=self.slave, stderr=self.slave
+        )
+
+    def resize(self, width, height):
+        fcntl.ioctl(
+            self.slave, termios.TIOCSWINSZ, struct.pack("HHHH", height, width, 0, 0)
+        )
+
+    def read(self, until=None, timeout=3):
+        data = b""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if select.select([self.master], [], [], 0.05)[0]:
+                data += os.read(self.master, 1_000_000)
+                if until and until in data:
+                    return data
+        if until:
+            raise AssertionError(f"missing terminal output: {until!r}")
+        return data
+
+    def send(self, keys):
+        os.write(self.master, keys)
+
+    def assert_restored(self):
+        cleanup = self.read(until=b"\x1b[?1049l")
+        assert self.process.wait(timeout=3) == 0
+        assert b"\x1b[?25h" in cleanup, "cursor must be visible after quitting"
+        assert termios.tcgetattr(self.slave) == self.original
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.terminate()
+            self.process.wait(timeout=3)
+        os.close(self.master)
+        os.close(self.slave)
+
+
+def tree_pixels(output):
+    """Compare visible tree glyphs, excluding the header and slider cursor."""
+    frame = output.split(b"\x1b[H")[-1].decode()
+    return "".join(c for c in frame if "\u2800" <= c <= "\u28ff")
+
+
+def check_interaction(binary):
+    terminal = Terminal(binary)
+    try:
+        initial = terminal.read(until=b"\x1b[51G\x1b[38;2;225;239;208m_")
+        assert len(tree_pixels(initial)) > 100, "tree must be visible"
+        terminal.send(b"j" * 12)
+        moved = terminal.read(until=b"\x1b[39G\x1b[38;2;225;239;208m_")
+        moved += terminal.read(timeout=1)
+        assert tree_pixels(moved) != tree_pixels(initial), "camera must rotate the tree"
+
+        # Arrow escape sequences may arrive in separate reads.
+        terminal.send(b"\x1b")
+        time.sleep(0.03)
+        terminal.send(b"[C")
+        terminal.read(until=b"\x1b[40G\x1b[38;2;225;239;208m_")
+        terminal.send(b"\x1b[D")
+        terminal.read(until=b"\x1b[39G\x1b[38;2;225;239;208m_")
+        terminal.send(b"L")
+        terminal.read(until=b"\x1b[40G\x1b[38;2;225;239;208m_")
+
+        terminal.send(b"J" * 150)
+        terminal.read(until=b"\x1b[1G\x1b[38;2;225;239;208m_")
+        terminal.send(b"l" * 150)
+        terminal.read(until=b"\x1b[100G\x1b[38;2;225;239;208m_")
+
+        terminal.resize(60, 20)
+        terminal.read(until=b"\x1b[20;1H")
+        terminal.resize(20, 8)
+        terminal.read(until=b"Resize to 40 x 14.")
+        terminal.resize(100, 30)
+        terminal.read(until=b"\x1b[30;1H")
+        terminal.send(b"q")
+        terminal.assert_restored()
+    finally:
+        terminal.close()
+
+
+def check_exit(binary, action):
+    terminal = Terminal(binary)
+    try:
+        terminal.read(until=b"\x1b[30;1H")
+        if isinstance(action, bytes):
+            terminal.send(action)
+        else:
+            terminal.process.send_signal(action)
+        terminal.assert_restored()
+    finally:
+        terminal.close()
+
+
+with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
+    binary = str(Path(directory) / "dither-cli")
+    subprocess.run(["go", "build", "-o", binary, "."], cwd=ROOT, check=True)
+    help_result = subprocess.run([binary, "-h"], capture_output=True)
+    assert help_result.returncode == 0 and b"Usage: dither-cli" in help_result.stderr
+    non_terminal = subprocess.run([binary], stdin=subprocess.DEVNULL, capture_output=True)
+    assert non_terminal.returncode == 1 and b"interactive terminal" in non_terminal.stderr
+    check_interaction(binary)
+    check_exit(binary, b"\x03")
+    check_exit(binary, signal.SIGTERM)
+    print("Passed: rendering, rotation, arrows, J/L, bounds, resize, quit, Ctrl-C, SIGTERM, restoration")

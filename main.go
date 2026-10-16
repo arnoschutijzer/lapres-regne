@@ -95,11 +95,12 @@ func run() error {
 	resize := time.NewTicker(500 * time.Millisecond)
 	defer resize.Stop()
 	position, angle := 0.5, 0.0
+	tree := newTree()
 	dirty := true
 	var decoder keyDecoder
 	for {
 		if dirty {
-			if _, err := io.WriteString(os.Stdout, frame(width, height, position, angle)); err != nil {
+			if _, err := io.WriteString(os.Stdout, tree.frame(width, height, position, angle)); err != nil {
 				return err
 			}
 			dirty = false
@@ -116,8 +117,13 @@ func run() error {
 				return nil
 			}
 			if action != 0 {
-				position = math.Max(0, math.Min(1, position+float64(action)/float64(max(1, width-1))))
-				dirty = true
+				// Snap to a terminal column before moving to avoid half-cell rounding drift.
+				span := max(1, width-1)
+				column := int(math.Round(position * float64(span)))
+				next := float64(max(0, min(span, column+action))) / float64(span)
+				if next != position {
+					position, dirty = next, true
+				}
 			}
 		case <-resize.C:
 			if w, h, err := terminalSize(); err == nil && (w != width || h != height) {
@@ -172,17 +178,4 @@ func (d *keyDecoder) feed(key byte) int {
 		return 1
 	}
 	return 0
-}
-
-func frame(width, height int, position, angle float64) string {
-	var out strings.Builder
-	out.WriteString("\x1b[H\x1b[0m\x1b[2J")
-	if width < 24 || height < 10 {
-		out.WriteString("Resize terminal")
-		return out.String()
-	}
-	out.WriteString("\x1b[2;3H\x1b[2mDITHER / TREE   ← → or J L · Q quit\x1b[0m")
-	fmt.Fprintf(&out, "\x1b[%d;%dH♣", height/2, width/2)
-	fmt.Fprintf(&out, "\x1b[%d;%dH_", height, 1+int(math.Round(position*float64(width-1))))
-	return out.String()
 }
