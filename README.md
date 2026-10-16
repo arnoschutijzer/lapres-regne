@@ -15,6 +15,12 @@ all five songs and avoids immediate repeats between cycles. Playback is built in
 you do not need `ffplay` or a separate music player. Use `go run . --mute` for
 silent play. Music stops when you quit.
 
+Press **N** for the next track or **P** for the previous track. Previous follows
+playback history; Next retraces forward history before drawing another shuffled
+song. Previous restarts the first track when there is no earlier history.
+Manual changes also crossfade. A change during a fade follows the current fade;
+repeated requests during that fade keep only the latest request.
+
 Walk with the **arrow keys**, **WASD**, or **IJKL** (I up, J left, K down,
 L right). Hold a key to keep walking. Press **Q** or **Ctrl-C** to quit.
 Hold **Shift** to run at **2× speed**; release Shift to return to walking

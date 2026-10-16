@@ -127,6 +127,9 @@ def check_forest(binary):
         initial = terminal.read(until=b"steps 0")
         assert "L’Après-Règne".encode() in initial
         assert b"236;185;105m" in initial, "traveler must be visible"
+        terminal.send(b"np\x1b[110;1u\x1b[112;1:3u")
+        terminal.read(timeout=0.05)
+        assert terminal.process.poll() is None, "music hotkeys must be safe in muted mode"
         terminal.send(b"d")
         terminal.read(until=b"x 0.6  z 0.0  |  steps 1")
         terminal.send(b"\x1b[A")

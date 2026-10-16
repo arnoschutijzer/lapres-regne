@@ -46,6 +46,37 @@ func (s *shuffledSongs) Next() string {
 	return id
 }
 
+type songHistory struct {
+	shuffle shuffledSongs
+	songs   []string
+	index   int
+}
+
+func (h *songHistory) Next() string {
+	if h.index+1 < len(h.songs) {
+		h.index++
+		return h.songs[h.index]
+	}
+	h.songs = append(h.songs, h.shuffle.Next())
+	// Keep navigation memory bounded during long exploration sessions.
+	if len(h.songs) > 64 {
+		copy(h.songs, h.songs[len(h.songs)-64:])
+		h.songs = h.songs[:64]
+	}
+	h.index = len(h.songs) - 1
+	return h.songs[h.index]
+}
+
+func (h *songHistory) Previous() string {
+	if len(h.songs) == 0 {
+		return h.Next()
+	}
+	if h.index > 0 {
+		h.index--
+	}
+	return h.songs[h.index]
+}
+
 type musicTrack struct {
 	samples          interface{ Read([]float32) (int, error) }
 	frames, position int64
@@ -69,24 +100,26 @@ func openSong(id string) (*musicTrack, error) {
 // musicStream produces sample-accurate crossfades on the audio thread, without
 // timers on the rendering thread or decoding entire songs into memory.
 type musicStream struct {
-	selectNext        func() (*musicTrack, error)
+	selectTrack       func(direction int) (*musicTrack, error)
 	current, upcoming *musicTrack
 	fadeFrames        int64
+	fadePosition      int64
+	requests          chan int
 	a, b              [2048]float32
 	encoded           [8192]byte
 	pending           []byte
 	err               error
 }
 
-func newMusicStream(next func() (*musicTrack, error), fadeFrames int64) (*musicStream, error) {
-	m := &musicStream{selectNext: next, fadeFrames: fadeFrames}
+func newMusicStream(selectTrack func(int) (*musicTrack, error), fadeFrames int64) (*musicStream, error) {
+	m := &musicStream{selectTrack: selectTrack, fadeFrames: fadeFrames, requests: make(chan int, 1)}
 	var err error
-	m.current, err = m.loadNext()
+	m.current, err = m.loadTrack(1)
 	return m, err
 }
 
-func (m *musicStream) loadNext() (*musicTrack, error) {
-	track, err := m.selectNext()
+func (m *musicStream) loadTrack(direction int) (*musicTrack, error) {
+	track, err := m.selectTrack(direction)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +127,22 @@ func (m *musicStream) loadNext() (*musicTrack, error) {
 		return nil, fmt.Errorf("song must be at least twice the crossfade duration")
 	}
 	return track, nil
+}
+
+// Skip is nonblocking; decoder changes happen on the audio thread. If a fade is
+// already in progress, finish it before handling the latest navigation request.
+func (m *musicStream) Skip(direction int) {
+	if direction == 0 {
+		return
+	}
+	select {
+	case <-m.requests:
+	default:
+	}
+	select {
+	case m.requests <- direction:
+	default:
+	}
 }
 
 func readSamples(track *musicTrack, samples []float32) error {
@@ -119,16 +168,30 @@ func readSamples(track *musicTrack, samples []float32) error {
 func (m *musicStream) mix() (int, error) {
 	current := m.current
 	fadeStart := current.frames - m.fadeFrames
+	if m.upcoming == nil {
+		direction := 0
+		select {
+		case direction = <-m.requests:
+		default:
+			if current.position >= fadeStart {
+				direction = 1
+			}
+		}
+		if direction != 0 {
+			var err error
+			m.upcoming, err = m.loadTrack(direction)
+			if err != nil {
+				return 0, err
+			}
+			m.fadePosition = 0
+		}
+	}
 	frames := min(int64(len(m.a)/musicChannels), current.frames-current.position)
-	fading := current.position >= fadeStart
+	fading := m.upcoming != nil
 	if !fading {
 		frames = min(frames, fadeStart-current.position)
-	} else if m.upcoming == nil {
-		var err error
-		m.upcoming, err = m.loadNext()
-		if err != nil {
-			return 0, err
-		}
+	} else {
+		frames = min(frames, m.fadeFrames-m.fadePosition)
 	}
 	n := int(frames) * musicChannels
 	if err := readSamples(current, m.a[:n]); err != nil {
@@ -139,7 +202,7 @@ func (m *musicStream) mix() (int, error) {
 			return 0, err
 		}
 		for frame := range int(frames) {
-			progress := float64(current.position+int64(frame)-fadeStart) / float64(m.fadeFrames)
+			progress := float64(m.fadePosition+int64(frame)) / float64(m.fadeFrames)
 			incoming, outgoing := math.Sincos(progress * math.Pi / 2)
 			for channel := range musicChannels {
 				i := frame*musicChannels + channel
@@ -147,9 +210,10 @@ func (m *musicStream) mix() (int, error) {
 			}
 		}
 		m.upcoming.position += frames
+		m.fadePosition += frames
 	}
 	current.position += frames
-	if current.position == current.frames {
+	if fading && m.fadePosition == m.fadeFrames {
 		m.current, m.upcoming = m.upcoming, nil
 	}
 	return n, nil
@@ -181,11 +245,17 @@ func (m *musicStream) Read(p []byte) (int, error) {
 type musicPlayback struct {
 	context *oto.Context
 	player  *oto.Player
+	stream  *musicStream
 }
 
 func startMusic() (*musicPlayback, error) {
-	playlist := &shuffledSongs{}
-	stream, err := newMusicStream(func() (*musicTrack, error) { return openSong(playlist.Next()) }, musicFadeFrames)
+	history := &songHistory{}
+	stream, err := newMusicStream(func(direction int) (*musicTrack, error) {
+		if direction < 0 {
+			return openSong(history.Previous())
+		}
+		return openSong(history.Next())
+	}, musicFadeFrames)
 	if err != nil {
 		return nil, err
 	}
@@ -205,9 +275,15 @@ func startMusic() (*musicPlayback, error) {
 		return nil, err
 	}
 	player := context.NewPlayer(stream)
+	// Avoid half a second of decoded audio delaying navigation requests.
+	player.SetBufferSize(musicSampleRate * musicChannels * 4 / 10)
 	player.SetVolume(0.35)
 	player.Play()
-	return &musicPlayback{context: context, player: player}, nil
+	return &musicPlayback{context: context, player: player, stream: stream}, nil
+}
+
+func (m *musicPlayback) Skip(direction int) {
+	m.stream.Skip(direction)
 }
 
 func (m *musicPlayback) Err() error {

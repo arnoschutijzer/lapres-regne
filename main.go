@@ -21,7 +21,7 @@ func main() {
 	seed := flag.Uint64("seed", 7, "procedural forest seed")
 	mute := flag.Bool("mute", false, "disable the soundtrack")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--tree] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--tree] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -126,6 +126,16 @@ func run(treeMode bool, seed uint64, mute bool) error {
 		}
 		if event.action == quit {
 			return true
+		}
+		if event.action == nextTrack || event.action == previousTrack {
+			if music != nil && !event.repeat {
+				direction := 1
+				if event.action == previousTrack {
+					direction = -1
+				}
+				music.Skip(direction)
+			}
+			return false
 		}
 		if !treeMode {
 			if !event.enhanced {

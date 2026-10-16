@@ -270,7 +270,11 @@ func (f *forest) frame(width, height int, seconds float64) string {
 			f.cells = make([]forestCell, cols*rows)
 		}
 		out.WriteString("\x1b[2J\x1b[1;1H  " + appTitle)
-		controls := []rune("  arrows/WASD/IJKL · shift run · Q quit")
+		hint := "  arrows/WASD/IJKL · shift run · Q quit"
+		if width >= 54 {
+			hint += " · N/P tracks"
+		}
+		controls := []rune(hint)
 		fmt.Fprintf(&out, "\x1b[%d;1H%s", height-1, string(controls[:min(width-1, len(controls))]))
 	}
 	lastInk := -1

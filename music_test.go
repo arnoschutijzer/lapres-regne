@@ -28,6 +28,73 @@ func TestPlaylistShuffle(t *testing.T) {
 	}
 }
 
+func TestSongHistoryNavigation(t *testing.T) {
+	history := &songHistory{}
+	first, second, third := history.Next(), history.Next(), history.Next()
+	if history.Previous() != second || history.Previous() != first || history.Previous() != first {
+		t.Fatal("previous must retrace history and stay on the first song at the start")
+	}
+	if history.Next() != second || history.Next() != third {
+		t.Fatal("next must retrace forward history before selecting a new song")
+	}
+}
+
+func TestManualTrackChangesCrossfade(t *testing.T) {
+	index := -1
+	stream, err := newMusicStream(func(direction int) (*musicTrack, error) {
+		index = max(0, index+direction)
+		tone := stereoTone{left: 1}
+		if index%2 == 1 {
+			tone = stereoTone{right: 1}
+		}
+		return &musicTrack{samples: tone, frames: 10000}, nil
+	}, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := func(frames int) []byte {
+		t.Helper()
+		pcm := make([]byte, frames*musicChannels*4)
+		if _, err := io.ReadFull(stream, pcm); err != nil {
+			t.Fatal(err)
+		}
+		return pcm
+	}
+	assertTone := func(pcm []byte, left, right float32) {
+		t.Helper()
+		for offset := 0; offset < len(pcm); offset += 8 {
+			l := math.Float32frombits(binary.LittleEndian.Uint32(pcm[offset:]))
+			r := math.Float32frombits(binary.LittleEndian.Uint32(pcm[offset+4:]))
+			if l != left || r != right {
+				t.Fatalf("wrong song after navigation: %f, %f", l, r)
+			}
+		}
+	}
+	assertTone(read(1024), 1, 0)
+	stream.Skip(1)
+	fade := read(4)
+	for offset := 8; offset < len(fade); offset += 8 {
+		l := math.Float32frombits(binary.LittleEndian.Uint32(fade[offset:]))
+		r := math.Float32frombits(binary.LittleEndian.Uint32(fade[offset+4:]))
+		if l <= 0 || r <= 0 {
+			t.Fatal("manual skip must overlap the outgoing and incoming songs")
+		}
+	}
+	assertTone(read(1024), 0, 1)
+	stream.Skip(-1)
+	read(4)
+	assertTone(read(1024), 1, 0)
+
+	// Preserve the current crossfade, then honor the latest queued request.
+	stream.Skip(1)
+	read(1)
+	stream.Skip(1)
+	stream.Skip(-1)
+	read(3)
+	read(4)
+	assertTone(read(1024), 1, 0)
+}
+
 func TestEmbeddedSongsDecode(t *testing.T) {
 	for _, id := range forestSongs {
 		t.Run(id, func(t *testing.T) {
@@ -69,7 +136,7 @@ func (s stereoTone) Read(p []float32) (int, error) {
 func crossfadeFixture(t *testing.T) *musicStream {
 	t.Helper()
 	next := 0
-	stream, err := newMusicStream(func() (*musicTrack, error) {
+	stream, err := newMusicStream(func(_ int) (*musicTrack, error) {
 		tone := stereoTone{left: 1}
 		if next%2 == 1 {
 			tone = stereoTone{right: 1}
@@ -126,7 +193,7 @@ func TestSoundtrackCrossfadesWithoutGaps(t *testing.T) {
 
 func TestSoundtrackTransitionsThroughEmbeddedSongs(t *testing.T) {
 	selected := 0
-	stream, err := newMusicStream(func() (*musicTrack, error) {
+	stream, err := newMusicStream(func(_ int) (*musicTrack, error) {
 		track, err := openSong(forestSongs[selected%len(forestSongs)])
 		if err != nil {
 			return nil, err
