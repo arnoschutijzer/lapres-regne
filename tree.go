@@ -198,7 +198,7 @@ func (t *tree) frame(width, height int, position, angle float64) string {
 	for y := range height - 1 {
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K", y+1)
 		if y == 1 {
-			out.WriteString("  \x1b[38;2;103;132;116mD I T H E R  /  T R E E")
+			out.WriteString("  \x1b[38;2;103;132;116m" + appTitle + " / TREE")
 			if width >= 66 {
 				fmt.Fprintf(&out, "\x1b[%dG← → / J L   ·   Q quit", width-22)
 			}

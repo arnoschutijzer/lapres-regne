@@ -14,11 +14,13 @@ import (
 	"time"
 )
 
+const appTitle = "L’Après-Règne"
+
 func main() {
 	treeMode := flag.Bool("tree", false, "show the original orbiting tree")
 	seed := flag.Uint64("seed", 7, "procedural forest seed")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "Usage: dither-cli [--seed number] [--tree]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--tree]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

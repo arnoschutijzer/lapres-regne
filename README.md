@@ -1,4 +1,4 @@
-# Dither wilds
+# L’Après-Règne
 
 A full-screen, dithered forest you can walk through from an elevated top-down
 view. A tiny traveler explores an endless, procedurally generated landscape:

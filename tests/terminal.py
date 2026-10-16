@@ -125,7 +125,7 @@ def check_forest(binary):
     terminal = Terminal(binary)
     try:
         initial = terminal.read(until=b"steps 0")
-        assert b"W I L D S" in initial
+        assert "L’Après-Règne".encode() in initial
         assert b"236;185;105m" in initial, "traveler must be visible"
         terminal.send(b"d")
         terminal.read(until=b"x 0.6  z 0.0  |  steps 1")
@@ -262,6 +262,7 @@ with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     subprocess.run(["go", "build", "-o", binary, "."], cwd=ROOT, check=True)
     help_result = subprocess.run([binary, "-h"], capture_output=True)
     assert help_result.returncode == 0 and b"Usage: dither-cli" in help_result.stderr
+    assert "L’Après-Règne".encode() in help_result.stderr
     non_terminal = subprocess.run([binary], stdin=subprocess.DEVNULL, capture_output=True)
     assert non_terminal.returncode == 1 and b"interactive terminal" in non_terminal.stderr
     check_interaction(binary)

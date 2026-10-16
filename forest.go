@@ -269,7 +269,7 @@ func (f *forest) frame(width, height int, seconds float64) string {
 		if len(f.cells) != cols*rows {
 			f.cells = make([]forestCell, cols*rows)
 		}
-		out.WriteString("\x1b[2J\x1b[1;1H  D I T H E R  /  W I L D S")
+		out.WriteString("\x1b[2J\x1b[1;1H  " + appTitle)
 		controls := []rune("  arrows/WASD/IJKL · shift run · Q quit")
 		fmt.Fprintf(&out, "\x1b[%d;1H%s", height-1, string(controls[:min(width-1, len(controls))]))
 	}
