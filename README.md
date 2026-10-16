@@ -11,7 +11,16 @@ go run .
 
 Walk with the **arrow keys**, **WASD**, or **IJKL** (I up, J left, K down,
 L right). Hold a key to keep walking. Press **Q** or **Ctrl-C** to quit.
-The camera follows the traveler and the view adapts when the terminal resizes.
+The animation loop targets **60 FPS**. The camera follows the traveler and the
+view adapts when the terminal resizes.
+
+In terminals supporting the [Kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/),
+including Ghostty and Kitty, movement uses independent held keys: hold LEFT + UP
+to walk diagonally, then release LEFT to continue UP. Diagonals have the same
+speed as straight movement. Losing window focus stops movement.
+The app enables key release reporting automatically and restores it on exit.
+Older terminals fall back to key-repeat movement because they cannot report
+which keys were released.
 
 Trees cast shadows and you can walk freely through their trunks. Tall grass
 sways in front of the traveler, while a small canopy cutaway keeps the character

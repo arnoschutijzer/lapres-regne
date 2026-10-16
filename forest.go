@@ -13,6 +13,7 @@ type forest struct {
 	seed                      uint64
 	x, z, cameraX, cameraZ    float64
 	steps                     int
+	stepDistance              float64
 	facing                    action
 	started, lastWalk         time.Time
 	canvas                    forestCanvas
@@ -49,28 +50,57 @@ func (f *forest) walk(direction action) {
 	dx, dz := 0.0, 0.0
 	switch direction {
 	case left:
-		dx = -0.55
+		dx = -1
 	case right:
-		dx = 0.55
+		dx = 1
 	case up:
-		dz = -0.55
+		dz = -1
 	case down:
-		dz = 0.55
+		dz = 1
 	default:
 		return
 	}
-	f.facing, f.lastWalk = direction, time.Now()
-	distance, width := f.river(f.x, f.z)
-	if distance < width {
-		dx, dz = dx*0.5, dz*0.5
-	}
-	f.x, f.z = f.x+dx, f.z+dz
+	f.move(dx, dz, 0.55)
 	f.steps++
 }
 
-func (f *forest) follow() {
-	f.cameraX += (f.x - f.cameraX) * 0.65
-	f.cameraZ += (f.z - f.cameraZ) * 0.65
+// Advance by elapsed time, independently of terminal key-repeat timing.
+func (f *forest) advance(dx, dz float64, dt time.Duration) {
+	f.stepDistance += f.move(dx, dz, 9*dt.Seconds())
+	for f.stepDistance >= 0.55 {
+		f.steps++
+		f.stepDistance -= 0.55
+	}
+}
+
+func (f *forest) move(dx, dz, distance float64) float64 {
+	length := math.Hypot(dx, dz)
+	if length == 0 {
+		return 0
+	}
+	dx, dz = dx/length, dz/length
+	f.facing = down
+	if math.Abs(dx) > math.Abs(dz) {
+		f.facing = right
+		if dx < 0 {
+			f.facing = left
+		}
+	} else if dz < 0 {
+		f.facing = up
+	}
+	f.lastWalk = time.Now()
+	riverDistance, width := f.river(f.x, f.z)
+	if riverDistance < width {
+		distance *= 0.5
+	}
+	f.x, f.z = f.x+dx*distance, f.z+dz*distance
+	return distance
+}
+
+func (f *forest) follow(dt time.Duration) {
+	blend := 1 - math.Exp(-32*dt.Seconds())
+	f.cameraX += (f.x - f.cameraX) * blend
+	f.cameraZ += (f.z - f.cameraZ) * blend
 }
 
 type forestPixel struct {

@@ -76,8 +76,8 @@ func run(treeMode bool, seed uint64) error {
 		return err
 	}
 	defer stty(state)
-	defer fmt.Fprint(os.Stdout, "\x1b[0m\x1b[?25h\x1b[?1049l")
-	if _, err := fmt.Fprint(os.Stdout, "\x1b[?1049h\x1b[?25l\x1b[2J"); err != nil {
+	defer fmt.Fprint(os.Stdout, keyboardStop+"\x1b[0m\x1b[?25h\x1b[?1049l")
+	if _, err := fmt.Fprint(os.Stdout, "\x1b[?1049h\x1b[?25l\x1b[2J"+keyboardStart); err != nil {
 		return err
 	}
 
@@ -96,7 +96,7 @@ func run(treeMode bool, seed uint64) error {
 		}
 	}()
 
-	frames := time.NewTicker(time.Second / 30)
+	frames := time.NewTicker(time.Second / 60)
 	defer frames.Stop()
 	position, angle := 0.5, 0.0
 	var original *tree
@@ -106,19 +106,26 @@ func run(treeMode bool, seed uint64) error {
 	forest := newForest(seed)
 	dirty := true
 	var decoder keyDecoder
+	held := make(heldKeys)
 	handleKey := func(key byte) bool {
-		action := decoder.feed(key)
-		if action == quit {
+		event := decoder.feed(key)
+		held.update(event)
+		if event.release || event.focusOut {
+			return false
+		}
+		if event.action == quit {
 			return true
 		}
-		if !treeMode && action != none {
-			forest.walk(action)
-		} else if action == left || action == right {
+		if !treeMode {
+			if !event.enhanced {
+				forest.walk(event.action)
+			}
+		} else if event.action == left || event.action == right {
 			// Snap to a terminal column before moving to avoid half-cell rounding drift.
 			span := max(1, width-1)
 			column := int(position*float64(span) + 0.5)
 			delta := 1
-			if action == left {
+			if event.action == left {
 				delta = -1
 			}
 			next := float64(max(0, min(span, column+delta))) / float64(span)
@@ -142,6 +149,7 @@ func run(treeMode bool, seed uint64) error {
 	if err := draw(); err != nil {
 		return err
 	}
+	lastFrame := time.Now()
 	for {
 		select {
 		case <-signals:
@@ -164,13 +172,18 @@ func run(treeMode bool, seed uint64) error {
 				width, height, dirty = w, h, true
 			}
 		case <-frames.C:
+			now := time.Now()
+			dt := min(now.Sub(lastFrame), 100*time.Millisecond)
+			lastFrame = now
 			if !treeMode {
-				forest.follow()
+				dx, dz := held.direction()
+				forest.advance(dx, dz, dt)
+				forest.follow(dt)
 				dirty = true
 			} else {
 				target := (position - 0.5) * 2 * math.Pi
 				if math.Abs(target-angle) > 0.0005 {
-					angle += (target - angle) * 0.24
+					angle += (target - angle) * (1 - math.Exp(-8.2*dt.Seconds()))
 					dirty = true
 				}
 			}
@@ -181,64 +194,4 @@ func run(treeMode bool, seed uint64) error {
 			}
 		}
 	}
-}
-
-type action byte
-
-const (
-	none action = iota
-	left
-	right
-	up
-	down
-	quit
-)
-
-type keyDecoder struct{ escape byte }
-
-func (d *keyDecoder) feed(key byte) action {
-	if key == 3 || key == 4 || key == 'q' || key == 'Q' {
-		return quit
-	}
-	if key == 27 {
-		d.escape = 1
-		return 0
-	}
-	if d.escape == 1 {
-		d.escape = 0
-		if key == '[' || key == 'O' {
-			d.escape = 2
-			return 0
-		}
-	}
-	if d.escape == 2 {
-		// Consume parameters too, so modified arrows work across read boundaries.
-		if key >= 0x40 && key <= 0x7e {
-			d.escape = 0
-			if key == 'D' {
-				return left
-			}
-			if key == 'C' {
-				return right
-			}
-			if key == 'A' {
-				return up
-			}
-			if key == 'B' {
-				return down
-			}
-		}
-		return 0
-	}
-	switch key {
-	case 'j', 'J', 'a', 'A':
-		return left
-	case 'l', 'L', 'd', 'D':
-		return right
-	case 'i', 'I', 'w', 'W':
-		return up
-	case 'k', 'K', 's', 'S':
-		return down
-	}
-	return 0
 }

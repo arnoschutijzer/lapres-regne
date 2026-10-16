@@ -4,6 +4,8 @@ import fcntl
 import os
 from pathlib import Path
 import pty
+import math
+import re
 import select
 import signal
 import struct
@@ -52,6 +54,7 @@ class Terminal:
         cleanup = self.read(until=b"\x1b[?1049l")
         assert self.process.wait(timeout=3) == 0
         assert b"\x1b[?25h" in cleanup, "cursor must be visible after quitting"
+        assert b"\x1b[<u" in cleanup, "keyboard protocol must be restored after quitting"
         assert termios.tcgetattr(self.slave) == self.original
 
     def close(self):
@@ -156,7 +159,7 @@ def check_responsive_rendering(binary):
         initial = terminal.read(until=b"seed 7")
         idle = terminal.read(timeout=0.35)
         frames = idle.count(b"\x1b[H")
-        assert frames >= 5, "animation must update more frequently than the old 12 FPS loop"
+        assert frames >= 15, "animation must use the new 60 FPS cadence"
         assert b"\x1b[2J" not in idle, "steady animation must not clear the screen"
         assert len(idle) / frames < len(initial) / 2, "idle frames must send incremental updates"
 
@@ -164,6 +167,57 @@ def check_responsive_rendering(binary):
         moved = terminal.read(until=b"steps 40  |")
         assert moved.count(b"\x1b[H") <= 3, "queued input must not trigger one redraw per key"
         terminal.send(b"q")
+        terminal.assert_restored()
+    finally:
+        terminal.close()
+
+
+def positions(output):
+    return [
+        (float(x), float(z))
+        for x, z in re.findall(rb"  x (-?[\d.]+)  z (-?[\d.]+)  \|", output)
+    ]
+
+
+def check_held_movement(binary):
+    terminal = Terminal(binary)
+    try:
+        startup = terminal.read(until=b"seed 7")
+        assert b"\x1b[>11u\x1b[?u" in startup, "request key press/release reporting"
+        terminal.send(b"\x1b[?11u")  # Simulate a supporting terminal's capability reply.
+        terminal.send(b"\x1b[1;1D\x1b[1;1A")  # Hold LEFT + UP without repeats.
+        start = time.monotonic()
+        diagonal = positions(terminal.read(timeout=0.35))
+        elapsed = time.monotonic() - start
+        assert diagonal and diagonal[-1][0] < -1 and diagonal[-1][1] < -1
+        assert abs(diagonal[-1][0] - diagonal[-1][1]) < 0.15
+        assert 0.8 < math.hypot(*diagonal[-1]) / (9 * elapsed) < 1.2, "diagonal speed must be normalized"
+
+        # Repeats do not add movement impulses, and releasing LEFT preserves UP.
+        terminal.send(b"\x1b[1;1:2A" * 20 + b"\x1b[1;1:3D")
+        vertical = positions(terminal.read(timeout=0.35))
+        assert vertical and abs(vertical[-1][0] - diagonal[-1][0]) < 0.2
+        assert 2 < diagonal[-1][1] - vertical[-1][1] < 4.3, "repeats must not add movement impulses"
+
+        # Independent physical aliases: release the arrow while keeping W held.
+        terminal.send(b"\x1b[119;1u\x1b[1;1:3A")
+        letter = positions(terminal.read(timeout=0.2))
+        assert letter and letter[-1][1] < vertical[-1][1] - 1
+        terminal.send(b"\x1b[119;1:")
+        time.sleep(0.01)
+        terminal.send(b"3u")
+        terminal.read(timeout=0.1)
+        assert not positions(terminal.read(timeout=0.2)), "releasing all movement keys must stop immediately"
+
+        terminal.send(b"\x1b[100;1u")
+        assert positions(terminal.read(timeout=0.15))
+        terminal.send(b"\x1b[O")  # Losing focus clears held keys.
+        terminal.read(timeout=0.1)
+        assert not positions(terminal.read(timeout=0.2)), "focus loss must stop movement"
+        terminal.send(b"\x1b[113;1:3u")  # Releasing Q must not quit.
+        terminal.read(timeout=0.05)
+        assert terminal.process.poll() is None
+        terminal.send(b"\x1b[113;1u")
         terminal.assert_restored()
     finally:
         terminal.close()
@@ -179,6 +233,9 @@ with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     check_interaction(binary)
     check_forest(binary)
     check_responsive_rendering(binary)
+    check_held_movement(binary)
     check_exit(binary, b"\x03")
+    check_exit(binary, b"\x1b[1;\x03")
+    check_exit(binary, b"\x1b[99;5u")
     check_exit(binary, signal.SIGTERM)
-    print("Passed: exploration, river crossing, input batching, incremental redraws, animation cadence, tree orbit, controls, resize, cleanup")
+    print("Passed: held diagonals, independent releases, normalized speed, focus loss, 60 FPS cadence, legacy controls, exploration, incremental redraws, cleanup")
