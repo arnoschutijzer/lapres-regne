@@ -218,16 +218,30 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	for y := range c.height {
 		// Every pixel of a row shows ground equally far toward the viewer.
 		toward := (float64(y) - float64(c.height)*0.57) / (0.72 * c.scale)
+		// The canopy and its pools of light change over many pixels, so they are worked out every
+		// broadStep pixels along the row and blended in between.
+		broad := func(x int) (cover, pools float64) {
+			wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
+			return f.Cover(wx, wz), f.Noise(wx/9, wz/9, 81)
+		}
+		var coverFrom, poolsFrom float64
+		coverTo, poolsTo := broad(0)
 		for x := range c.width {
+			if x%broadStep == 0 {
+				coverFrom, poolsFrom = coverTo, poolsTo
+				coverTo, poolsTo = broad(x + broadStep)
+			}
+			between := float64(x%broadStep) / broadStep
+			cover := coverFrom + (coverTo-coverFrom)*between
+			pools := poolsFrom + (poolsTo-poolsFrom)*between
 			wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
 			n := f.Noise(wx*0.65, wz*0.65, 19)
-			cover := f.Cover(wx, wz)
 			ink, light := 0, 0.13+n*0.23
 			if cover < 0.38 {
 				ink, light = 1, 0.21+n*0.24
 			}
 			// Diagonal pools of sunlight survive only where the canopy opens.
-			beam := max(0, wave(wx*0.28-wz*0.19+f.Noise(wx/9, wz/9, 81)*2)-0.45)
+			beam := max(0, wave(wx*0.28-wz*0.19+pools*2)-0.45)
 			sun := beam * max(0, 1-cover*1.3)
 			light += sun * 0.8
 			if sun > 0.24 {
@@ -524,6 +538,9 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	}
 	return out.String()
 }
+
+// broadStep is how many pixels apart along a row the canopy and its pools of light are worked out.
+const broadStep = 4
 
 // riverSamples holds the river channels at depths a step apart across the drawn area, so each
 // ground pixel looks up its rivers instead of working them out again.
