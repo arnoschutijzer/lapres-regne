@@ -128,11 +128,15 @@ var forestPalette = [...][3]int{
 	{96, 206, 238},  // cyan fireworks
 	{226, 104, 214}, // magenta fireworks
 	{226, 52, 44},   // red fireworks
+	{168, 164, 150}, // stone
+	{150, 122, 84},  // earth path
+	{124, 118, 104}, // flagstones
+	{92, 98, 104},   // iron
 }
 
-// foremost marks the inks of the hero, their axe and flying chips.
+// foremost marks the inks of the hero, their axe, flying chips and fireworks.
 func foremost(ink int) bool {
-	return ink >= 8 && ink <= 10 || ink >= defaultLook.skin
+	return ink >= 8 && ink <= 10 || ink >= defaultLook.skin && ink < stoneInk
 }
 
 // toView turns a world position into the view's frame: across the canvas, and toward the viewer.
@@ -247,6 +251,9 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		}()
 	}
 	ground.Wait()
+	if f.Mapped() {
+		r.drawStructures(c, left, right, back, front)
+	}
 	for _, tree := range trees {
 		if !tree.Stump {
 			c.shadow(tree)
@@ -577,9 +584,17 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 		water, bank := false, false
 		if f.Mapped() {
 			ground, onMap := f.GroundAt(wx, wz)
-			if !onMap {
-				c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, 0, 0, 0}
-				continue
+			switch {
+			case !onMap:
+				ink, light = 0, 0
+			case ground == world.Path:
+				ink, light = pathInk, 0.24+n*0.22
+				// Pebbles catch the light here and there along the track.
+				if f.Noise(wx*3, wz*3, 23) > 0.78 {
+					light += 0.3
+				}
+			case ground == world.Floor || ground == world.Wall:
+				ink, light = floorInk, flagstones(wx, wz, n)
 			}
 			water = ground == world.Water
 		} else {

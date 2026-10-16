@@ -148,3 +148,63 @@ func TestResumingOnAMapReturnsTheHeroOnlyToTheSameMap(t *testing.T) {
 		t.Fatalf("position = %v, %v; want the endless forest's start", x, z)
 	}
 }
+
+// courtyard is a walled yard: a stone floor inside walls with a gap to the south, a path leading
+// out, and a fence, a gate and a grave beside it.
+func courtyard() world.Map {
+	g, p, f, w := world.Grass, world.Path, world.Floor, world.Wall
+	return world.Map{
+		Name: "courtyard",
+		Ground: [][]world.Ground{
+			{w, w, w, w, w, g, world.Fence, world.Gate, world.Fence},
+			{w, f, f, f, w, g, g, g, g},
+			{w, f, f, f, w, g, world.Grave, g, g},
+			{w, w, f, w, w, g, g, g, g},
+			{g, g, p, g, g, g, g, g, g},
+		},
+		StartCol: 2, StartRow: 1,
+	}
+}
+
+func TestOnlyStructuresBlockTheWay(t *testing.T) {
+	for ground, blocks := range map[world.Ground]bool{
+		world.Grass: false, world.Water: false, world.Path: false, world.Floor: false,
+		world.Wall: true, world.Fence: true, world.Gate: true, world.Grave: true,
+	} {
+		if ground.Blocks() != blocks {
+			t.Errorf("ground %v blocks = %v, want %v", ground, ground.Blocks(), blocks)
+		}
+	}
+}
+
+func TestWallsStopTheHero(t *testing.T) {
+	w := world.NewOnMap(7, courtyard())
+	w.Advance(-1, 0, 2*time.Second, false)
+	if x, _ := w.Hero().Position(); x < world.TileSize || x > 1.2*world.TileSize {
+		t.Fatalf("x = %v; want the hero stopped against the west wall", x)
+	}
+	w.Advance(0, -1, 2*time.Second, false)
+	if _, z := w.Hero().Position(); z < world.TileSize {
+		t.Fatalf("z = %v; want the hero stopped against the north wall", z)
+	}
+}
+
+func TestTheHeroWalksOutThroughAGapInTheWall(t *testing.T) {
+	w := world.NewOnMap(7, courtyard())
+	w.Advance(0, 1, 2*time.Second, false)
+	if _, z := w.Hero().Position(); z < 4*world.TileSize {
+		t.Fatalf("z = %v; want the hero out on the path", z)
+	}
+}
+
+func TestFencesGatesAndGravesStopTheHero(t *testing.T) {
+	m := courtyard()
+	for _, start := range [][2]int{{6, 1}, {7, 1}, {6, 3}} {
+		m.StartCol, m.StartRow = start[0], start[1]
+		w := world.NewOnMap(7, m)
+		w.Advance(0, -1, 2*time.Second, false)
+		if _, z := w.Hero().Position(); z < float64(start[1])*world.TileSize {
+			t.Fatalf("from tile %v z = %v; want the hero stopped by what stands north", start, z)
+		}
+	}
+}

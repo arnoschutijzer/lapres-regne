@@ -14,7 +14,12 @@
 //	.  grass            ~  water
 //	T  tree             O  oak
 //	W  willow           Y  yew
+//	:  earth path       _  stone floor
+//	#  wall             =  fence
+//	G  gate             +  grave
 //	@  where the hero starts, on grass
+//
+// Walls, fences, gates and graves block the way.
 package mapfile
 
 import (
@@ -42,6 +47,12 @@ var tiles = map[rune]tile{
 	'O': {ground: world.Grass, tree: true, kind: world.Oak},
 	'W': {ground: world.Grass, tree: true, kind: world.Willow},
 	'Y': {ground: world.Grass, tree: true, kind: world.Yew},
+	':': {ground: world.Path},
+	'_': {ground: world.Floor},
+	'#': {ground: world.Wall},
+	'=': {ground: world.Fence},
+	'G': {ground: world.Gate},
+	'+': {ground: world.Grave},
 }
 
 // Load reads the map in the file at path. A map without a name is named after its file.

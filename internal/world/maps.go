@@ -14,7 +14,20 @@ type Ground byte
 const (
 	Grass Ground = iota
 	Water
+	// Path is a beaten earth track.
+	Path
+	// Floor is flagstones, inside buildings and courtyards.
+	Floor
+	Wall
+	Fence
+	Gate
+	Grave
 )
+
+// Blocks tells whether whatever stands on the ground keeps the hero off it.
+func (g Ground) Blocks() bool {
+	return g >= Wall
+}
 
 // Map is a hand-made world: rows of tiles from north to south, each listing its tiles from west to
 // east, with trees planted on some of them. Nothing beyond its edges can be walked on.
@@ -149,8 +162,8 @@ func (w *World) passable(x, z float64) bool {
 	if w.terrain == nil {
 		return true
 	}
-	_, ok := w.terrain.at(x, z)
-	return ok
+	ground, ok := w.terrain.at(x, z)
+	return ok && !ground.Blocks()
 }
 
 // plantedTree is the tree planted on a tile of the map, placed a little off the tile's centre.

@@ -78,3 +78,17 @@ func TestAMissingMapFileIsReported(t *testing.T) {
 		t.Fatal("a missing map file must be reported")
 	}
 }
+
+func TestAMapFileLoadsBuiltGroundAndStructures(t *testing.T) {
+	loaded, err := Load(write(t, "yard.map", "terrain\n#_:@\n=G+.\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][]world.Ground{
+		{world.Wall, world.Floor, world.Path, world.Grass},
+		{world.Fence, world.Gate, world.Grave, world.Grass},
+	}
+	if !reflect.DeepEqual(loaded.Ground, want) {
+		t.Fatalf("ground = %v, want %v", loaded.Ground, want)
+	}
+}

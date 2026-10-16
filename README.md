@@ -76,9 +76,13 @@ WY...
 | `.`  | grass   | `~`  | water (wade at half speed) |
 | `T`  | tree    | `O`  | oak     |
 | `W`  | willow  | `Y`  | yew     |
+| `:`  | earth path | `_`  | stone floor |
+| `#`  | wall    | `=`  | fence   |
+| `G`  | gate    | `+`  | grave   |
 | `@`  | where the hero starts | | |
 
-Nothing beyond the map's edges can be walked on. Progress keeps the map's name,
+Walls, fences, gates and graves block the way, and nothing beyond the map's
+edges can be walked on. Progress keeps the map's name,
 so your position and stumps return only to the map they were saved on.
 
 Requires Go 1.25+, macOS or Linux with `stty`, and a UTF-8 terminal with
