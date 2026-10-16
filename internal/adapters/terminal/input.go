@@ -35,7 +35,9 @@ type keyEvent struct {
 	mouse    bool
 	click    bool
 	// zoom is 1 for the wheel scrolling up and -1 for scrolling down.
-	zoom   int
+	zoom int
+	// pan is -1 for the wheel scrolling left and 1 for scrolling right.
+	pan    int
 	column int
 	row    int
 }
@@ -187,7 +189,7 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 	return event
 }
 
-// mouseEvent reports pointer movement, left clicks and the wheel, and ignores releases and other buttons.
+// mouseEvent reports pointer movement, left clicks and the wheel in any direction, and ignores releases and other buttons.
 func mouseEvent(params string, final byte) keyEvent {
 	fields := strings.Split(params, ";")
 	if len(fields) != 3 || final != 'M' {
@@ -205,6 +207,10 @@ func mouseEvent(params string, final byte) keyEvent {
 			return keyEvent{zoom: 1}
 		case 1:
 			return keyEvent{zoom: -1}
+		case 2:
+			return keyEvent{pan: -1}
+		case 3:
+			return keyEvent{pan: 1}
 		}
 		return keyEvent{}
 	}

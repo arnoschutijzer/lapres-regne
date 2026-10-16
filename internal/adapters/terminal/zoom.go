@@ -31,3 +31,12 @@ func (z *zoom) step(target int, dt time.Duration) {
 func (z *zoom) scale() float64 {
 	return forestScale * math.Pow(zoomStep, z.current)
 }
+
+// panColumns is how many terminal columns the view slides for one sideways scroll step.
+const panColumns = 3
+
+// panDistance is how far in world units one sideways scroll step pans, so the view slides the
+// same columns at any zoom. Each column holds two canvas pixels.
+func (z *zoom) panDistance() float64 {
+	return panColumns * 2 / z.scale()
+}

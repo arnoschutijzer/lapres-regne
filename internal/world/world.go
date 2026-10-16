@@ -10,6 +10,8 @@ type World struct {
 	seed             uint64
 	hero             Character
 	cameraX, cameraZ float64
+	// pan is how far the camera looks to the side of the hero, until the hero walks.
+	pan float64
 	// zoom is how many steps the camera has moved in from the forest view toward a close-up.
 	zoom int
 	// felled holds the cells whose tree is a stump, with the time left until it regrows.
@@ -64,6 +66,7 @@ func (w *World) Walk(dx, dz float64, sprinting bool) {
 		return
 	}
 	w.Stop()
+	w.pan = 0
 	distance := stride
 	if sprinting {
 		distance *= 2
@@ -75,6 +78,7 @@ func (w *World) Walk(dx, dz float64, sprinting bool) {
 func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	if dx != 0 || dz != 0 {
 		w.Stop()
+		w.pan = 0
 	}
 	speed := walkingSpeed
 	if sprinting {
@@ -110,8 +114,11 @@ func (w *World) ZoomBy(steps int) {
 	w.zoom = min(CloseUp, max(0, w.zoom+steps))
 }
 
+// PanBy moves the camera sideways by distance world units, to the right for positive distances.
+func (w *World) PanBy(distance float64) { w.pan += distance }
+
 func (w *World) Follow(dt time.Duration) {
 	blend := 1 - math.Exp(-32*dt.Seconds())
-	w.cameraX += (w.hero.x - w.cameraX) * blend
+	w.cameraX += (w.hero.x + w.pan - w.cameraX) * blend
 	w.cameraZ += (w.hero.z - w.cameraZ) * blend
 }

@@ -35,3 +35,13 @@ func TestAResumedViewOpensAtTheKeptZoom(t *testing.T) {
 		t.Fatalf("scale = %v on the first frame, want the close-up %v without easing in", c.scale, closeUpScale)
 	}
 }
+
+func TestAPanStepCrossesTheSameColumnsAtAnyZoom(t *testing.T) {
+	forest := zoom{current: 0}
+	closeUp := zoom{current: world.CloseUp}
+	forestColumns := forest.panDistance() * forest.scale() / 2
+	closeUpColumns := closeUp.panDistance() * closeUp.scale() / 2
+	if forestColumns != panColumns || math.Abs(closeUpColumns-panColumns) > 1e-9 {
+		t.Fatalf("a pan step crosses %v columns in the forest and %v up close, want %v", forestColumns, closeUpColumns, panColumns)
+	}
+}

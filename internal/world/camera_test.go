@@ -1,6 +1,7 @@
 package world_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -41,5 +42,38 @@ func TestTheZoomIsKeptAndResumedInAnyWorld(t *testing.T) {
 		if w.Zoom() != 5 {
 			t.Fatalf("zoom = %d resuming in world %d, want the kept 5", w.Zoom(), seed)
 		}
+	}
+}
+
+func settle(w *world.World) {
+	for range 100 {
+		w.Follow(50 * time.Millisecond)
+	}
+}
+
+func TestPanningMovesTheCameraSidewaysFromTheHero(t *testing.T) {
+	w := world.New(7)
+	w.PanBy(-3)
+	settle(w)
+	heroX, heroZ := w.Hero().Position()
+	x, z := w.Camera()
+	if math.Abs(x-(heroX-3)) > 1e-6 || math.Abs(z-heroZ) > 1e-6 {
+		t.Fatalf("camera = (%v, %v), want 3 units left of the hero at (%v, %v)", x, z, heroX, heroZ)
+	}
+	w.PanBy(5)
+	settle(w)
+	if x, _ := w.Camera(); math.Abs(x-(heroX+2)) > 1e-6 {
+		t.Fatalf("camera x = %v, want 2 units right of the hero at %v", x, heroX)
+	}
+}
+
+func TestWalkingBringsThePannedCameraBackToTheHero(t *testing.T) {
+	w := world.New(7)
+	w.PanBy(4)
+	w.Advance(1, 0, 100*time.Millisecond, false)
+	settle(w)
+	heroX, _ := w.Hero().Position()
+	if x, _ := w.Camera(); math.Abs(x-heroX) > 1e-6 {
+		t.Fatalf("camera x = %v after walking, want it back on the hero at %v", x, heroX)
 	}
 }
