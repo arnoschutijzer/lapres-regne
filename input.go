@@ -22,6 +22,7 @@ type keyEvent struct {
 	release  bool
 	enhanced bool
 	focusOut bool
+	shift    bool
 }
 
 const (
@@ -29,6 +30,7 @@ const (
 	keyRight
 	keyUp
 	keyDown
+	keyShift
 )
 
 // Kitty's keyboard protocol reports independent key press/repeat/release events.
@@ -87,7 +89,7 @@ func (d *keyDecoder) feed(key byte) keyEvent {
 		d.params = append(d.params, key)
 		return keyEvent{}
 	}
-	return keyEvent{key: int(key), action: keyAction(int(key))}
+	return keyEvent{key: int(key), action: keyAction(int(key)), shift: key >= 'A' && key <= 'Z'}
 }
 
 func (d *keyDecoder) sequence(final byte) keyEvent {
@@ -139,6 +141,7 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 		return keyEvent{}
 	}
 	event.action = keyAction(event.key)
+	event.shift = (modifiers-1)&1 != 0
 	if (event.key == 'c' || event.key == 'd') && (modifiers-1)&4 != 0 {
 		event.action = quit
 	}
@@ -150,11 +153,27 @@ type heldKeys map[int]action
 func (keys heldKeys) update(event keyEvent) {
 	if event.focusOut {
 		clear(keys)
-	} else if event.release {
+		return
+	}
+	// Every enhanced event carries the current modifier state, including Shift
+	// pressed before a direction and either Shift released while the other is held.
+	if event.enhanced && event.key != 0 {
+		if event.shift {
+			keys[keyShift] = none
+		} else {
+			delete(keys, keyShift)
+		}
+	}
+	if event.release {
 		delete(keys, event.key)
 	} else if event.enhanced && event.action >= left && event.action <= down {
 		keys[event.key] = event.action
 	}
+}
+
+func (keys heldKeys) sprinting() bool {
+	_, held := keys[keyShift]
+	return held
 }
 
 func (keys heldKeys) direction() (dx, dz float64) {

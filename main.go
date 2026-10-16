@@ -18,7 +18,7 @@ func main() {
 	treeMode := flag.Bool("tree", false, "show the original orbiting tree")
 	seed := flag.Uint64("seed", 7, "procedural forest seed")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "Usage: dither-cli [--seed number] [--tree]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
+		fmt.Fprintln(flag.CommandLine.Output(), "Usage: dither-cli [--seed number] [--tree]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -118,7 +118,7 @@ func run(treeMode bool, seed uint64) error {
 		}
 		if !treeMode {
 			if !event.enhanced {
-				forest.walk(event.action)
+				forest.walk(event.action, event.shift)
 			}
 		} else if event.action == left || event.action == right {
 			// Snap to a terminal column before moving to avoid half-cell rounding drift.
@@ -177,7 +177,7 @@ func run(treeMode bool, seed uint64) error {
 			lastFrame = now
 			if !treeMode {
 				dx, dz := held.direction()
-				forest.advance(dx, dz, dt)
+				forest.advance(dx, dz, dt, held.sprinting())
 				forest.follow(dt)
 				dirty = true
 			} else {

@@ -223,6 +223,40 @@ def check_held_movement(binary):
         terminal.close()
 
 
+def check_sprinting(binary):
+    terminal = Terminal(binary)
+    try:
+        terminal.read(until=b"seed 7")
+        terminal.send(b"\x1b[?11u\x1b[119;1u")  # Hold W throughout speed changes.
+        start = time.monotonic()
+        walked = positions(terminal.read(timeout=0.25))[-1]
+        walking_speed = -walked[1] / (time.monotonic() - start)
+
+        terminal.send(b"\x1b[57441;2u")  # Press left Shift without repeating W.
+        start = time.monotonic()
+        ran = positions(terminal.read(timeout=0.25))[-1]
+        running_speed = (walked[1] - ran[1]) / (time.monotonic() - start)
+        assert 1.7 < running_speed / walking_speed < 2.3, "Shift must double movement speed"
+
+        # Releasing one Shift preserves sprinting while the other remains held.
+        terminal.send(b"\x1b[57447;2u\x1b[57441;2:3u")
+        both_shifts = positions(terminal.read(timeout=0.2))[-1]
+        assert ran[1] - both_shifts[1] > 2.7
+
+        terminal.send(b"\x1b[57447;1:3u")
+        start = time.monotonic()
+        resumed = positions(terminal.read(timeout=0.25))[-1]
+        resumed_speed = (both_shifts[1] - resumed[1]) / (time.monotonic() - start)
+        assert 0.8 < resumed_speed / walking_speed < 1.2, "releasing Shift must restore walking speed"
+        terminal.send(b"\x1b[119;1:3u")
+        terminal.read(timeout=0.1)
+        assert not positions(terminal.read(timeout=0.15)), "sprinting must preserve direction-key releases"
+        terminal.send(b"q")
+        terminal.assert_restored()
+    finally:
+        terminal.close()
+
+
 with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     binary = str(Path(directory) / "dither-cli")
     subprocess.run(["go", "build", "-o", binary, "."], cwd=ROOT, check=True)
@@ -234,8 +268,9 @@ with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     check_forest(binary)
     check_responsive_rendering(binary)
     check_held_movement(binary)
+    check_sprinting(binary)
     check_exit(binary, b"\x03")
     check_exit(binary, b"\x1b[1;\x03")
     check_exit(binary, b"\x1b[99;5u")
     check_exit(binary, signal.SIGTERM)
-    print("Passed: held diagonals, independent releases, normalized speed, focus loss, 60 FPS cadence, legacy controls, exploration, incremental redraws, cleanup")
+    print("Passed: Shift sprinting, independent Shift releases, held diagonals, normalized speed, focus loss, 60 FPS cadence, legacy controls, exploration, cleanup")

@@ -11,6 +11,8 @@ go run .
 
 Walk with the **arrow keys**, **WASD**, or **IJKL** (I up, J left, K down,
 L right). Hold a key to keep walking. Press **Q** or **Ctrl-C** to quit.
+Hold **Shift** to run at **2× speed**; release Shift to return to walking
+while keeping your movement keys held.
 The animation loop targets **60 FPS**. The camera follows the traveler and the
 view adapts when the terminal resizes.
 

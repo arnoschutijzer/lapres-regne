@@ -46,7 +46,7 @@ func (f *forest) noise(x, z float64, salt uint64) float64 {
 	return a*(1-v) + b*v
 }
 
-func (f *forest) walk(direction action) {
+func (f *forest) walk(direction action, sprinting bool) {
 	dx, dz := 0.0, 0.0
 	switch direction {
 	case left:
@@ -60,13 +60,21 @@ func (f *forest) walk(direction action) {
 	default:
 		return
 	}
-	f.move(dx, dz, 0.55)
+	distance := 0.55
+	if sprinting {
+		distance *= 2
+	}
+	f.move(dx, dz, distance)
 	f.steps++
 }
 
 // Advance by elapsed time, independently of terminal key-repeat timing.
-func (f *forest) advance(dx, dz float64, dt time.Duration) {
-	f.stepDistance += f.move(dx, dz, 9*dt.Seconds())
+func (f *forest) advance(dx, dz float64, dt time.Duration, sprinting bool) {
+	speed := 9.0
+	if sprinting {
+		speed *= 2
+	}
+	f.stepDistance += f.move(dx, dz, speed*dt.Seconds())
 	for f.stepDistance >= 0.55 {
 		f.steps++
 		f.stepDistance -= 0.55
@@ -262,7 +270,7 @@ func (f *forest) frame(width, height int, seconds float64) string {
 			f.cells = make([]forestCell, cols*rows)
 		}
 		out.WriteString("\x1b[2J\x1b[1;1H  D I T H E R  /  W I L D S")
-		controls := []rune("  arrows / WASD / IJKL walk · Q quit")
+		controls := []rune("  arrows/WASD/IJKL · shift run · Q quit")
 		fmt.Fprintf(&out, "\x1b[%d;1H%s", height-1, string(controls[:min(width-1, len(controls))]))
 	}
 	lastInk := -1
