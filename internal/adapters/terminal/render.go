@@ -3,9 +3,11 @@ package terminal
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"lapresregne/internal/world"
@@ -215,50 +217,20 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		return towardI*0.69+trees[i].Height*0.72 > towardJ*0.69+trees[j].Height*0.72
 	})
 	r.rivers.sample(f, back, front, left, right, 1/c.scale)
-	for y := range c.height {
-		// Every pixel of a row shows ground equally far toward the viewer.
-		toward := (float64(y) - float64(c.height)*0.57) / (0.72 * c.scale)
-		// The canopy and its pools of light change over many pixels, so they are worked out every
-		// broadStep pixels along the row and blended in between.
-		broad := func(x int) (cover, pools float64) {
-			wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
-			return f.Cover(wx, wz), f.Noise(wx/9, wz/9, 81)
-		}
-		var coverFrom, poolsFrom float64
-		coverTo, poolsTo := broad(0)
-		for x := range c.width {
-			if x%broadStep == 0 {
-				coverFrom, poolsFrom = coverTo, poolsTo
-				coverTo, poolsTo = broad(x + broadStep)
+	// Each row of ground depends only on the world, so the rows are shared out across the cores,
+	// interleaved so rows crossing a river don't all land on one core.
+	var ground sync.WaitGroup
+	cores := runtime.GOMAXPROCS(0)
+	for core := range cores {
+		ground.Add(1)
+		go func() {
+			defer ground.Done()
+			for y := core; y < c.height; y += cores {
+				r.groundRow(c, y, seconds)
 			}
-			between := float64(x%broadStep) / broadStep
-			cover := coverFrom + (coverTo-coverFrom)*between
-			pools := poolsFrom + (poolsTo-poolsFrom)*between
-			wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
-			n := f.Noise(wx*0.65, wz*0.65, 19)
-			ink, light := 0, 0.13+n*0.23
-			if cover < 0.38 {
-				ink, light = 1, 0.21+n*0.24
-			}
-			// Diagonal pools of sunlight survive only where the canopy opens.
-			beam := max(0, wave(wx*0.28-wz*0.19+pools*2)-0.45)
-			sun := beam * max(0, 1-cover*1.3)
-			light += sun * 0.8
-			if sun > 0.24 {
-				ink = 7
-			}
-			distance, width := world.NearestRiver(r.rivers.at(wz), wx)
-			if distance < width {
-				ink, light = 5, 0.28+n*0.3
-				if wave(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
-					ink, light = 6, 0.8
-				}
-			} else if distance < width+0.65 {
-				ink, light = 7, 0.32+n*0.25
-			}
-			c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light, ink}
-		}
+		}()
 	}
+	ground.Wait()
 	for _, tree := range trees {
 		if !tree.Stump {
 			c.shadow(tree)
@@ -537,6 +509,53 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		r.lastStatus = status
 	}
 	return out.String()
+}
+
+// groundRow lights the ground of one canvas row: grass, canopy shade, pools of sunlight and rivers.
+func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
+	f := r.world
+	// Every pixel of a row shows ground equally far toward the viewer.
+	toward := (float64(y) - float64(c.height)*0.57) / (0.72 * c.scale)
+	// The canopy and its pools of light change over many pixels, so they are worked out every
+	// broadStep pixels along the row and blended in between.
+	broad := func(x int) (cover, pools float64) {
+		wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
+		return f.Cover(wx, wz), f.Noise(wx/9, wz/9, 81)
+	}
+	var coverFrom, poolsFrom float64
+	coverTo, poolsTo := broad(0)
+	for x := range c.width {
+		if x%broadStep == 0 {
+			coverFrom, poolsFrom = coverTo, poolsTo
+			coverTo, poolsTo = broad(x + broadStep)
+		}
+		between := float64(x%broadStep) / broadStep
+		cover := coverFrom + (coverTo-coverFrom)*between
+		pools := poolsFrom + (poolsTo-poolsFrom)*between
+		wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
+		n := f.Noise(wx*0.65, wz*0.65, 19)
+		ink, light := 0, 0.13+n*0.23
+		if cover < 0.38 {
+			ink, light = 1, 0.21+n*0.24
+		}
+		// Diagonal pools of sunlight survive only where the canopy opens.
+		beam := max(0, wave(wx*0.28-wz*0.19+pools*2)-0.45)
+		sun := beam * max(0, 1-cover*1.3)
+		light += sun * 0.8
+		if sun > 0.24 {
+			ink = 7
+		}
+		distance, width := world.NearestRiver(r.rivers.at(wz), wx)
+		if distance < width {
+			ink, light = 5, 0.28+n*0.3
+			if wave(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
+				ink, light = 6, 0.8
+			}
+		} else if distance < width+0.65 {
+			ink, light = 7, 0.32+n*0.25
+		}
+		c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light, ink}
+	}
 }
 
 // broadStep is how many pixels apart along a row the canopy and its pools of light are worked out.
