@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"embed"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,11 +9,7 @@ import (
 	"time"
 
 	"github.com/ebitengine/oto/v3"
-	"github.com/jfreymuth/oggvorbis"
 )
-
-//go:embed assets/*.ogg
-var soundtrackFiles embed.FS
 
 const (
 	musicSampleRate = 44100
@@ -23,20 +17,19 @@ const (
 	musicFadeFrames = 3 * musicSampleRate
 )
 
-var forestSongs = []string{"harmony", "newbie-melody", "autumn-voyage", "adventure", "scape-soft"}
-
 // Selection is independent of decoding and crossfading. A trigger-based selector
 // can choose a song ID here without changing the playback engine.
 type shuffledSongs struct {
+	songs     []string
 	remaining []string
 	last      string
 }
 
 func (s *shuffledSongs) Next() string {
 	if len(s.remaining) == 0 {
-		s.remaining = append(s.remaining, forestSongs...)
+		s.remaining = append(s.remaining, s.songs...)
 		rand.Shuffle(len(s.remaining), func(i, j int) { s.remaining[i], s.remaining[j] = s.remaining[j], s.remaining[i] })
-		if s.remaining[0] == s.last {
+		if len(s.remaining) > 1 && s.remaining[0] == s.last {
 			s.remaining[0], s.remaining[1] = s.remaining[1], s.remaining[0]
 		}
 	}
@@ -80,21 +73,13 @@ func (h *songHistory) Previous() string {
 type musicTrack struct {
 	samples          interface{ Read([]float32) (int, error) }
 	frames, position int64
+	closer           io.Closer
 }
 
-func openSong(id string) (*musicTrack, error) {
-	data, err := soundtrackFiles.ReadFile("assets/" + id + ".ogg")
-	if err != nil {
-		return nil, err
+func (t *musicTrack) Close() {
+	if t.closer != nil {
+		t.closer.Close()
 	}
-	decoder, err := oggvorbis.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("decode %s: %w", id, err)
-	}
-	if decoder.SampleRate() != musicSampleRate || decoder.Channels() != musicChannels {
-		return nil, fmt.Errorf("%s must be 44.1 kHz stereo", id)
-	}
-	return &musicTrack{samples: decoder, frames: decoder.Length()}, nil
 }
 
 // musicStream produces sample-accurate crossfades on the audio thread, without
@@ -124,6 +109,7 @@ func (m *musicStream) loadTrack(direction int) (*musicTrack, error) {
 		return nil, err
 	}
 	if m.fadeFrames <= 0 || track.frames < 2*m.fadeFrames {
+		track.Close()
 		return nil, fmt.Errorf("song must be at least twice the crossfade duration")
 	}
 	return track, nil
@@ -214,6 +200,7 @@ func (m *musicStream) mix() (int, error) {
 	}
 	current.position += frames
 	if fading && m.fadePosition == m.fadeFrames {
+		current.Close()
 		m.current, m.upcoming = m.upcoming, nil
 	}
 	return n, nil
@@ -248,8 +235,12 @@ type musicPlayback struct {
 	stream  *musicStream
 }
 
-func startMusic() (*musicPlayback, error) {
-	history := &songHistory{}
+func startMusic(directory string) (*musicPlayback, error) {
+	songs, err := songsInFolder(directory)
+	if err != nil || len(songs) == 0 {
+		return nil, err
+	}
+	history := &songHistory{shuffle: shuffledSongs{songs: songs}}
 	stream, err := newMusicStream(func(direction int) (*musicTrack, error) {
 		if direction < 0 {
 			return openSong(history.Previous())
@@ -264,14 +255,17 @@ func startMusic() (*musicPlayback, error) {
 		Format: oto.FormatFloat32LE, BufferSize: 100 * time.Millisecond,
 	})
 	if err != nil {
+		stream.current.Close()
 		return nil, err
 	}
 	select {
 	case <-ready:
 	case <-time.After(5 * time.Second):
+		stream.current.Close()
 		return nil, fmt.Errorf("audio device initialization timed out")
 	}
 	if err := context.Err(); err != nil {
+		stream.current.Close()
 		return nil, err
 	}
 	player := context.NewPlayer(stream)
@@ -295,5 +289,11 @@ func (m *musicPlayback) Err() error {
 
 func (m *musicPlayback) Close() {
 	m.player.PauseAndStopReading()
+	if m.stream.current != nil {
+		m.stream.current.Close()
+	}
+	if m.stream.upcoming != nil {
+		m.stream.upcoming.Close()
+	}
 	m.context.Suspend()
 }

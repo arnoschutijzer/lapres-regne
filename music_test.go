@@ -9,18 +9,19 @@ import (
 )
 
 func TestPlaylistShuffle(t *testing.T) {
-	playlist := &shuffledSongs{}
+	songs := []string{"a", "b", "c", "d", "e"}
+	playlist := &shuffledSongs{songs: songs}
 	last := ""
 	for range 20 {
 		seen := make(map[string]bool)
-		for range len(forestSongs) {
+		for range len(songs) {
 			id := playlist.Next()
 			if id == last || seen[id] {
 				t.Fatalf("song %q repeats before completing the shuffle", id)
 			}
 			seen[id], last = true, id
 		}
-		for _, id := range forestSongs {
+		for _, id := range songs {
 			if !seen[id] {
 				t.Errorf("shuffle omitted %q", id)
 			}
@@ -29,7 +30,7 @@ func TestPlaylistShuffle(t *testing.T) {
 }
 
 func TestSongHistoryNavigation(t *testing.T) {
-	history := &songHistory{}
+	history := &songHistory{shuffle: shuffledSongs{songs: []string{"a", "b", "c"}}}
 	first, second, third := history.Next(), history.Next(), history.Next()
 	if history.Previous() != second || history.Previous() != first || history.Previous() != first {
 		t.Fatal("previous must retrace history and stay on the first song at the start")
@@ -93,34 +94,6 @@ func TestManualTrackChangesCrossfade(t *testing.T) {
 	read(3)
 	read(4)
 	assertTone(read(1024), 1, 0)
-}
-
-func TestEmbeddedSongsDecode(t *testing.T) {
-	for _, id := range forestSongs {
-		t.Run(id, func(t *testing.T) {
-			track, err := openSong(id)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if track.frames < 2*musicFadeFrames {
-				t.Fatal("track is too short for the crossfade")
-			}
-			samples := make([]float32, musicSampleRate*musicChannels)
-			if err := readSamples(track, samples); err != nil {
-				t.Fatal(err)
-			}
-			peak := 0.0
-			for _, sample := range samples {
-				if math.IsNaN(float64(sample)) || math.IsInf(float64(sample), 0) {
-					t.Fatal("invalid audio sample")
-				}
-				peak = math.Max(peak, math.Abs(float64(sample)))
-			}
-			if peak < 0.0001 {
-				t.Fatal("track starts with silent audio")
-			}
-		})
-	}
 }
 
 // Stereo fixtures isolate outgoing sound on the left and incoming on the right.
@@ -188,33 +161,5 @@ func TestSoundtrackCrossfadesWithoutGaps(t *testing.T) {
 	}
 	if !bytes.Equal(pcm, fragmented) {
 		t.Fatal("audio changes with backend read sizes")
-	}
-}
-
-func TestSoundtrackTransitionsThroughEmbeddedSongs(t *testing.T) {
-	selected := 0
-	stream, err := newMusicStream(func(_ int) (*musicTrack, error) {
-		track, err := openSong(forestSongs[selected%len(forestSongs)])
-		if err != nil {
-			return nil, err
-		}
-		selected++
-		// Use the actual end of each song to exercise decoder EOFs quickly.
-		tailFrames := int64(2*musicFadeFrames + musicSampleRate/10)
-		seeker := track.samples.(interface{ SetPosition(int64) error })
-		if err := seeker.SetPosition(track.frames - tailFrames); err != nil {
-			return nil, err
-		}
-		track.frames = tailFrames
-		return track, nil
-	}, musicFadeFrames)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := io.CopyN(io.Discard, stream, 20*musicSampleRate*musicChannels*4); err != nil {
-		t.Fatal(err)
-	}
-	if selected < len(forestSongs)+1 {
-		t.Fatal("soundtrack did not continue into a second playlist cycle")
 	}
 }

@@ -19,12 +19,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Terminal:
-    def __init__(self, binary, *args):
+    def __init__(self, binary, *args, mute=True):
         self.master, self.slave = pty.openpty()
         self.resize(100, 30)
         self.original = termios.tcgetattr(self.slave)
         self.process = subprocess.Popen(
-            [binary, "--mute", *args], stdin=self.slave, stdout=self.slave, stderr=self.slave
+            [binary, *(["--mute"] if mute else []), *args], stdin=self.slave, stdout=self.slave, stderr=self.slave
         )
 
     def resize(self, width, height):
@@ -273,6 +273,13 @@ with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     check_responsive_rendering(binary)
     check_held_movement(binary)
     check_sprinting(binary)
+    terminal = Terminal(binary, "--music-dir", str(Path(directory) / "missing"), mute=False)
+    try:
+        terminal.read(until=b"seed 7")
+        terminal.send(b"npdq")
+        terminal.assert_restored()
+    finally:
+        terminal.close()
     check_exit(binary, b"\x03")
     check_exit(binary, b"\x1b[1;\x03")
     check_exit(binary, b"\x1b[99;5u")
