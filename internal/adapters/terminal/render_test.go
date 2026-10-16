@@ -501,10 +501,6 @@ func TestUpCloseTheHeroIsDrawnInDetail(t *testing.T) {
 			t.Errorf("the close-up draws no %s", part)
 		}
 	}
-	far := newRenderer(world.New(7), "L’Après-Règne").render(100, 27, 0)
-	if countInk(far, defaultLook.skin, defaultLook.undershirt) != 0 {
-		t.Error("the forest view must keep the small traveler")
-	}
 }
 
 func TestTheHeroShowsTheirFaceOnlyWhenFacingTheViewer(t *testing.T) {
@@ -573,12 +569,42 @@ func TestUpCloseTrunksAreSolidWood(t *testing.T) {
 	}
 }
 
-func TestTheDetailedHeroStaysAFewStepsFromTheForestView(t *testing.T) {
-	r := newRenderer(world.New(7), "L’Après-Règne")
-	r.world.ZoomBy(3)
-	r.zoom.step(r.world.Zoom(), 5*time.Second)
-	if countInk(r.render(100, 27, 0), defaultLook.skin) == 0 {
-		t.Fatal("three wheel steps in, the hero must already be drawn in detail")
+// heroHeight is how many canvas pixels the hero's body spans from head to foot.
+func heroHeight(c *forestCanvas) int {
+	top, bottom := c.height, -1
+	for y := range c.height {
+		for x := range c.width {
+			if ink := c.pixels[y*c.width+x].ink; ink >= defaultLook.skin && ink <= defaultLook.shorts {
+				top, bottom = min(top, y), max(bottom, y)
+			}
+		}
+	}
+	return bottom - top + 1
+}
+
+func TestTheHeroStaysTallEnoughToReadTheirPoseAtEveryZoom(t *testing.T) {
+	r := newRenderer(meadow(), "L’Après-Règne")
+	for step := 0; step <= world.CloseUp; step++ {
+		r.zoom = zoom{current: float64(step)}
+		c := r.render(160, 60, 0)
+		if height := heroHeight(c); height < minFigurePixels {
+			t.Fatalf("hero %d pixels tall at zoom %d, want at least %d", height, step, minFigurePixels)
+		}
+		if countInk(c, defaultLook.skin) == 0 || countInk(c, defaultLook.undershirt) == 0 {
+			t.Fatalf("zoom %d draws the hero without their body", step)
+		}
+	}
+}
+
+func TestUpCloseTheHeroIsDrawnTrueToScale(t *testing.T) {
+	r := newRenderer(meadow(), "L’Après-Règne")
+	r.zoom = zoom{current: world.CloseUp}
+	c := r.render(160, 60, 0)
+	if c.figureSize() != 1 {
+		t.Fatalf("figures drawn %v times life size up close, want true to size", c.figureSize())
+	}
+	if lifeSize := int(figureHeight * 0.69 * c.scale); heroHeight(c) < lifeSize || heroHeight(c) > lifeSize*5/4 {
+		t.Fatalf("hero %d pixels tall up close, want about their life size of %d", heroHeight(c), lifeSize)
 	}
 }
 

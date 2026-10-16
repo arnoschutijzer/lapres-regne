@@ -5,9 +5,6 @@ import "math"
 // detailScale is the zoom from which trees are drawn in detail.
 var detailScale = forestScale * math.Pow(zoomStep, 6)
 
-// heroDetailScale is the zoom from which the hero is drawn in detail, a few steps out from the forest.
-var heroDetailScale = forestScale * math.Pow(zoomStep, 3)
-
 // heroLook holds the palette entries of the hero's base body: their skin and hair, and the plain
 // undershirt and shorts that gear will later cover.
 type heroLook struct{ skin, hair, undershirt, shorts int }
@@ -26,11 +23,13 @@ type heroBody struct {
 	bob, lean float64
 	// side and forward are unit directions across the body to its right and out of its front.
 	sideX, sideZ, forwardX, forwardZ float64
+	// size is how many times larger than life the body is drawn, about its feet.
+	size float64
 }
 
-func newHeroBody(c *forestCanvas, x, z, heading float64) heroBody {
+func newHeroBody(c *forestCanvas, x, z, heading, size float64) heroBody {
 	cos, sin := math.Cos(heading), math.Sin(heading)
-	return heroBody{c: c, x: x, z: z, heading: heading, sideX: cos, sideZ: -sin, forwardX: sin, forwardZ: cos}
+	return heroBody{c: c, x: x, z: z, heading: heading, sideX: cos, sideZ: -sin, forwardX: sin, forwardZ: cos, size: size}
 }
 
 // carry applies the body's bob and lean to a point at height y and forward offset.
@@ -43,13 +42,15 @@ func (b heroBody) carry(y, forward float64) (float64, float64) {
 
 // at turns an offset to the hero's side and front into a world position.
 func (b heroBody) at(side, forward float64) (x, z float64) {
+	side, forward = side*b.size, forward*b.size
 	return b.x + b.sideX*side + b.forwardX*forward, b.z + b.sideZ*side + b.forwardZ*forward
 }
 
 // part draws one rounded, sunlit body part with its own width, height and depth.
 func (b heroBody) part(side, y, forward, width, height, depth float64, ink int) {
 	x, z := b.at(side, forward)
-	width, height, depth = b.visible(width), b.visible(height), b.visible(depth)
+	y = y * b.size
+	width, height, depth = b.visible(width*b.size), b.visible(height*b.size), b.visible(depth*b.size)
 	ellipsoid(b.c, x, y, z, width, height, depth, b.heading, func(px, py int, depth float64, _, normal vec) {
 		// Shading flows smoothly across parts; only the outline behind the figure marks its edge.
 		light := 0.6 + 0.4*max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
@@ -64,9 +65,11 @@ func (b heroBody) part(side, y, forward, width, height, depth float64, ink int) 
 func (b heroBody) outline(side, y, forward, width, height, depth float64) {
 	x, z := b.at(side, forward)
 	band := 1.5 / b.c.scale
-	width, height, depth = b.visible(width), b.visible(height), b.visible(depth)
+	y = y * b.size
+	width, height, depth = b.visible(width*b.size), b.visible(height*b.size), b.visible(depth*b.size)
 	ellipsoid(b.c, x, y, z, width+band, height+band, depth+band, b.heading, func(px, py int, depth float64, _, _ vec) {
-		b.c.plot(px, py, depth+0.4, 0, 0)
+		// Set back by its own band too, so the band never reaches in front of the part it rings.
+		b.c.plot(px, py, depth+0.4+band, 0, 0)
 	})
 }
 
@@ -89,7 +92,7 @@ func (b heroBody) eye(side float64) {
 	}
 	y, carried := b.carry(1.54, forward)
 	x, z := b.at(side, carried)
-	px, py, depth := b.c.project(x, y, z)
+	px, py, depth := b.c.project(x, y*b.size, z)
 	for dy := range 2 {
 		b.c.plot(int(math.Round(px)), int(math.Round(py))+dy, depth-0.05, 0, eyeInk)
 	}
@@ -130,10 +133,11 @@ func bend(from joint, side, angle, length float64) joint {
 }
 
 // drawDetailedHero draws the hero's base body with realistic, slender proportions: skin, short
-// hair, a plain undershirt and shorts, and bare feet, posed by their gait. Legs swing from the
-// hips with the knee lifting as each passes through, and arms swing against them.
-func drawDetailedHero(c *forestCanvas, x, z float64, g gait, look heroLook) {
-	b := newHeroBody(c, x, z, g.heading)
+// hair, a plain undershirt and shorts, and bare feet, posed by their gait, size times larger than
+// life. Legs swing from the hips with the knee lifting as each passes through, and arms swing
+// against them.
+func drawDetailedHero(c *forestCanvas, x, z float64, g gait, look heroLook, size float64) {
+	b := newHeroBody(c, x, z, g.heading, size)
 	// Wider strides at speed; the knee lifts as a leg swings through, and running arms bend.
 	reach := g.amount * math.Min(0.45, 0.22+0.02*g.speed)
 	elbowBend := 0.15 + 0.5*g.amount
@@ -186,7 +190,7 @@ func drawDetailedHero(c *forestCanvas, x, z float64, g gait, look heroLook) {
 		b.part(p.side, p.y, p.forward, p.width, p.height, p.depth, p.ink)
 	}
 	// Eyes need a head a few dots across, or their gaps would erase the face.
-	if 0.085*c.scale >= 2 {
+	if 0.085*size*c.scale >= 2 {
 		b.eye(-0.032)
 		b.eye(0.032)
 	}

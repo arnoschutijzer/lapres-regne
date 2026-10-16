@@ -25,8 +25,9 @@ func jolt(sinceHit float64) float64 {
 	return 0.35 * math.Exp(-14*sinceHit) * math.Cos(sinceHit*30)
 }
 
-// drawAxe swings an axe from the hero's hands toward the faced tree.
-func drawAxe(c *forestCanvas, x, z float64, facing world.Facing, sinceHit float64) {
+// drawAxe swings an axe from the hero's hands toward the faced tree, size times larger than life
+// to match the hero.
+func drawAxe(c *forestCanvas, x, z float64, facing world.Facing, sinceHit, size float64) {
 	dx, dz := 0.0, 1.0
 	switch facing {
 	case world.FacingLeft:
@@ -37,10 +38,11 @@ func drawAxe(c *forestCanvas, x, z float64, facing world.Facing, sinceHit float6
 		dx, dz = 0, -1
 	}
 	angle := axeAngle(sinceHit)
-	reachOut, lift := math.Cos(angle)*0.75, math.Sin(angle)*0.75
-	headX, headY, headZ := x+dx*reachOut, 1.0+lift, z+dz*reachOut
-	c.line(x, 1.0, z, headX, headY, headZ, 0.62, 4)
-	c.line(headX, headY-0.18, headZ, headX+dx*0.08, headY+0.18, headZ+dz*0.08, 1, 9)
+	reachOut, lift := math.Cos(angle)*0.75*size, math.Sin(angle)*0.75*size
+	hands := 1.0 * size
+	headX, headY, headZ := x+dx*reachOut, hands+lift, z+dz*reachOut
+	c.line(x, hands, z, headX, headY, headZ, 0.62, 4)
+	c.line(headX, headY-0.18*size, headZ, headX+dx*0.08*size, headY+0.18*size, headZ+dz*0.08*size, 1, 9)
 }
 
 // chipFlight is how long wood chips stay in the air after a strike.
