@@ -78,18 +78,18 @@ func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px,
 func leafClumps(x, y, z float64) float64 {
 	broad := wave(3.7*x+1.3*y) * wave(2.9*y+3.3*z) * wave(3.1*z+2.3*x)
 	fine := wave(11*x+5*y) * wave(9*y+12*z) * wave(10*z+7*x)
-	return math.Min(1, math.Max(0, 0.5+0.75*broad+0.3*fine))
+	return min(1, max(0, 0.5+0.75*broad+0.3*fine))
 }
 
 // sunlight is how brightly the sun lights a surface facing along normal.
 func sunlight(normal vec) float64 {
-	return 0.34 + 0.6*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
+	return 0.34 + 0.6*max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
 }
 
 // rim fades a surface toward its silhouette, leaving a dotless outline so each shape reads in braille.
 func (c *forestCanvas) rim(normal vec) float64 {
 	facing := math.Abs(normal.dot(c.viewer()))
-	return math.Min(1, math.Max(0, (facing-0.12)/0.3))
+	return min(1, max(0, (facing-0.12)/0.3))
 }
 
 // crown draws a rounded crown of leaves with real depth and lighting.
@@ -238,7 +238,7 @@ func vine(c *forestCanvas, x1, y1, z1, x2, y2, z2 float64, ink int) {
 		sway := 0.035 * float64(1-2*(i%2))
 		x, y, z := x1+(x2-x1)*u+sway, y1+(y2-y1)*u, z1+(z2-z1)*u
 		ellipsoid(c, x, y, z, 0.035, 0.06, 0.035, 0, func(px, py int, depth float64, _, normal vec) {
-			c.plot(px, py, depth, 0.45+0.55*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29})), ink)
+			c.plot(px, py, depth, 0.45+0.55*max(0, normal.dot(vec{-0.52, 0.80, -0.29})), ink)
 		})
 	}
 }
@@ -304,7 +304,7 @@ func wood(c *forestCanvas, x1, y1, z1, x2, y2, z2, fromRadius, toRadius float64)
 			}
 			// Deep, slightly wandering furrows run along the bark between raised ridges.
 			ridge := wave(math.Atan2(normal.x, normal.z)*11 + wave((y+point.y)*2.3)*1.2)
-			furrows := 0.45 + 0.55*math.Sqrt(math.Max(0, ridge*0.5+0.5))
+			furrows := 0.45 + 0.55*math.Sqrt(max(0, ridge*0.5+0.5))
 			// Light wraps around the bark from the sun's side, so upright wood is never left unlit.
 			side := 0.5 + 0.5*normal.dot(vec{-0.87, 0.2, -0.45})
 			c.plot(px, py, depth, (0.25+0.75*side)*furrows, 4)

@@ -52,7 +52,7 @@ func (b heroBody) part(side, y, forward, width, height, depth float64, ink int) 
 	width, height, depth = b.visible(width), b.visible(height), b.visible(depth)
 	ellipsoid(b.c, x, y, z, width, height, depth, b.heading, func(px, py int, depth float64, _, normal vec) {
 		// Shading flows smoothly across parts; only the outline behind the figure marks its edge.
-		light := 0.6 + 0.4*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
+		light := 0.6 + 0.4*max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
 		// A small, distant hero is lit more fully, so their few dots form a solid figure.
 		light += 0.3 * math.Max(0, 1-b.c.scale/detailScale)
 		b.c.plot(px, py, depth, light, ink)

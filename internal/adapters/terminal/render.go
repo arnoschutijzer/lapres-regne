@@ -165,7 +165,7 @@ func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
 func (c *forestCanvas) line(x1, y1, z1, x2, y2, z2, light float64, ink int) {
 	ax, ay, ad := c.project(x1, y1, z1)
 	bx, by, bd := c.project(x2, y2, z2)
-	steps := max(1, int(math.Ceil(math.Max(math.Abs(bx-ax), math.Abs(by-ay)))))
+	steps := max(1, int(math.Ceil(max(math.Abs(bx-ax), math.Abs(by-ay)))))
 	for i := 0; i <= steps; i++ {
 		u := float64(i) / float64(steps)
 		c.plot(int(math.Round(ax+(bx-ax)*u)), int(math.Round(ay+(by-ay)*u)), ad+(bd-ad)*u-0.02, light, ink)
@@ -218,8 +218,8 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 				ink, light = 1, 0.21+n*0.24
 			}
 			// Diagonal pools of sunlight survive only where the canopy opens.
-			beam := math.Max(0, wave(wx*0.28-wz*0.19+f.Noise(wx/9, wz/9, 81)*2)-0.45)
-			sun := beam * math.Max(0, 1-cover*1.3)
+			beam := max(0, wave(wx*0.28-wz*0.19+f.Noise(wx/9, wz/9, 81)*2)-0.45)
+			sun := beam * max(0, 1-cover*1.3)
 			light += sun * 0.8
 			if sun > 0.24 {
 				ink = 7
