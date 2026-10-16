@@ -9,7 +9,7 @@ import (
 const forestScale = 3.6
 
 // zoomSteps is how many wheel steps, each zoomStep times closer, lead to the close-up.
-const zoomSteps, zoomStep = 9, 1.25
+const zoomSteps, zoomStep = 12, 1.25
 
 var closeUpScale = forestScale * math.Pow(zoomStep, zoomSteps)
 

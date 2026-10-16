@@ -94,6 +94,17 @@ var forestPalette = [...][3]int{
 	{84, 140, 112},  // sunlit yew needles
 	{112, 104, 54},  // shaded oak leaves
 	{176, 158, 78},  // sunlit oak leaves
+	{228, 186, 150}, // skin
+	{160, 108, 64},  // hair
+	{168, 72, 74},   // tunic
+	{118, 126, 148}, // trousers
+	{124, 88, 62},   // boots
+	{30, 26, 24},    // eyes
+}
+
+// foremost marks the inks of the hero, their axe and flying chips.
+func foremost(ink int) bool {
+	return ink >= 8 && ink <= 10 || ink >= defaultLook.skin
 }
 
 func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
@@ -220,14 +231,18 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 	if facing := r.world.Hero().Facing(); facing == world.FacingLeft || facing == world.FacingRight {
 		strideX, strideZ = stride, 0
 	}
-	// A small warm-colored traveler: boots, coat, arms, and a round hat.
-	c.line(x-0.16+strideX, 0.05, z+strideZ, x-0.12, 0.7, z, 1, 8)
-	c.line(x+0.16-strideX, 0.05, z-strideZ, x+0.12, 0.7, z, 1, 8)
-	c.line(x, 0.55, z, x, 1.15, z, 1, 8)
-	c.line(x-0.34, 0.65, z-stride, x+0.34, 1.0, z+stride, 0.95, 8)
-	for i := range 8 {
-		a := float64(i) * math.Pi / 4
-		c.line(x, 1.48, z, x+math.Cos(a)*0.28, 1.48, z+math.Sin(a)*0.28, 1, 8)
+	if c.scale >= detailScale {
+		drawDetailedHero(c, x, z, r.world.Hero().Facing(), stride, defaultLook)
+	} else {
+		// A small warm-colored traveler: boots, coat, arms, and a round hat.
+		c.line(x-0.16+strideX, 0.05, z+strideZ, x-0.12, 0.7, z, 1, 8)
+		c.line(x+0.16-strideX, 0.05, z-strideZ, x+0.12, 0.7, z, 1, 8)
+		c.line(x, 0.55, z, x, 1.15, z, 1, 8)
+		c.line(x-0.34, 0.65, z-stride, x+0.34, 1.0, z+stride, 0.95, 8)
+		for i := range 8 {
+			a := float64(i) * math.Pi / 4
+			c.line(x, 1.48, z, x+math.Cos(a)*0.28, 1.48, z+math.Sin(a)*0.28, 1, 8)
+		}
 	}
 	if _, sinceStrike, chopping := r.world.LastStrike(); chopping {
 		drawAxe(c, x, z, r.world.Hero().Facing(), sinceStrike.Seconds())
@@ -370,10 +385,15 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 					}
 				}
 			}
-			for i := range votes {
+			best := 0
+			for i, count := range votes {
 				// The hero, their axe and flying chips stay visible over anything else in the cell.
-				if votes[i] > votes[ink] || i >= 8 && i <= 10 && votes[i] > 0 {
-					ink = i
+				score := count
+				if foremost(i) && count > 0 {
+					score += 64
+				}
+				if score > best {
+					ink, best = i, score
 				}
 			}
 			current[col] = forestCell{bits: uint8(bits), ink: uint8(ink)}
