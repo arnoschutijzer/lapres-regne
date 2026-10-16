@@ -44,3 +44,55 @@ func TestTheChopIsABriefBrightWoodenTok(t *testing.T) {
 		}
 	}
 }
+
+// amplitudeAt measures how strongly a frequency sounds in a window of a mono signal, in seconds.
+func amplitudeAt(samples []float32, frequency, from, length float64) float64 {
+	start := int(from * soundtrack.SampleRate)
+	return amplitude(samples[start*soundtrack.Channels:], frequency, int(length*1000))
+}
+
+func TestTheLevelUpJingleOpensWithAStabAndKnocksAndEndsOnAHeldCChord(t *testing.T) {
+	samples := levelUpSound(false)
+	if seconds := float64(len(samples)/soundtrack.Channels) / soundtrack.SampleRate; seconds < 5.5 || seconds > 6.5 {
+		t.Fatalf("jingle lasts %.2f s, want about the original's 6 s", seconds)
+	}
+	// The stab sounds G4 and C5 together.
+	g4, c5, between := amplitudeAt(samples, 392, 0, 0.1), amplitudeAt(samples, 523.3, 0, 0.1), amplitudeAt(samples, 460, 0, 0.1)
+	if g4 < 4*between || c5 < 4*between {
+		t.Fatalf("G4 = %.3f, C5 = %.3f, between = %.3f; want a G4 and C5 stab", g4, c5, between)
+	}
+	// A low wooden knock answers it, well below the stab's pitch.
+	if knock, high := amplitudeAt(samples, 210, 0.44, 0.05), amplitudeAt(samples, 1600, 0.44, 0.05); knock < 3*high {
+		t.Fatalf("210 Hz = %.3f, 1600 Hz = %.3f at 0.44 s; want a low knock", knock, high)
+	}
+	// The finale holds a C chord with C3 in the bass.
+	if c3, d3 := amplitudeAt(samples, 130.8, 3, 0.2), amplitudeAt(samples, 146.8, 3, 0.2); c3 < 4*d3 {
+		t.Fatalf("C3 = %.3f, D3 = %.3f at 3 s; want the finale's C chord", c3, d3)
+	}
+	peak := 0.0
+	for i := 0; i < len(samples); i += soundtrack.Channels {
+		if samples[i] != samples[i+1] {
+			t.Fatalf("frame %d differs between channels; want a centred jingle", i/2)
+		}
+		peak = math.Max(peak, math.Abs(float64(samples[i])))
+	}
+	if peak < 0.1 || peak > 0.6 {
+		t.Fatalf("peak = %.2f, want a clear jingle that never clips", peak)
+	}
+	for _, sample := range samples[len(samples)-soundtrack.SampleRate/10*soundtrack.Channels:] {
+		if math.Abs(float64(sample)) > 0.005 {
+			t.Fatalf("tail sample = %.4f, want the jingle to fade to silence", sample)
+		}
+	}
+}
+
+func TestTheUnlockingJingleAddsALeadMelody(t *testing.T) {
+	plain, unlocking := levelUpSound(false), levelUpSound(true)
+	// The lead rises to E5 over the C chord at 0.6 s, and steps down from F5 at 1.5 s.
+	for _, check := range []struct{ frequency, at float64 }{{659.3, 0.62}, {698.5, 1.52}} {
+		lead, without := amplitudeAt(unlocking, check.frequency, check.at, 0.1), amplitudeAt(plain, check.frequency, check.at, 0.1)
+		if lead < 4*without {
+			t.Fatalf("%.0f Hz at %.2f s = %.3f with the lead, %.3f without; want the lead melody", check.frequency, check.at, lead, without)
+		}
+	}
+}

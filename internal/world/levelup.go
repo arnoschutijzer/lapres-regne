@@ -30,6 +30,7 @@ func (w *World) celebrate(from, to int) {
 		}
 	}
 	w.celebration = celebration{active: true, levelUp: levelUp}
+	w.sounds.LevelUp(len(levelUp.Unlocked) > 0)
 }
 
 // ageCelebration lets time pass since the last level-up.

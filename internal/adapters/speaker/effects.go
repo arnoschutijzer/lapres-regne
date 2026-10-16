@@ -14,17 +14,33 @@ import (
 type Effects struct {
 	context *oto.Context
 	chop    []byte
+	// levelUp holds the level-up jingle, and unlockingLevelUp the one for a level that unlocks a tree.
+	levelUp, unlockingLevelUp []byte
 	// playing keeps players referenced until their sound has finished.
 	playing []*oto.Player
 }
 
 func newEffects(context *oto.Context) *Effects {
-	return &Effects{context: context, chop: encode(chopSound())}
+	return &Effects{
+		context:          context,
+		chop:             encode(chopSound()),
+		levelUp:          encode(levelUpSound(false)),
+		unlockingLevelUp: encode(levelUpSound(true)),
+	}
 }
 
 // Chop plays a woody tok as an axe lands.
 func (e *Effects) Chop() {
 	e.play(e.chop)
+}
+
+// LevelUp plays the level-up jingle, with its melody when the level unlocks a tree.
+func (e *Effects) LevelUp(unlocked bool) {
+	if unlocked {
+		e.play(e.unlockingLevelUp)
+	} else {
+		e.play(e.levelUp)
+	}
 }
 
 func (e *Effects) play(sound []byte) {

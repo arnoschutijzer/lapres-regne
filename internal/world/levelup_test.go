@@ -66,3 +66,23 @@ func TestALevelThatOpensANewTreeNamesIt(t *testing.T) {
 		t.Fatalf("level up = %+v, %v; want level 15 unlocking oaks", levelUp, ok)
 	}
 }
+
+func TestALevelUpPlaysItsJingleOnce(t *testing.T) {
+	w := besideTreeWithXP(t, 75)
+	sounds := &recordedSounds{}
+	w.SetSounds(sounds)
+	w.Chop()
+	chopUntilFelled(t, w)
+	w.Advance(0, 0, time.Second, false)
+	if !reflect.DeepEqual(sounds.levelUps, []bool{false}) {
+		t.Fatalf("level-up jingles = %v, want one plain jingle for level 2", sounds.levelUps)
+	}
+	unlocking := besideTreeWithXP(t, 2400)
+	sounds = &recordedSounds{}
+	unlocking.SetSounds(sounds)
+	unlocking.Chop()
+	chopUntilFelled(t, unlocking)
+	if !reflect.DeepEqual(sounds.levelUps, []bool{true}) {
+		t.Fatalf("level-up jingles = %v, want the unlocking jingle for level 15", sounds.levelUps)
+	}
+}

@@ -6,12 +6,16 @@ import "time"
 type Sounds interface {
 	// Chop sounds an axe landing on a tree.
 	Chop()
+	// LevelUp plays the jingle for a new level; unlocked picks the variant for a level that lets
+	// the hero chop a new kind of tree.
+	LevelUp(unlocked bool)
 }
 
 // silence is the default when no sound effects are wired.
 type silence struct{}
 
-func (silence) Chop() {}
+func (silence) Chop()        {}
+func (silence) LevelUp(bool) {}
 
 // Progress keeps the hero's progress between sessions.
 type Progress interface {
