@@ -1,10 +1,6 @@
 package terminal
 
-import (
-	"math"
-
-	"lapresregne/internal/world"
-)
+import "math"
 
 // detailScale is the zoom from which the hero is drawn in detail.
 var detailScale = forestScale * math.Pow(zoomStep, 6)
@@ -18,25 +14,18 @@ var defaultLook = heroLook{skin: 17, hair: 18, undershirt: 19, shorts: 20}
 // eyeInk marks the eyes, drawn as unlit gaps in the face.
 const eyeInk = 21
 
-// heroBody places the hero's body parts around their feet, turned the way they face.
+// heroBody places the hero's body parts around their feet, turned to their heading.
 type heroBody struct {
-	c                  *forestCanvas
-	x, z               float64
-	forwardX, forwardZ float64
-	sideX, sideZ       float64
+	c       *forestCanvas
+	x, z    float64
+	heading float64
+	// side and forward are unit directions across the body to its right and out of its front.
+	sideX, sideZ, forwardX, forwardZ float64
 }
 
-func newHeroBody(c *forestCanvas, x, z float64, facing world.Facing) heroBody {
-	b := heroBody{c: c, x: x, z: z, forwardZ: 1, sideX: 1}
-	switch facing {
-	case world.FacingUp:
-		b.forwardZ, b.sideX = -1, -1
-	case world.FacingLeft:
-		b.forwardX, b.forwardZ, b.sideX, b.sideZ = -1, 0, 0, 1
-	case world.FacingRight:
-		b.forwardX, b.forwardZ, b.sideX, b.sideZ = 1, 0, 0, -1
-	}
-	return b
+func newHeroBody(c *forestCanvas, x, z, heading float64) heroBody {
+	cos, sin := math.Cos(heading), math.Sin(heading)
+	return heroBody{c: c, x: x, z: z, heading: heading, sideX: cos, sideZ: -sin, forwardX: sin, forwardZ: cos}
 }
 
 // at turns an offset to the hero's side and front into a world position.
@@ -47,8 +36,7 @@ func (b heroBody) at(side, forward float64) (x, z float64) {
 // part draws one rounded, sunlit body part with its own width, height and depth.
 func (b heroBody) part(side, y, forward, width, height, depth float64, ink int) {
 	x, z := b.at(side, forward)
-	rx, rz := b.radii(width, depth)
-	ellipsoid(b.c, x, y, z, rx, height, rz, 0, func(px, py int, depth float64, _, normal vec) {
+	ellipsoid(b.c, x, y, z, width, height, depth, b.heading, func(px, py int, depth float64, _, normal vec) {
 		// Shading flows smoothly across parts; only the outline behind the figure marks its edge.
 		light := 0.6 + 0.4*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
 		b.c.plot(px, py, depth, light, ink)
@@ -60,20 +48,21 @@ func (b heroBody) part(side, y, forward, width, height, depth float64, ink int) 
 func (b heroBody) outline(side, y, forward, width, height, depth float64) {
 	x, z := b.at(side, forward)
 	band := 1.5 / b.c.scale
-	rx, rz := b.radii(width+band, depth+band)
-	ellipsoid(b.c, x, y, z, rx, height+band, rz, 0, func(px, py int, depth float64, _, _ vec) {
+	ellipsoid(b.c, x, y, z, width+band, height+band, depth+band, b.heading, func(px, py int, depth float64, _, _ vec) {
 		b.c.plot(px, py, depth+0.4, 0, 0)
 	})
 }
 
-// radii turns a part's width across the body and depth front to back into world radii.
-func (b heroBody) radii(width, depth float64) (rx, rz float64) {
-	return math.Abs(b.sideX)*width + math.Abs(b.forwardX)*depth, math.Abs(b.sideZ)*width + math.Abs(b.forwardZ)*depth
-}
-
-// eye leaves an unlit gap two dots tall on the front of the face.
+// eye leaves an unlit gap two dots tall on the face, when that side of the face turns toward the view.
 func (b heroBody) eye(side float64) {
-	x, z := b.at(side, 0.09)
+	const forward = 0.09
+	// The head's surface normal at the eye, turned into the world, must face the camera.
+	normalSide, normalForward := side/(0.085*0.085), forward/(0.095*0.095)
+	length := math.Hypot(normalSide, normalForward)
+	if (normalSide*b.sideZ+normalForward*b.forwardZ)/length < 0.15 {
+		return
+	}
+	x, z := b.at(side, forward)
 	px, py, depth := b.c.project(x, 1.54, z)
 	for dy := range 2 {
 		b.c.plot(int(math.Round(px)), int(math.Round(py))+dy, depth-0.05, 0, eyeInk)
@@ -117,8 +106,8 @@ func bend(from joint, side, angle, length float64) joint {
 // drawDetailedHero draws the hero's base body with realistic, slender proportions: skin, short
 // hair, a plain undershirt and shorts, and bare feet. Legs swing from the hips with the knee
 // bending on the back swing, and arms swing against them.
-func drawDetailedHero(c *forestCanvas, x, z float64, facing world.Facing, stride float64, look heroLook) {
-	b := newHeroBody(c, x, z, facing)
+func drawDetailedHero(c *forestCanvas, x, z, heading, stride float64, look heroLook) {
+	b := newHeroBody(c, x, z, heading)
 	swing := stride / 0.24 * 0.22
 	var parts []bodyPart
 	for _, side := range []float64{-1, 1} {
@@ -158,11 +147,6 @@ func drawDetailedHero(c *forestCanvas, x, z float64, facing world.Facing, stride
 	for _, p := range parts {
 		b.part(p.side, p.y, p.forward, p.width, p.height, p.depth, p.ink)
 	}
-	switch facing {
-	case world.FacingDown:
-		b.eye(-0.032)
-		b.eye(0.032)
-	case world.FacingLeft, world.FacingRight:
-		b.eye(0.03)
-	}
+	b.eye(-0.032)
+	b.eye(0.032)
 }

@@ -34,6 +34,9 @@ type renderer struct {
 	menu      []string
 	menuTitle string
 	zoom      zoom
+	gait      gait
+	// lastSeconds is when the last frame was rendered, so the gait can follow the time between frames.
+	lastSeconds float64
 }
 
 func newRenderer(world *world.World, title string) *renderer {
@@ -230,8 +233,10 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 	if facing := r.world.Hero().Facing(); facing == world.FacingLeft || facing == world.FacingRight {
 		strideX, strideZ = stride, 0
 	}
+	r.gait.update(x, z, r.world.Hero().Facing(), min(0.1, max(0, seconds-r.lastSeconds)))
+	r.lastSeconds = seconds
 	if c.scale >= detailScale {
-		drawDetailedHero(c, x, z, r.world.Hero().Facing(), stride, defaultLook)
+		drawDetailedHero(c, x, z, r.gait.heading, stride, defaultLook)
 	} else {
 		// A small warm-colored traveler: boots, coat, arms, and a round hat.
 		c.line(x-0.16+strideX, 0.05, z+strideZ, x-0.12, 0.7, z, 1, 8)
