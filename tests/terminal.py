@@ -19,12 +19,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Terminal:
-    def __init__(self, binary, *args):
+    def __init__(self, binary, *args, mute=True):
         self.master, self.slave = pty.openpty()
         self.resize(100, 30)
         self.original = termios.tcgetattr(self.slave)
         self.process = subprocess.Popen(
-            [binary, *args], stdin=self.slave, stdout=self.slave, stderr=self.slave
+            [binary, *(["--mute"] if mute else []), *args], stdin=self.slave, stdout=self.slave, stderr=self.slave
         )
 
     def resize(self, width, height):
@@ -127,6 +127,9 @@ def check_forest(binary):
         initial = terminal.read(until=b"steps 0")
         assert "L’Après-Règne".encode() in initial
         assert b"236;185;105m" in initial, "traveler must be visible"
+        terminal.send(b"np\x1b[110;1u\x1b[112;1:3u")
+        terminal.read(timeout=0.05)
+        assert terminal.process.poll() is None, "music hotkeys must be safe in muted mode"
         terminal.send(b"d")
         terminal.read(until=b"x 0.6  z 0.0  |  steps 1")
         terminal.send(b"\x1b[A")
@@ -270,6 +273,13 @@ with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     check_responsive_rendering(binary)
     check_held_movement(binary)
     check_sprinting(binary)
+    terminal = Terminal(binary, "--music-dir", str(Path(directory) / "missing"), mute=False)
+    try:
+        terminal.read(until=b"seed 7")
+        terminal.send(b"npdq")
+        terminal.assert_restored()
+    finally:
+        terminal.close()
     check_exit(binary, b"\x03")
     check_exit(binary, b"\x1b[1;\x03")
     check_exit(binary, b"\x1b[99;5u")

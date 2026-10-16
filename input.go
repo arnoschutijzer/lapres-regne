@@ -14,6 +14,8 @@ const (
 	up
 	down
 	quit
+	nextTrack
+	previousTrack
 )
 
 type keyEvent struct {
@@ -23,6 +25,7 @@ type keyEvent struct {
 	enhanced bool
 	focusOut bool
 	shift    bool
+	repeat   bool
 }
 
 const (
@@ -56,6 +59,10 @@ func keyAction(key int) action {
 		return down
 	case 3, 4, 'q', 'Q':
 		return quit
+	case 'n', 'N':
+		return nextTrack
+	case 'p', 'P':
+		return previousTrack
 	}
 	return none
 }
@@ -120,6 +127,7 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 				return keyEvent{}
 			}
 			event.enhanced, event.release = true, typeID == 3
+			event.repeat = typeID == 2
 		}
 	}
 	switch final {

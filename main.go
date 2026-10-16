@@ -19,8 +19,10 @@ const appTitle = "L’Après-Règne"
 func main() {
 	treeMode := flag.Bool("tree", false, "show the original orbiting tree")
 	seed := flag.Uint64("seed", 7, "procedural forest seed")
+	mute := flag.Bool("mute", false, "disable the soundtrack")
+	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--tree]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--tree] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -28,7 +30,7 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if err := run(*treeMode, *seed); err != nil {
+	if err := run(*treeMode, *seed, *mute, *musicDir); err != nil {
 		fmt.Fprintln(os.Stderr, "dither-cli:", err)
 		os.Exit(1)
 	}
@@ -59,7 +61,7 @@ func terminalSize() (int, int, error) {
 	return cols, rows, nil
 }
 
-func run(treeMode bool, seed uint64) error {
+func run(treeMode bool, seed uint64, mute bool, musicDir string) error {
 	state, err := stty("-g")
 	if err != nil {
 		return fmt.Errorf("open an interactive terminal to explore the forest (%w)", err)
@@ -74,6 +76,16 @@ func run(treeMode bool, seed uint64) error {
 	resize := make(chan os.Signal, 1)
 	signal.Notify(resize, syscall.SIGWINCH)
 	defer signal.Stop(resize)
+	var music *musicPlayback
+	if !mute && !treeMode {
+		music, err = startMusic(musicDir)
+		if err != nil {
+			return fmt.Errorf("start soundtrack (use --mute for silent play): %w", err)
+		}
+		if music != nil {
+			defer music.Close()
+		}
+	}
 	if _, err := stty("raw", "-echo"); err != nil {
 		return err
 	}
@@ -117,6 +129,16 @@ func run(treeMode bool, seed uint64) error {
 		}
 		if event.action == quit {
 			return true
+		}
+		if event.action == nextTrack || event.action == previousTrack {
+			if music != nil && !event.repeat {
+				direction := 1
+				if event.action == previousTrack {
+					direction = -1
+				}
+				music.Skip(direction)
+			}
+			return false
 		}
 		if !treeMode {
 			if !event.enhanced {
@@ -174,6 +196,11 @@ func run(treeMode bool, seed uint64) error {
 				width, height, dirty = w, h, true
 			}
 		case <-frames.C:
+			if music != nil {
+				if err := music.Err(); err != nil {
+					return fmt.Errorf("soundtrack (use --mute for silent play): %w", err)
+				}
+			}
 			now := time.Now()
 			dt := min(now.Sub(lastFrame), 100*time.Millisecond)
 			lastFrame = now
