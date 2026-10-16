@@ -18,6 +18,8 @@ const (
 	Path
 	// Floor is flagstones, inside buildings and courtyards.
 	Floor
+	// Door is an open doorway through a wall, on a flagstone floor.
+	Door
 	Wall
 	Fence
 	Gate

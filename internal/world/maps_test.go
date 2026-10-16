@@ -181,7 +181,7 @@ func courtyard() world.Map {
 
 func TestOnlyStructuresBlockTheWay(t *testing.T) {
 	for ground, blocks := range map[world.Ground]bool{
-		world.Grass: false, world.Water: false, world.Path: false, world.Floor: false,
+		world.Grass: false, world.Water: false, world.Path: false, world.Floor: false, world.Door: false,
 		world.Wall: true, world.Fence: true, world.Gate: true, world.Grave: true,
 	} {
 		if ground.Blocks() != blocks {
@@ -199,6 +199,16 @@ func TestWallsStopTheHero(t *testing.T) {
 	w.Advance(0, -1, 2*time.Second, false)
 	if _, z := w.Hero().Position(); z < world.TileSize {
 		t.Fatalf("z = %v; want the hero stopped against the north wall", z)
+	}
+}
+
+func TestTheHeroWalksOutThroughADoorway(t *testing.T) {
+	m := courtyard()
+	m.Ground[3][2] = world.Door
+	w := world.NewOnMap(7, m)
+	w.Advance(0, 1, 2*time.Second, false)
+	if _, z := w.Hero().Position(); z < 4*world.TileSize {
+		t.Fatalf("z = %v; want the hero out through the door onto the path", z)
 	}
 }
 

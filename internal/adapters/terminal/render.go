@@ -128,10 +128,11 @@ var forestPalette = [...][3]int{
 	{96, 206, 238},  // cyan fireworks
 	{226, 104, 214}, // magenta fireworks
 	{226, 52, 44},   // red fireworks
-	{168, 164, 150}, // stone
+	{214, 206, 186}, // stone
 	{150, 122, 84},  // earth path
-	{124, 118, 104}, // flagstones
-	{92, 98, 104},   // iron
+	{96, 100, 108},  // flagstones
+	{150, 162, 176}, // iron
+	{164, 118, 70},  // planks
 }
 
 // foremost marks the inks of the hero, their axe, flying chips and fireworks.
@@ -464,6 +465,9 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 				if foremost(i) && count > 0 {
 					score += 64
 				}
+				if prominent(i) {
+					score *= 2
+				}
 				if score > best {
 					ink, best = i, score
 				}
@@ -593,7 +597,7 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 				if f.Noise(wx*3, wz*3, 23) > 0.78 {
 					light += 0.3
 				}
-			case ground == world.Floor || ground == world.Wall:
+			case ground == world.Floor || ground == world.Wall || ground == world.Door:
 				ink, light = floorInk, flagstones(wx, wz, n)
 			}
 			water = ground == world.Water
