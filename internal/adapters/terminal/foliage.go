@@ -53,8 +53,11 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 			}
 			localY, localZ := -v*0.69+t*0.72, v*0.72+t*0.69
 			normal := vec{u / (rx * rx), localY / (ry * ry), localZ / (rz * rz)}.unit()
-			light := 0.20 + 0.68*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
+			light := 0.34 + 0.6*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
 			light += 0.04 * math.Sin(u*11+localY*8+localZ*7)
+			// Darkening toward the rim leaves a dotless outline, so each crown's shape reads in braille.
+			facing := math.Abs(normal.dot(vec{0, 0.72, 0.69}))
+			light *= math.Min(1, math.Max(0, (facing-0.12)/0.3))
 			ink := leaves.shaded
 			if light > 0.58 {
 				ink = leaves.sunlit
@@ -74,13 +77,15 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 // foliageInks are the palette entries a crown uses in shade and in sunlight.
 type foliageInks struct{ shaded, sunlit int }
 
-// leavesOf gives willows pale, soft leaves and yews dark needles; oaks share the common green.
+// leavesOf gives willows pale, soft leaves, yews blue-green needles and oaks bronzed leaves.
 func leavesOf(kind world.TreeKind) foliageInks {
 	switch kind {
 	case world.Willow:
 		return foliageInks{11, 12}
 	case world.Yew:
 		return foliageInks{13, 14}
+	case world.Oak:
+		return foliageInks{15, 16}
 	}
 	return foliageInks{2, 3}
 }
@@ -158,7 +163,7 @@ func (r *renderer) drawWillow(c *forestCanvas, tree world.Tree, shake float64) {
 			out := reach * math.Sin(t*math.Pi/2)
 			y := h*1.1 + h*0.15*math.Sin(t*math.Pi) - (h*1.1-end)*t*t
 			pointX, pointZ := x+shake*(1-t*0.6)+cos*out, z+sin*out
-			c.line(previousX, previousY, previousZ, pointX, y, pointZ, 0.45+0.1*(1-t), ink)
+			c.line(previousX, previousY, previousZ, pointX, y, pointZ, 0.95, ink)
 			previousX, previousY, previousZ = pointX, y, pointZ
 		}
 	}

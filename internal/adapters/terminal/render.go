@@ -75,7 +75,7 @@ type forestCanvas struct {
 	x, z, scale   float64
 }
 
-var forestPalette = [][3]int{
+var forestPalette = [...][3]int{
 	{59, 78, 58},    // ground
 	{102, 131, 71},  // grass
 	{76, 100, 62},   // shaded leaves
@@ -87,10 +87,12 @@ var forestPalette = [][3]int{
 	{236, 185, 105}, // character
 	{205, 214, 218}, // axe head
 	{214, 184, 136}, // wood chips
-	{96, 112, 70},   // shaded willow leaves
-	{170, 176, 112}, // sunlit willow leaves
-	{40, 58, 46},    // shaded yew needles
-	{74, 98, 66},    // sunlit yew needles
+	{140, 150, 100}, // shaded willow leaves
+	{206, 208, 150}, // sunlit willow leaves
+	{48, 104, 86},   // shaded yew needles
+	{84, 140, 112},  // sunlit yew needles
+	{112, 104, 54},  // shaded oak leaves
+	{176, 158, 78},  // sunlit oak leaves
 }
 
 func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
@@ -356,7 +358,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
 			bits, ink := 0, 0
-			var votes [15]int
+			var votes [len(forestPalette)]int
 			for dy := range 4 {
 				for dx := range 2 {
 					x, y := col*2+dx, row*4+dy
