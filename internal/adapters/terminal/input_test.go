@@ -28,6 +28,16 @@ func TestLeftClicksReportTheCell(t *testing.T) {
 	}
 }
 
+func TestShiftClicksReportTheCell(t *testing.T) {
+	var d keyDecoder
+	// Shift sets the button's bit 4.
+	events := feed(&d, "\x1b[<4;12;7M")
+	last := events[len(events)-1]
+	if !last.click || last.column != 12 || last.row != 7 {
+		t.Fatalf("event = %+v, want a shift-click at column 12, row 7", last)
+	}
+}
+
 func TestMouseReleasesAndOtherButtonsAreIgnored(t *testing.T) {
 	var d keyDecoder
 	for _, event := range feed(&d, "\x1b[<0;12;7m\x1b[<2;12;7M") {

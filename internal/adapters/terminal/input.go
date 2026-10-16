@@ -59,8 +59,10 @@ const keyboardStart = "\x1b[>11u\x1b[?u\x1b[?1004h"
 const keyboardStop = "\x1b[?1004l\x1b[<u"
 
 // Any-motion tracking with SGR encoding reports the pointer cell even with no button held.
-const mouseStart = "\x1b[?1003h\x1b[?1006h"
-const mouseStop = "\x1b[?1006l\x1b[?1003l"
+// XTSHIFTESCAPE 1 asks terminals that keep Shift-click for selecting text to report it instead,
+// so the hero can run to a clicked spot; 0 hands Shift-click back to the terminal.
+const mouseStart = "\x1b[?1003h\x1b[?1006h\x1b[>1s"
+const mouseStop = "\x1b[>0s\x1b[?1006l\x1b[?1003l"
 
 type keyDecoder struct {
 	escape   byte
