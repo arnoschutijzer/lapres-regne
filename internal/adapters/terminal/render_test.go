@@ -22,6 +22,32 @@ func BenchmarkForestFrame(b *testing.B) {
 	}
 }
 
+// BenchmarkScenes renders the largest view of the places and camera angles a traveler sees most.
+func BenchmarkScenes(b *testing.B) {
+	scenes := []struct {
+		name  string
+		setUp func(w *world.World)
+	}{
+		{"forest", func(*world.World) {}},
+		{"midway", func(w *world.World) { w.ZoomBy(world.CloseUp / 2) }},
+		{"close-up", func(w *world.World) { w.ZoomBy(world.CloseUp) }},
+		{"turned", func(w *world.World) { w.TurnBy(world.QuarterTurn / 2) }},
+		{"river", func(w *world.World) { w.Advance(1, 0, 6*time.Second, false) }},
+	}
+	for _, scene := range scenes {
+		b.Run(scene.name, func(b *testing.B) {
+			w := world.New(7)
+			scene.setUp(w)
+			w.Follow(time.Second)
+			r := newRenderer(w, "L’Après-Règne")
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				r.frame(220, 93, float64(i%120)/30)
+			}
+		})
+	}
+}
+
 func TestGroundAtFollowsTheScreenAroundTheHero(t *testing.T) {
 	r := newRenderer(world.New(7), "L’Après-Règne")
 	r.frame(100, 30, 0)
