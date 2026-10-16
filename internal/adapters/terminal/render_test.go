@@ -359,8 +359,11 @@ func TestEachKindOfTreeHasItsOwnSilhouette(t *testing.T) {
 	if yewHeight <= yewWidth {
 		t.Errorf("a yew is %d wide and %d tall, want it taller than wide", yewWidth, yewHeight)
 	}
-	_, _, willowLowest := leafBounds(world.Willow)
+	willowWidth, _, willowLowest := leafBounds(world.Willow)
 	if willowLowest <= oakLowest+10 {
 		t.Errorf("a willow's leaves reach row %d, want them hanging well below an oak's at row %d", willowLowest, oakLowest)
+	}
+	if willowWidth <= oakWidth {
+		t.Errorf("a willow's strands spread %d wide, want them sweeping past an oak's %d", willowWidth, oakWidth)
 	}
 }

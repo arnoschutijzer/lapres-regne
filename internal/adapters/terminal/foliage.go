@@ -134,25 +134,33 @@ func (r *renderer) drawOak(c *forestCanvas, tree world.Tree, shake float64) {
 	r.crown(c, x+shake, h*1.08, z, radius*1.05, radius*0.5, radius*0.95, leaves)
 }
 
-// drawWillow hangs a curtain of leafy strands from a rounded dome nearly to the ground.
+// drawWillow sweeps long, drooping strands out from a small crown in a wide fountain that
+// nearly touches the ground.
 func (r *renderer) drawWillow(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	leaves := leavesOf(tree.Kind)
-	drawTrunk(c, tree, tree.Trunk, h*0.9, shake)
-	r.crown(c, x+shake, h*0.9, z, radius*0.9, radius*0.62, radius*0.9, leaves)
-	for i := range 26 {
-		angle := tree.Variation*6.28 + float64(i)*0.2417
+	drawTrunk(c, tree, tree.Trunk, h*1.05, shake)
+	r.crown(c, x+shake, h*1.05, z, radius*0.55, radius*0.4, radius*0.55, leaves)
+	const strands, segments = 44, 7
+	for i := range strands {
+		angle := tree.Variation*6.28 + float64(i)*2.399
 		cos, sin := math.Cos(angle), math.Sin(angle)
-		// Strands arch out past the dome's rim, then fall straight down at varied lengths.
-		rimX, rimZ := x+shake+cos*radius*0.7, z+sin*radius*0.7
-		archX, archZ := x+shake*0.8+cos*radius*1.02, z+sin*radius*1.02
-		end := h * (0.08 + 0.18*math.Abs(math.Sin(float64(i)*2.3+tree.Variation*9)))
+		// Each strand rises a little from the crown, arcs far outward, then falls to a varied length.
+		reach := radius * (1.3 + 0.45*math.Abs(math.Sin(float64(i)*1.7+tree.Variation*5)))
+		end := h * (0.04 + 0.2*math.Abs(math.Sin(float64(i)*2.3+tree.Variation*9)))
 		ink := leaves.shaded
-		if cos < 0.2 && i%2 == 0 {
+		if cos < 0.3 && sin < 0.4 && i%3 != 0 {
 			ink = leaves.sunlit
 		}
-		c.line(rimX, h*1.05, rimZ, archX, h*0.8, archZ, 0.5, ink)
-		c.line(archX, h*0.8, archZ, archX+shake*0.3, end, archZ, 0.45, ink)
+		previousX, previousY, previousZ := x+shake, h*1.1, z
+		for s := 1; s <= segments; s++ {
+			t := float64(s) / segments
+			out := reach * math.Sin(t*math.Pi/2)
+			y := h*1.1 + h*0.15*math.Sin(t*math.Pi) - (h*1.1-end)*t*t
+			pointX, pointZ := x+shake*(1-t*0.6)+cos*out, z+sin*out
+			c.line(previousX, previousY, previousZ, pointX, y, pointZ, 0.45+0.1*(1-t), ink)
+			previousX, previousY, previousZ = pointX, y, pointZ
+		}
 	}
 }
 
