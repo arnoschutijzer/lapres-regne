@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	musicSampleRate = 44100
-	musicChannels   = 2
-	musicFadeFrames = 3 * musicSampleRate
+	musicSampleRate    = 44100
+	musicChannels      = 2
+	musicFadeFrames    = 3 * musicSampleRate
+	musicSilenceFrames = musicSampleRate / 4
 )
 
 // Selection is independent of decoding and crossfading. A trigger-based selector
@@ -82,24 +83,42 @@ func (t *musicTrack) Close() {
 	}
 }
 
-// musicStream produces sample-accurate crossfades on the audio thread, without
+type musicPhase byte
+
+const (
+	musicFadeIn musicPhase = iota
+	musicPlaying
+	musicFadeOut
+	musicSilence
+)
+
+// musicStream produces sequential fades on the audio thread, without
 // timers on the rendering thread or decoding entire songs into memory.
 type musicStream struct {
-	selectTrack       func(direction int) (*musicTrack, error)
-	current, upcoming *musicTrack
-	fadeFrames        int64
-	fadePosition      int64
-	requests          chan int
-	a, b              [2048]float32
-	encoded           [8192]byte
-	pending           []byte
-	err               error
+	selectTrack                func(direction int) (*musicTrack, error)
+	current                    *musicTrack
+	fadeFrames, silenceFrames  int64
+	phase                      musicPhase
+	phasePosition, phaseLength int64
+	gain, fadeOutGain          float64
+	direction                  int
+	requests                   chan int
+	a                          [2048]float32
+	encoded                    [8192]byte
+	pending                    []byte
+	err                        error
 }
 
-func newMusicStream(selectTrack func(int) (*musicTrack, error), fadeFrames int64) (*musicStream, error) {
-	m := &musicStream{selectTrack: selectTrack, fadeFrames: fadeFrames, requests: make(chan int, 1)}
+func newMusicStream(selectTrack func(int) (*musicTrack, error), fadeFrames, silenceFrames int64) (*musicStream, error) {
+	if fadeFrames < 1 || silenceFrames < 1 {
+		return nil, fmt.Errorf("fade and silence durations must be positive")
+	}
+	m := &musicStream{selectTrack: selectTrack, fadeFrames: fadeFrames, silenceFrames: silenceFrames, direction: 1, requests: make(chan int, 1)}
 	var err error
 	m.current, err = m.loadTrack(1)
+	if err == nil {
+		m.beginFadeIn()
+	}
 	return m, err
 }
 
@@ -108,15 +127,15 @@ func (m *musicStream) loadTrack(direction int) (*musicTrack, error) {
 	if err != nil {
 		return nil, err
 	}
-	if m.fadeFrames <= 0 || track.frames < 2*m.fadeFrames {
+	if track.frames < 2 {
 		track.Close()
-		return nil, fmt.Errorf("song must be at least twice the crossfade duration")
+		return nil, fmt.Errorf("song must contain at least two audio frames")
 	}
 	return track, nil
 }
 
-// Skip is nonblocking; decoder changes happen on the audio thread. If a fade is
-// already in progress, finish it before handling the latest navigation request.
+// Skip is nonblocking. While fading out, the latest request chooses which song
+// starts after the silence, so rapid navigation never builds up a queue.
 func (m *musicStream) Skip(direction int) {
 	if direction == 0 {
 		return
@@ -152,58 +171,92 @@ func readSamples(track *musicTrack, samples []float32) error {
 }
 
 func (m *musicStream) mix() (int, error) {
-	current := m.current
-	fadeStart := current.frames - m.fadeFrames
-	if m.upcoming == nil {
-		direction := 0
-		select {
-		case direction = <-m.requests:
-		default:
-			if current.position >= fadeStart {
-				direction = 1
-			}
+	select {
+	case direction := <-m.requests:
+		m.direction = direction
+		if m.phase == musicPlaying || m.phase == musicFadeIn {
+			m.beginFadeOut()
 		}
-		if direction != 0 {
-			var err error
-			m.upcoming, err = m.loadTrack(direction)
-			if err != nil {
-				return 0, err
-			}
-			m.fadePosition = 0
-		}
+	default:
 	}
-	frames := min(int64(len(m.a)/musicChannels), current.frames-current.position)
-	fading := m.upcoming != nil
-	if !fading {
-		frames = min(frames, fadeStart-current.position)
+	frames := int64(len(m.a) / musicChannels)
+	if m.phase == musicSilence {
+		frames = min(frames, m.phaseLength-m.phasePosition)
+		clear(m.a[:int(frames)*musicChannels])
 	} else {
-		frames = min(frames, m.fadeFrames-m.fadePosition)
-	}
-	n := int(frames) * musicChannels
-	if err := readSamples(current, m.a[:n]); err != nil {
-		return 0, err
-	}
-	if fading {
-		if err := readSamples(m.upcoming, m.b[:n]); err != nil {
+		fadeStart := m.current.frames - min(m.fadeFrames, m.current.frames/2)
+		if m.phase == musicPlaying && m.current.position >= fadeStart {
+			m.direction = 1
+			m.beginFadeOut()
+		}
+		frames = min(frames, m.current.frames-m.current.position)
+		if m.phase == musicPlaying {
+			frames = min(frames, fadeStart-m.current.position)
+		} else {
+			frames = min(frames, m.phaseLength-m.phasePosition)
+		}
+		if err := readSamples(m.current, m.a[:int(frames)*musicChannels]); err != nil {
 			return 0, err
 		}
 		for frame := range int(frames) {
-			progress := float64(m.fadePosition+int64(frame)) / float64(m.fadeFrames)
-			incoming, outgoing := math.Sincos(progress * math.Pi / 2)
+			gain := 1.0
+			if m.phase != musicPlaying {
+				progress := float64(m.phasePosition+int64(frame)+1) / float64(m.phaseLength)
+				if m.phase == musicFadeIn {
+					gain = math.Sin(progress * math.Pi / 2)
+				} else if progress >= 1 {
+					gain = 0
+				} else {
+					gain = m.fadeOutGain * math.Cos(progress*math.Pi/2)
+				}
+			}
+			m.gain = gain
 			for channel := range musicChannels {
-				i := frame*musicChannels + channel
-				m.a[i] = float32(float64(m.a[i])*outgoing + float64(m.b[i])*incoming)
+				m.a[frame*musicChannels+channel] *= float32(gain)
 			}
 		}
-		m.upcoming.position += frames
-		m.fadePosition += frames
+		m.current.position += frames
 	}
-	current.position += frames
-	if fading && m.fadePosition == m.fadeFrames {
-		current.Close()
-		m.current, m.upcoming = m.upcoming, nil
+	if m.phase != musicPlaying {
+		m.phasePosition += frames
+		if m.phasePosition == m.phaseLength {
+			if err := m.finishPhase(); err != nil {
+				return 0, err
+			}
+		}
 	}
-	return n, nil
+	return int(frames) * musicChannels, nil
+}
+
+func (m *musicStream) beginFadeIn() {
+	m.phase, m.phasePosition = musicFadeIn, 0
+	m.phaseLength = min(m.fadeFrames, m.current.frames/2)
+	m.gain = 0
+}
+
+func (m *musicStream) beginFadeOut() {
+	m.phase, m.phasePosition = musicFadeOut, 0
+	m.phaseLength = min(m.fadeFrames, m.current.frames-m.current.position)
+	m.fadeOutGain = m.gain
+}
+
+func (m *musicStream) finishPhase() error {
+	switch m.phase {
+	case musicFadeIn:
+		m.phase = musicPlaying
+	case musicFadeOut:
+		m.current.Close()
+		m.current = nil
+		m.phase, m.phasePosition, m.phaseLength = musicSilence, 0, m.silenceFrames
+	case musicSilence:
+		var err error
+		m.current, err = m.loadTrack(m.direction)
+		if err != nil {
+			return err
+		}
+		m.beginFadeIn()
+	}
+	return nil
 }
 
 func (m *musicStream) Read(p []byte) (int, error) {
@@ -246,7 +299,7 @@ func startMusic(directory string) (*musicPlayback, error) {
 			return openSong(history.Previous())
 		}
 		return openSong(history.Next())
-	}, musicFadeFrames)
+	}, musicFadeFrames, musicSilenceFrames)
 	if err != nil {
 		return nil, err
 	}
@@ -291,9 +344,6 @@ func (m *musicPlayback) Close() {
 	m.player.PauseAndStopReading()
 	if m.stream.current != nil {
 		m.stream.current.Close()
-	}
-	if m.stream.upcoming != nil {
-		m.stream.upcoming.Close()
 	}
 	m.context.Suspend()
 }

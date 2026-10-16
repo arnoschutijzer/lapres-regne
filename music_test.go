@@ -40,63 +40,7 @@ func TestSongHistoryNavigation(t *testing.T) {
 	}
 }
 
-func TestManualTrackChangesCrossfade(t *testing.T) {
-	index := -1
-	stream, err := newMusicStream(func(direction int) (*musicTrack, error) {
-		index = max(0, index+direction)
-		tone := stereoTone{left: 1}
-		if index%2 == 1 {
-			tone = stereoTone{right: 1}
-		}
-		return &musicTrack{samples: tone, frames: 10000}, nil
-	}, 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	read := func(frames int) []byte {
-		t.Helper()
-		pcm := make([]byte, frames*musicChannels*4)
-		if _, err := io.ReadFull(stream, pcm); err != nil {
-			t.Fatal(err)
-		}
-		return pcm
-	}
-	assertTone := func(pcm []byte, left, right float32) {
-		t.Helper()
-		for offset := 0; offset < len(pcm); offset += 8 {
-			l := math.Float32frombits(binary.LittleEndian.Uint32(pcm[offset:]))
-			r := math.Float32frombits(binary.LittleEndian.Uint32(pcm[offset+4:]))
-			if l != left || r != right {
-				t.Fatalf("wrong song after navigation: %f, %f", l, r)
-			}
-		}
-	}
-	assertTone(read(1024), 1, 0)
-	stream.Skip(1)
-	fade := read(4)
-	for offset := 8; offset < len(fade); offset += 8 {
-		l := math.Float32frombits(binary.LittleEndian.Uint32(fade[offset:]))
-		r := math.Float32frombits(binary.LittleEndian.Uint32(fade[offset+4:]))
-		if l <= 0 || r <= 0 {
-			t.Fatal("manual skip must overlap the outgoing and incoming songs")
-		}
-	}
-	assertTone(read(1024), 0, 1)
-	stream.Skip(-1)
-	read(4)
-	assertTone(read(1024), 1, 0)
-
-	// Preserve the current crossfade, then honor the latest queued request.
-	stream.Skip(1)
-	read(1)
-	stream.Skip(1)
-	stream.Skip(-1)
-	read(3)
-	read(4)
-	assertTone(read(1024), 1, 0)
-}
-
-// Stereo fixtures isolate outgoing sound on the left and incoming on the right.
+// Stereo fixtures make any overlap between different songs directly observable.
 type stereoTone struct{ left, right float32 }
 
 func (s stereoTone) Read(p []float32) (int, error) {
@@ -106,54 +50,76 @@ func (s stereoTone) Read(p []float32) (int, error) {
 	return len(p), nil
 }
 
-func crossfadeFixture(t *testing.T) *musicStream {
+func readMusic(t *testing.T, stream io.Reader, frames int) []byte {
 	t.Helper()
-	next := 0
-	stream, err := newMusicStream(func(_ int) (*musicTrack, error) {
+	pcm := make([]byte, frames*musicChannels*4)
+	if _, err := io.ReadFull(stream, pcm); err != nil {
+		t.Fatal(err)
+	}
+	return pcm
+}
+
+func sampleAt(pcm []byte, frame int) (float32, float32) {
+	return math.Float32frombits(binary.LittleEndian.Uint32(pcm[frame*8:])),
+		math.Float32frombits(binary.LittleEndian.Uint32(pcm[frame*8+4:]))
+}
+
+func musicFixture(t *testing.T, frames int64) *musicStream {
+	t.Helper()
+	index := -1
+	stream, err := newMusicStream(func(direction int) (*musicTrack, error) {
+		index = max(0, index+direction)
 		tone := stereoTone{left: 1}
-		if next%2 == 1 {
+		if index%2 == 1 {
 			tone = stereoTone{right: 1}
 		}
-		next++
-		return &musicTrack{samples: tone, frames: 12}, nil
-	}, 4)
+		return &musicTrack{samples: tone, frames: frames}, nil
+	}, 4, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return stream
 }
 
-func TestSoundtrackCrossfadesWithoutGaps(t *testing.T) {
-	stream := crossfadeFixture(t)
-	pcm := make([]byte, 20*musicChannels*4)
-	if _, err := io.ReadFull(stream, pcm); err != nil {
-		t.Fatal(err)
+func TestSongsFadeThroughSilenceWithoutOverlap(t *testing.T) {
+	pcm := readMusic(t, musicFixture(t, 12), 28)
+	for frame := range 28 {
+		left, right := sampleAt(pcm, frame)
+		if left != 0 && right != 0 {
+			t.Fatalf("songs overlap at frame %d", frame)
+		}
+		if frame < 12 && right != 0 {
+			t.Fatal("next song starts before outgoing fade completes")
+		}
+		if frame >= 14 && left != 0 {
+			t.Fatal("outgoing song continues after the silence")
+		}
+		if frame >= 11 && frame <= 13 || frame >= 25 {
+			if left != 0 || right != 0 {
+				t.Fatalf("transition must reach actual silence at frame %d", frame)
+			}
+		}
+		if frame > 0 && frame < 4 {
+			previous, _ := sampleAt(pcm, frame-1)
+			if left <= previous {
+				t.Fatal("first song must fade in")
+			}
+		}
+		if frame > 8 && frame < 12 {
+			previous, _ := sampleAt(pcm, frame-1)
+			if left >= previous {
+				t.Fatal("outgoing song must fade out")
+			}
+		}
+		if frame >= 14 && frame < 18 {
+			_, previous := sampleAt(pcm, frame-1)
+			if right <= previous {
+				t.Fatal("next song must fade in after the silence")
+			}
+		}
 	}
-	var previousLeft, previousRight float64
-	for frame := range 20 {
-		left := float64(math.Float32frombits(binary.LittleEndian.Uint32(pcm[frame*8:])))
-		right := float64(math.Float32frombits(binary.LittleEndian.Uint32(pcm[frame*8+4:])))
-		if math.Abs(left*left+right*right-1) > 0.00001 {
-			t.Fatalf("audible power dips or spikes at frame %d: %f, %f", frame, left, right)
-		}
-		if frame < 8 && (left != 1 || right != 0) {
-			t.Fatal("incoming song begins before the crossfade")
-		}
-		if frame > 8 && frame < 12 && (left >= previousLeft || right <= previousRight) {
-			t.Fatal("outgoing song must fade down while incoming song fades up")
-		}
-		if frame >= 12 && frame < 16 && (left != 0 || right != 1) {
-			t.Fatal("incoming song must continue after the crossfade")
-		}
-		if frame > 0 && (math.Abs(left-previousLeft) > 0.4 || math.Abs(right-previousRight) > 0.4) {
-			t.Fatal("discontinuous sample at the track transition")
-		}
-		previousLeft, previousRight = left, right
-	}
-
-	// Audio backends may pull bytes in sizes that split sample boundaries.
 	fragmented := make([]byte, len(pcm))
-	other := crossfadeFixture(t)
+	other := musicFixture(t, 12)
 	for i := range fragmented {
 		if _, err := io.ReadFull(other, fragmented[i:i+1]); err != nil {
 			t.Fatal(err)
@@ -161,5 +127,62 @@ func TestSoundtrackCrossfadesWithoutGaps(t *testing.T) {
 	}
 	if !bytes.Equal(pcm, fragmented) {
 		t.Fatal("audio changes with backend read sizes")
+	}
+}
+
+func TestManualNavigationFadesThroughSilence(t *testing.T) {
+	stream := musicFixture(t, 10000)
+	assertTone := func(pcm []byte, left, right float32) {
+		t.Helper()
+		for frame := range len(pcm) / 8 {
+			l, r := sampleAt(pcm, frame)
+			if l != left || r != right {
+				t.Fatalf("wrong song: %f, %f", l, r)
+			}
+		}
+	}
+	readMusic(t, stream, 4)
+	assertTone(readMusic(t, stream, 1024), 1, 0)
+	for _, direction := range []int{1, -1} {
+		stream.Skip(direction)
+		out := readMusic(t, stream, 4)
+		left, right := sampleAt(out, 3)
+		if left != 0 || right != 0 {
+			t.Fatal("manual navigation must fade to zero")
+		}
+		assertTone(readMusic(t, stream, 2), 0, 0)
+		readMusic(t, stream, 4)
+		if direction > 0 {
+			assertTone(readMusic(t, stream, 1024), 0, 1)
+		} else {
+			assertTone(readMusic(t, stream, 1024), 1, 0)
+		}
+	}
+	stream.Skip(1)
+	readMusic(t, stream, 1)
+	stream.Skip(1)
+	stream.Skip(-1)
+	readMusic(t, stream, 3)
+	assertTone(readMusic(t, stream, 2), 0, 0)
+	readMusic(t, stream, 4)
+	assertTone(readMusic(t, stream, 1024), 1, 0)
+}
+
+func TestVeryShortTracksLoop(t *testing.T) {
+	readMusic(t, musicFixture(t, 2), 100)
+}
+
+func TestNavigationWhileStreaming(t *testing.T) {
+	stream := musicFixture(t, 10000)
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.CopyN(io.Discard, stream, 100000)
+		done <- err
+	}()
+	for i := range 1000 {
+		stream.Skip(1 - 2*(i%2))
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
