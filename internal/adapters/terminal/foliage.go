@@ -108,7 +108,7 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 		// opens fully so no leaves speckle the detailed hero.
 		hx, hy := (float64(px)-heroX)/(7*c.scale/forestScale), (float64(py)-heroY)/(9*c.scale/forestScale)
 		if distance := hx*hx + hy*hy; distance < 1 {
-			if distance < 0.13 || c.scale >= detailScale || f.Random(int(math.Floor(x+point.x*3)), int(math.Floor(z+point.z*3)), 83) > 0.18 {
+			if distance < 0.13 || c.scale >= heroDetailScale || f.Random(int(math.Floor(x+point.x*3)), int(math.Floor(z+point.z*3)), 83) > 0.18 {
 				return
 			}
 		}

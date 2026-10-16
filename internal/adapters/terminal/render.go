@@ -235,7 +235,7 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 	}
 	r.gait.update(x, z, r.world.Hero().Facing(), min(0.1, max(0, seconds-r.lastSeconds)))
 	r.lastSeconds = seconds
-	if c.scale >= detailScale {
+	if c.scale >= heroDetailScale {
 		drawDetailedHero(c, x, z, r.gait, defaultLook)
 	} else {
 		// A small warm-colored traveler: boots, coat, arms, and a round hat.

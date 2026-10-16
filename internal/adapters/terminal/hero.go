@@ -2,8 +2,11 @@ package terminal
 
 import "math"
 
-// detailScale is the zoom from which the hero is drawn in detail.
+// detailScale is the zoom from which trees are drawn in detail.
 var detailScale = forestScale * math.Pow(zoomStep, 6)
+
+// heroDetailScale is the zoom from which the hero is drawn in detail, a few steps out from the forest.
+var heroDetailScale = forestScale * math.Pow(zoomStep, 3)
 
 // heroLook holds the palette entries of the hero's base body: their skin and hair, and the plain
 // undershirt and shorts that gear will later cover.
@@ -46,9 +49,12 @@ func (b heroBody) at(side, forward float64) (x, z float64) {
 // part draws one rounded, sunlit body part with its own width, height and depth.
 func (b heroBody) part(side, y, forward, width, height, depth float64, ink int) {
 	x, z := b.at(side, forward)
+	width, height, depth = b.visible(width), b.visible(height), b.visible(depth)
 	ellipsoid(b.c, x, y, z, width, height, depth, b.heading, func(px, py int, depth float64, _, normal vec) {
 		// Shading flows smoothly across parts; only the outline behind the figure marks its edge.
 		light := 0.6 + 0.4*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
+		// A small, distant hero is lit more fully, so their few dots form a solid figure.
+		light += 0.3 * math.Max(0, 1-b.c.scale/detailScale)
 		b.c.plot(px, py, depth, light, ink)
 	})
 }
@@ -58,9 +64,16 @@ func (b heroBody) part(side, y, forward, width, height, depth float64, ink int) 
 func (b heroBody) outline(side, y, forward, width, height, depth float64) {
 	x, z := b.at(side, forward)
 	band := 1.5 / b.c.scale
+	width, height, depth = b.visible(width), b.visible(height), b.visible(depth)
 	ellipsoid(b.c, x, y, z, width+band, height+band, depth+band, b.heading, func(px, py int, depth float64, _, _ vec) {
 		b.c.plot(px, py, depth+0.4, 0, 0)
 	})
+}
+
+// visible keeps a part's radius at least about a canvas pixel, so slender limbs stay unbroken
+// when the view zooms out.
+func (b heroBody) visible(radius float64) float64 {
+	return math.Max(radius, 0.9/b.c.scale)
 }
 
 // eye leaves an unlit gap two dots tall on the face, when that side of the face turns toward the view.
@@ -170,6 +183,9 @@ func drawDetailedHero(c *forestCanvas, x, z float64, g gait, look heroLook) {
 	for _, p := range parts {
 		b.part(p.side, p.y, p.forward, p.width, p.height, p.depth, p.ink)
 	}
-	b.eye(-0.032)
-	b.eye(0.032)
+	// Eyes need a head a few dots across, or their gaps would erase the face.
+	if 0.085*c.scale >= 2 {
+		b.eye(-0.032)
+		b.eye(0.032)
+	}
 }

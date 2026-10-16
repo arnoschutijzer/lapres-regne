@@ -462,3 +462,12 @@ func TestUpCloseTrunksAreSolidWood(t *testing.T) {
 		}
 	}
 }
+
+func TestTheDetailedHeroStaysAFewStepsFromTheForestView(t *testing.T) {
+	r := newRenderer(world.New(7), "L’Après-Règne")
+	r.zoom.scroll(3)
+	r.zoom.step(5 * time.Second)
+	if countInk(r.render(100, 27, 0), defaultLook.skin) == 0 {
+		t.Fatal("three wheel steps in, the hero must already be drawn in detail")
+	}
+}
