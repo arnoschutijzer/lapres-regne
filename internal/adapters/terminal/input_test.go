@@ -31,7 +31,7 @@ func TestLeftClicksReportTheCell(t *testing.T) {
 func TestMouseReleasesAndOtherButtonsAreIgnored(t *testing.T) {
 	var d keyDecoder
 	for _, event := range feed(&d, "\x1b[<0;12;7m\x1b[<2;12;7M") {
-		if event.mouse || event.click || event.zoom != 0 || event.pan != 0 || event.action != none {
+		if event.mouse || event.click || event.zoom != 0 || event.panRight != 0 || event.panDown != 0 || event.action != none {
 			t.Fatalf("event = %+v, want it ignored", event)
 		}
 	}
@@ -102,14 +102,16 @@ func TestBracketsMoveBetweenInventorySlots(t *testing.T) {
 	}
 }
 
-func TestTheWheelScrollingSidewaysPans(t *testing.T) {
+func TestTheWheelWithOptionPans(t *testing.T) {
 	var d keyDecoder
-	events := feed(&d, "\x1b[<66;12;7M")
-	if toLeft := events[len(events)-1]; toLeft.pan != -1 || toLeft.zoom != 0 || toLeft.click {
-		t.Fatalf("event = %+v, want scrolling left to pan left", toLeft)
-	}
-	events = feed(&d, "\x1b[<67;12;7M")
-	if toRight := events[len(events)-1]; toRight.pan != 1 || toRight.zoom != 0 {
-		t.Fatalf("event = %+v, want scrolling right to pan right", toRight)
+	// Option sets the wheel button's Meta bit, 8.
+	for _, wheel := range []struct {
+		button      string
+		right, down int
+	}{{"72", 0, -1}, {"73", 0, 1}, {"74", -1, 0}, {"75", 1, 0}} {
+		events := feed(&d, "\x1b[<"+wheel.button+";12;7M")
+		if event := events[len(events)-1]; event.panRight != wheel.right || event.panDown != wheel.down || event.zoom != 0 {
+			t.Fatalf("event = %+v for button %s, want a pan of (%d, %d)", event, wheel.button, wheel.right, wheel.down)
+		}
 	}
 }

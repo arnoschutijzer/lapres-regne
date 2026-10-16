@@ -115,8 +115,9 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			world.ZoomBy(event.zoom)
 			return false
 		}
-		if event.pan != 0 {
-			world.PanBy(float64(event.pan) * view.zoom.panDistance())
+		if event.panRight != 0 || event.panDown != 0 {
+			distance := view.zoom.panDistance()
+			world.PanBy(float64(event.panRight)*distance, float64(event.panDown)*distance)
 			return false
 		}
 		if event.click {

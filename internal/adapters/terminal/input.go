@@ -36,10 +36,11 @@ type keyEvent struct {
 	click    bool
 	// zoom is 1 for the wheel scrolling up and -1 for scrolling down.
 	zoom int
-	// pan is -1 for the wheel scrolling left and 1 for scrolling right.
-	pan    int
-	column int
-	row    int
+	// panRight and panDown are the screen direction the wheel scrolls in while Option is held.
+	panRight int
+	panDown  int
+	column   int
+	row      int
 }
 
 const (
@@ -201,16 +202,24 @@ func mouseEvent(params string, final byte) keyEvent {
 	if buttonErr != nil || columnErr != nil || rowErr != nil {
 		return keyEvent{}
 	}
+	if button&64 != 0 && button&8 != 0 {
+		switch button & 3 {
+		case 0:
+			return keyEvent{panDown: -1}
+		case 1:
+			return keyEvent{panDown: 1}
+		case 2:
+			return keyEvent{panRight: -1}
+		case 3:
+			return keyEvent{panRight: 1}
+		}
+	}
 	if button&64 != 0 {
 		switch button & 3 {
 		case 0:
 			return keyEvent{zoom: 1}
 		case 1:
 			return keyEvent{zoom: -1}
-		case 2:
-			return keyEvent{pan: -1}
-		case 3:
-			return keyEvent{pan: 1}
 		}
 		return keyEvent{}
 	}
