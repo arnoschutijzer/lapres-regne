@@ -51,14 +51,14 @@ func NearestRiver(channels []RiverChannel, x float64) (distance, width float64) 
 }
 
 func (w *World) Region() string {
-	distance, width := w.River(w.x, w.z)
+	distance, width := w.River(w.hero.x, w.hero.z)
 	if distance < width {
 		return "river / wading"
 	}
 	if distance < width+1.5 {
 		return "riverbank reeds"
 	}
-	cover := w.Cover(w.x, w.z)
+	cover := w.Cover(w.hero.x, w.hero.z)
 	if cover < 0.38 {
 		return "tall-grass clearing"
 	}

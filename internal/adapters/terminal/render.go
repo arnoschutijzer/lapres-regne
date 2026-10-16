@@ -153,13 +153,13 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 }
 
 func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
-	x, z := r.world.Position()
+	x, z := r.world.Hero().Position()
 	stride := 0.0
-	if time.Since(r.world.LastWalk()) < 200*time.Millisecond {
+	if time.Since(r.world.Hero().LastWalk()) < 200*time.Millisecond {
 		stride = math.Sin(seconds*18) * 0.24
 	}
 	strideX, strideZ := 0.0, stride
-	if facing := r.world.Facing(); facing == world.FacingLeft || facing == world.FacingRight {
+	if facing := r.world.Hero().Facing(); facing == world.FacingLeft || facing == world.FacingRight {
 		strideX, strideZ = stride, 0
 	}
 	// A small warm-colored traveler: boots, coat, arms, and a round hat.
@@ -256,8 +256,8 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			}
 		}
 	}
-	x, z := r.world.Position()
-	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  %s  |  seed %d", x, z, r.world.Steps(), r.world.Region(), r.world.Seed())
+	x, z := r.world.Hero().Position()
+	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  %s  |  seed %d", x, z, r.world.Hero().Steps(), r.world.Region(), r.world.Seed())
 	if full || status != r.lastStatus {
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height, status[:min(width-1, len(status))])
 		r.lastStatus = status

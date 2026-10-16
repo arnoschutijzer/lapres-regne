@@ -32,7 +32,7 @@ func (c *forestCanvas) shadow(tree world.Tree) {
 // Ray/ellipsoid intersections provide rounded crowns with real depth and lighting.
 func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 	f := r.world
-	heroWorldX, heroWorldZ := f.Position()
+	heroWorldX, heroWorldZ := f.Hero().Position()
 	sx, sy, depth := c.project(x, y, z)
 	boundX := rx * c.scale
 	boundY := math.Sqrt(ry*ry*0.69*0.69+rz*rz*0.72*0.72) * c.scale

@@ -20,7 +20,7 @@
 ## Service: dither-cli
 - Entry point: `main.go` (`main`)
 - Composition root: `main.go` (`run`, `startMusic`)
-- Domain: `internal/world` (terrain, movement), `internal/soundtrack` (shuffle, history, fades)
+- Domain: `internal/world` (terrain, character, movement), `internal/soundtrack` (shuffle, history, fades)
 - Ports: `internal/soundtrack/ports.go` (`Samples`, `Decoder`, `Player`)
 - Inbound adapters: `internal/adapters/terminal` (`session.go`, `input.go`)
 - Outbound adapters: `internal/adapters/terminal` (`render.go`, `foliage.go`), `internal/adapters/songfiles`, `internal/adapters/speaker`
