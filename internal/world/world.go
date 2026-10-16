@@ -17,9 +17,10 @@ type World struct {
 	approach  approach
 	chop      chop
 	// ground holds the dropped logs until they disappear.
-	ground  []GroundLog
-	message string
-	sounds  Sounds
+	ground      []GroundLog
+	message     string
+	celebration celebration
+	sounds      Sounds
 }
 
 func New(seed uint64) *World {
@@ -78,6 +79,7 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 		speed *= 2
 	}
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
+	w.ageCelebration(dt)
 	w.approachFor(dt)
 	w.regrow(dt)
 	w.despawn(dt)

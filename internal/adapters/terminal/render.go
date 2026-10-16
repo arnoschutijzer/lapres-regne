@@ -46,6 +46,25 @@ type forestPixel struct {
 
 type forestCell struct {
 	bits, ink uint8
+	// veil dims the forest under an overlay, in sixteenths; an overlay's glyph replaces the forest's
+	// braille and shows its ink at veil sixteenths of full strength.
+	veil  uint8
+	glyph rune
+}
+
+// background is the terminal color behind the forest.
+var background = [3]int{9, 15, 14}
+
+// brailleDot numbers the braille dots by their row and column in a cell.
+var brailleDot = [4][2]int{{0, 3}, {1, 4}, {2, 5}, {6, 7}}
+
+// mix blends from one color toward another by amount, from 0 to 1.
+func mix(from, to [3]int, amount float64) [3]int {
+	var blended [3]int
+	for i := range blended {
+		blended[i] = from[i] + int(math.Round(float64(to[i]-from[i])*amount))
+	}
+	return blended
 }
 
 const maxForestColumns = 220
@@ -331,19 +350,19 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			}
 		}
 	}
-	lastInk := -1
+	banner := levelUpBanner(r.world, cols)
+	lastColor := [3]int{-1, -1, -1}
 	for row := range rows {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
 			bits, ink := 0, 0
 			var votes [15]int
-			mapping := [4][2]int{{0, 3}, {1, 4}, {2, 5}, {6, 7}}
 			for dy := range 4 {
 				for dx := range 2 {
 					x, y := col*2+dx, row*4+dy
 					p := c.pixels[y*c.width+x]
 					if p.light > (bayer[y%4][x%4]+0.5)/16 {
-						bits |= 1 << mapping[dy][dx]
+						bits |= 1 << brailleDot[dy][dx]
 						votes[p.ink]++
 					}
 				}
@@ -354,7 +373,14 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 					ink = i
 				}
 			}
-			current[col] = forestCell{uint8(bits), uint8(ink)}
+			current[col] = forestCell{bits: uint8(bits), ink: uint8(ink)}
+			if cover, covered := banner.at(row, col); covered {
+				if cover.glyph != 0 {
+					current[col] = cover
+				} else {
+					current[col].veil = cover.veil
+				}
+			}
 		}
 		previous := r.cells[row*cols : (row+1)*cols]
 		visible := cols
@@ -380,16 +406,21 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			for ; col < end; col++ {
 				cell := current[col]
 				previous[col] = cell
-				if cell.bits == 0 {
+				if cell.bits == 0 && cell.glyph == 0 {
 					out.WriteByte(' ')
 					continue
 				}
-				if int(cell.ink) != lastInk {
-					rgb := forestPalette[cell.ink]
-					fmt.Fprintf(&out, "\x1b[38;2;%d;%d;%dm", rgb[0], rgb[1], rgb[2])
-					lastInk = int(cell.ink)
+				color, glyph := forestPalette[cell.ink], rune(0x2800+int(cell.bits))
+				if cell.glyph != 0 {
+					color, glyph = mix(background, color, float64(cell.veil)/16), cell.glyph
+				} else if cell.veil != 0 {
+					color = mix(color, background, veilDepth*float64(cell.veil)/16)
 				}
-				out.WriteRune(rune(0x2800 + int(cell.bits)))
+				if color != lastColor {
+					fmt.Fprintf(&out, "\x1b[38;2;%d;%d;%dm", color[0], color[1], color[2])
+					lastColor = color
+				}
+				out.WriteRune(glyph)
 			}
 		}
 	}

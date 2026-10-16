@@ -235,7 +235,11 @@ func (w *World) roll(salt uint64) float64 {
 func (w *World) cutLog() {
 	kind := species[w.chop.kind]
 	w.hero.inventory.add(w.chop.kind)
+	level := w.hero.woodcutting.Level()
 	w.hero.woodcutting.gain(kind.xp)
+	if reached := w.hero.woodcutting.Level(); reached > level {
+		w.celebrate(level, reached)
+	}
 	if !kind.fallsWithFirstLog && w.depletion[w.chop.tree] < kind.lifetime {
 		if w.hero.inventory.Full() {
 			w.chop = chop{}
