@@ -152,6 +152,15 @@ func (c *forestCanvas) viewer() vec {
 	return vec{-0.69 * sin, 0.72, 0.69 * cos}
 }
 
+// mayShow tells whether any part of a tree can reach the canvas, judged by generous bounds around
+// its trunk and every species' crowns.
+func (c *forestCanvas) mayShow(tree world.Tree) bool {
+	reach := (2*tree.Radius + 1) * c.scale
+	baseX, baseY, _ := c.project(tree.X, 0, tree.Z)
+	_, topY, _ := c.project(tree.X, tree.Height*1.4+tree.Radius, tree.Z)
+	return baseX+reach >= 0 && baseX-reach < float64(c.width) && baseY+reach >= 0 && topY-reach < float64(c.height)
+}
+
 func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
 	if x < 0 || y < 0 || x >= c.width || y >= c.height {
 		return
@@ -249,7 +258,9 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		if chopping && tree == chopped {
 			shake = jolt(sinceHit)
 		}
-		r.drawTree(c, tree, shake)
+		if c.mayShow(tree) {
+			r.drawTree(c, tree, shake)
+		}
 	}
 	if chopping {
 		drawChips(c, f, chopped, strike, sinceHit)

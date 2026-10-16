@@ -498,3 +498,19 @@ func TestTheDetailedHeroStaysAFewStepsFromTheForestView(t *testing.T) {
 		t.Fatal("three wheel steps in, the hero must already be drawn in detail")
 	}
 }
+
+func TestOnlyTreesThatReachTheCanvasAreDrawn(t *testing.T) {
+	c := &forestCanvas{width: 200, height: 120, scale: forestScale}
+	c.turnTo(0)
+	tree := world.Tree{Height: 6, Radius: 2.4, Trunk: 0.25}
+	inView, farLeft, belowWithCrownInView := tree, tree, tree
+	farLeft.X = -60
+	// The ground at the bottom edge lies about 20 units in front of the camera; the crown rises into view.
+	belowWithCrownInView.Z = 22
+	if !c.mayShow(inView) || !c.mayShow(belowWithCrownInView) {
+		t.Fatal("a tree reaching into the canvas must be drawn")
+	}
+	if c.mayShow(farLeft) {
+		t.Fatal("a tree wholly beside the canvas must be skipped")
+	}
+}
