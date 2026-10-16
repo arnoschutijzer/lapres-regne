@@ -28,12 +28,29 @@ func TestLeftClicksReportTheCell(t *testing.T) {
 	}
 }
 
-func TestMouseReleasesOtherButtonsAndWheelAreIgnored(t *testing.T) {
+func TestMouseReleasesAndOtherButtonsAreIgnored(t *testing.T) {
 	var d keyDecoder
-	for _, event := range feed(&d, "\x1b[<0;12;7m\x1b[<2;12;7M\x1b[<64;12;7M\x1b[<96;12;7M") {
-		if event.mouse || event.click || event.action != none {
+	for _, event := range feed(&d, "\x1b[<0;12;7m\x1b[<2;12;7M\x1b[<66;12;7M") {
+		if event.mouse || event.click || event.zoom != 0 || event.action != none {
 			t.Fatalf("event = %+v, want it ignored", event)
 		}
+	}
+}
+
+func TestTheWheelZoomsInAndOut(t *testing.T) {
+	var d keyDecoder
+	events := feed(&d, "\x1b[<64;12;7M")
+	if in := events[len(events)-1]; in.zoom != 1 || in.click || in.mouse {
+		t.Fatalf("event = %+v, want scrolling up to zoom in", in)
+	}
+	events = feed(&d, "\x1b[<65;12;7M")
+	if out := events[len(events)-1]; out.zoom != -1 {
+		t.Fatalf("event = %+v, want scrolling down to zoom out", out)
+	}
+	// Some terminals mark wheel events that arrive while the pointer moves.
+	events = feed(&d, "\x1b[<96;12;7M")
+	if moving := events[len(events)-1]; moving.zoom != 1 {
+		t.Fatalf("event = %+v, want scrolling up while moving to zoom in", moving)
 	}
 }
 

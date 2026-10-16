@@ -33,6 +33,7 @@ type renderer struct {
 	// menu lists the actions offered for the tree in reach, named by menuTitle; nil when closed.
 	menu      []string
 	menuTitle string
+	zoom      zoom
 }
 
 func newRenderer(world *world.World, title string) *renderer {
@@ -131,7 +132,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	f := r.world
 	c := &r.canvas
 	cameraX, cameraZ := f.Camera()
-	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, 3.6
+	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
 	if len(c.pixels) != c.width*c.height {
 		c.pixels = make([]forestPixel, c.width*c.height)
 	}

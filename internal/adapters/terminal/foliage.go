@@ -63,7 +63,7 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 				ink = leaves.sunlit
 			}
 			// A small cutaway keeps the traveler readable under overlapping crowns.
-			hx, hy := (float64(px)-heroX)/7, (float64(py)-heroY)/9
+			hx, hy := (float64(px)-heroX)/(7*c.scale/forestScale), (float64(py)-heroY)/(9*c.scale/forestScale)
 			if distance := hx*hx + hy*hy; distance < 1 {
 				if distance < 0.13 || f.Random(int(math.Floor(x+u*3)), int(math.Floor(z+localZ*3)), 83) > 0.18 {
 					continue

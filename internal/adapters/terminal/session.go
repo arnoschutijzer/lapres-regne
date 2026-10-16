@@ -111,6 +111,10 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			cursorColumn, cursorRow = event.column, event.row
 			return false
 		}
+		if event.zoom != 0 {
+			view.zoom.scroll(event.zoom)
+			return false
+		}
 		if event.click {
 			if slot, ok := view.slotAt(event.column, event.row); ok {
 				view.cursor = slotCursor{active: true, slot: slot}
@@ -233,6 +237,7 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			dx, dz := held.direction()
 			world.Advance(dx, dz, dt, held.sprinting())
 			world.Follow(dt)
+			view.zoom.step(dt)
 			if x, z, ok := view.groundAt(cursorColumn, cursorRow); ok {
 				world.AimAt(x, z)
 			}

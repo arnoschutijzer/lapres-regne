@@ -364,3 +364,15 @@ func TestEachKindOfTreeHasItsOwnSilhouette(t *testing.T) {
 		t.Errorf("a willow's leaves reach row %d, want them hanging well below an oak's at row %d", willowLowest, oakLowest)
 	}
 }
+
+func TestZoomingInDrawsTheHeroLarger(t *testing.T) {
+	r := newRenderer(world.New(7), "L’Après-Règne")
+	far := countInk(r.render(100, 27, 0), 8)
+	for range zoomSteps {
+		r.zoom.scroll(1)
+	}
+	r.zoom.step(5 * time.Second)
+	if near := countInk(r.render(100, 27, 0), 8); near <= far*4 {
+		t.Fatalf("hero pixels = %d zoomed in, want far more than %d in the forest view", near, far)
+	}
+}
