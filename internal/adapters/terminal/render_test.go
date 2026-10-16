@@ -226,6 +226,30 @@ func TestTreeAtPicksTheTreeUnderAClick(t *testing.T) {
 	}
 }
 
+func TestTreeAtNeedsAClickOnTheTreeItself(t *testing.T) {
+	r := newRenderer(world.New(7), "L’Après-Règne")
+	r.frame(100, 30, 0)
+	// Column 58, row 18 is open ground below the crown of the tree at x 6.0, z 1.7.
+	if tree, ok := r.treeAt(58, 18); ok {
+		t.Fatalf("treeAt(58, 18) = %+v; want the ground below the crown", tree)
+	}
+}
+
+func TestUpCloseOnlyTheTrunkOfACutAwayCanopyIsClickable(t *testing.T) {
+	w := besideTree()
+	w.ZoomBy(world.CloseUp)
+	r := newRenderer(w, "L’Après-Règne")
+	r.frame(100, 30, 0)
+	// The trunk of the tree at x 6.0, z 1.7 fills column 80, row 10, right of the hero.
+	if tree, ok := r.treeAt(80, 10); !ok || tree.X < 6 || tree.X > 6.1 {
+		t.Fatalf("treeAt(80, 10) = %+v, %v; want the trunk of the tree at x 6.0", tree, ok)
+	}
+	// Column 60, row 10 lies under the canopy, which is cut away around the hero.
+	if tree, ok := r.treeAt(60, 10); ok {
+		t.Fatalf("treeAt(60, 10) = %+v; want the cut-away canopy left unclickable", tree)
+	}
+}
+
 func TestTheWoodcuttingSkillShowsOnTheTitleRow(t *testing.T) {
 	w := besideTree()
 	r := newRenderer(w, "L’Après-Règne")

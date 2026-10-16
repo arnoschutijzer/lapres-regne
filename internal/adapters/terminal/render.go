@@ -51,6 +51,8 @@ func newRenderer(world *world.World, title string) *renderer {
 type forestPixel struct {
 	depth, light float64
 	ink          int
+	// tree is the standing tree drawn here, counting from 1 into the frame's trees; 0 for anything else.
+	tree int
 }
 
 type forestCell struct {
@@ -85,6 +87,9 @@ type forestCanvas struct {
 	// yaw turns the world about the upright axis through x, z; at 0 north is up the canvas.
 	// yawSin and yawCos keep its sine and cosine for the many points projected each frame.
 	yaw, yawSin, yawCos float64
+	// drawing is the standing tree being drawn, counting from 1 into the frame's trees; 0 for
+	// anything else.
+	drawing int
 }
 
 // turnTo sets the canvas's yaw.
@@ -176,7 +181,7 @@ func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
 	}
 	i := y*c.width + x
 	if depth <= c.pixels[i].depth {
-		c.pixels[i] = forestPixel{depth, light, ink}
+		c.pixels[i] = forestPixel{depth, light, ink, c.drawing}
 	}
 }
 
@@ -246,13 +251,17 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	chopped, chopping := f.ChoppedTree()
 	strike, sinceStrike, _ := f.LastStrike()
 	sinceHit := sinceStrike.Seconds()
-	for _, tree := range trees {
+	for i, tree := range trees {
 		shake := 0.0
 		if chopping && tree == chopped {
 			shake = jolt(sinceHit)
 		}
 		if c.mayShow(tree) {
+			if !tree.Stump {
+				c.drawing = i + 1
+			}
 			r.drawTree(c, tree, shake)
+			c.drawing = 0
 		}
 	}
 	if chopping {
@@ -323,25 +332,27 @@ func (r *renderer) groundAt(column, row int) (x, z float64, ok bool) {
 }
 
 // treeAt finds the frontmost standing tree drawn under a 1-based terminal cell of the last frame.
+// Only the tree's own pixels count, so leaves cut away up close leave the trunk to be clicked.
 func (r *renderer) treeAt(column, row int) (world.Tree, bool) {
 	c := &r.canvas
-	x, y, ok := r.canvasPoint(column, row)
+	centreX, centreY, ok := r.canvasPoint(column, row)
 	if !ok {
 		return world.Tree{}, false
 	}
-	// Trees are kept front to back from the last render, so the first outline hit is in front.
-	for _, tree := range r.trees {
-		if tree.Stump {
-			continue
-		}
-		baseX, baseY, _ := c.project(tree.X, 0, tree.Z)
-		_, topY, _ := c.project(tree.X, tree.Height+0.3+tree.Radius*0.7, tree.Z)
-		halfWidth := tree.Radius * 1.3 * c.scale
-		if x >= baseX-halfWidth && x <= baseX+halfWidth && y >= topY && y <= baseY {
-			return tree, true
+	// The cell covers 2 x 4 braille dots around its centre.
+	left, top := int(centreX)-1, int(centreY)-2
+	front, nearest := 0, math.Inf(1)
+	for y := top; y < top+4; y++ {
+		for x := left; x < left+2; x++ {
+			if p := c.pixels[y*c.width+x]; p.tree != 0 && p.depth < nearest {
+				front, nearest = p.tree, p.depth
+			}
 		}
 	}
-	return world.Tree{}, false
+	if front == 0 {
+		return world.Tree{}, false
+	}
+	return r.trees[front-1], true
 }
 
 // slotAt finds the inventory slot under a 1-based terminal cell of the open panel.
@@ -562,7 +573,7 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 		} else if distance < width+0.65 {
 			ink, light = 7, 0.32+n*0.25
 		}
-		c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light, ink}
+		c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light, ink, 0}
 	}
 }
 
