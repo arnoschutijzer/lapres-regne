@@ -367,7 +367,7 @@ func TestEachKindOfTreeHasItsOwnSilhouette(t *testing.T) {
 
 func TestZoomingInDrawsTheHeroLarger(t *testing.T) {
 	r := newRenderer(world.New(7), "L’Après-Règne")
-	hero := []int{8, defaultLook.skin, defaultLook.hair, defaultLook.tunic, defaultLook.trousers, defaultLook.boots}
+	hero := []int{8, defaultLook.skin, defaultLook.hair, defaultLook.undershirt, defaultLook.shorts}
 	far := countInk(r.render(100, 27, 0), hero...)
 	for range zoomSteps {
 		r.zoom.scroll(1)
@@ -388,13 +388,13 @@ func closeUp(w *world.World) *forestCanvas {
 
 func TestUpCloseTheHeroIsDrawnInDetail(t *testing.T) {
 	near := closeUp(world.New(7))
-	for part, ink := range map[string]int{"skin": defaultLook.skin, "hair": defaultLook.hair, "tunic": defaultLook.tunic, "trousers": defaultLook.trousers, "boots": defaultLook.boots} {
+	for part, ink := range map[string]int{"skin": defaultLook.skin, "hair": defaultLook.hair, "undershirt": defaultLook.undershirt, "shorts": defaultLook.shorts} {
 		if countInk(near, ink) == 0 {
 			t.Errorf("the close-up draws no %s", part)
 		}
 	}
 	far := newRenderer(world.New(7), "L’Après-Règne").render(100, 27, 0)
-	if countInk(far, defaultLook.skin, defaultLook.tunic) != 0 {
+	if countInk(far, defaultLook.skin, defaultLook.undershirt) != 0 {
 		t.Error("the forest view must keep the small traveler")
 	}
 }

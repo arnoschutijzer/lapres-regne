@@ -94,11 +94,10 @@ var forestPalette = [...][3]int{
 	{84, 140, 112},  // sunlit yew needles
 	{112, 104, 54},  // shaded oak leaves
 	{176, 158, 78},  // sunlit oak leaves
-	{228, 186, 150}, // skin
-	{160, 108, 64},  // hair
-	{168, 72, 74},   // tunic
-	{118, 126, 148}, // trousers
-	{124, 88, 62},   // boots
+	{212, 172, 140}, // skin
+	{112, 82, 60},   // hair
+	{176, 172, 160}, // undershirt
+	{96, 100, 112},  // shorts
 	{30, 26, 24},    // eyes
 }
 
