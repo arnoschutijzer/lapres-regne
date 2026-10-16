@@ -19,6 +19,9 @@ const rollInterval = 4 * gameTick
 // independently of the rolls for logs.
 const StrikeInterval = 800 * time.Millisecond
 
+// inventoryFullMessage is Old School RuneScape's reply when no log fits in the inventory.
+const inventoryFullMessage = "Your inventory is too full to carry any more logs."
+
 // arrival is how close to a trunk an approach ends, comfortably within reach.
 const arrival = 1.2
 
@@ -91,6 +94,10 @@ func (w *World) startChop(tree Tree) bool {
 	w.chop = chop{}
 	if required := species[tree.Kind].level; w.hero.woodcutting.Level() < required {
 		w.message = fmt.Sprintf("You need woodcutting level %d to chop this %s.", required, tree.Kind)
+		return false
+	}
+	if w.hero.inventory.Full() {
+		w.message = inventoryFullMessage
 		return false
 	}
 	w.message = ""
@@ -227,9 +234,13 @@ func (w *World) roll(salt uint64) float64 {
 // trees fall with the first log after their depletion timer runs out.
 func (w *World) cutLog() {
 	kind := species[w.chop.kind]
-	w.hero.logs++
+	w.hero.inventory.add(w.chop.kind)
 	w.hero.woodcutting.gain(kind.xp)
 	if !kind.fallsWithFirstLog && w.depletion[w.chop.tree] < kind.lifetime {
+		if w.hero.inventory.Full() {
+			w.chop = chop{}
+			w.message = inventoryFullMessage
+		}
 		return
 	}
 	if w.felled == nil {

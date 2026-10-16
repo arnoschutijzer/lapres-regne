@@ -12,7 +12,7 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 		X:             w.hero.x,
 		Z:             w.hero.z,
 		WoodcuttingXP: w.hero.woodcutting.XP(),
-		Logs:          w.hero.logs,
+		Logs:          w.hero.inventory.Len(),
 		SavedAt:       now,
 	}
 	for tree, regrow := range w.felled {
@@ -37,7 +37,10 @@ func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 		return w, nil
 	}
 	w.hero.woodcutting.gain(snapshot.WoodcuttingXP)
-	w.hero.logs = snapshot.Logs
+	// Saves before typed inventories counted only normal logs.
+	for range min(snapshot.Logs, InventorySize) {
+		w.hero.inventory.add(NormalTree)
+	}
 	if snapshot.Seed != seed {
 		return w, nil
 	}

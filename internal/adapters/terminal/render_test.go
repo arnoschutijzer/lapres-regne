@@ -122,11 +122,11 @@ func TestChoppingSwingsAnAxe(t *testing.T) {
 	}
 }
 
-func TestTheActionMenuAndLogsShowOnScreen(t *testing.T) {
+func TestTheActionMenuShowsOnScreen(t *testing.T) {
 	w := besideTree()
 	r := newRenderer(w, "L’Après-Règne")
-	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "logs 0") || strings.Contains(frame, "Chop down") {
-		t.Fatal("the status line must count logs and the menu must start closed")
+	if frame := r.frame(100, 30, 0); strings.Contains(frame, "Chop down") {
+		t.Fatal("the menu must start closed")
 	}
 	r.menu = []string{"Chop down"}
 	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "1 Chop down") {
@@ -269,5 +269,39 @@ func TestTheMenuNamesTheTreeAndMessagesShowOnTheHintLine(t *testing.T) {
 	w.Chop()
 	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "You need woodcutting level 30 to chop this willow.") {
 		t.Fatal("the game's message must show on the hint line")
+	}
+}
+
+func TestTheStatusLineNoLongerCountsLogs(t *testing.T) {
+	r := newRenderer(besideTree(), "L’Après-Règne")
+	if frame := r.frame(100, 30, 0); strings.Contains(frame, "logs") {
+		t.Fatal("the status line must not mention logs")
+	}
+}
+
+func TestTheInventoryPanelOpensWithTintedLogsAndClosesCleanly(t *testing.T) {
+	w := besideTree()
+	w.Chop()
+	chopUntilFelled(t, w)
+	r := newRenderer(w, "L’Après-Règne")
+	if frame := r.frame(100, 30, 0); strings.Contains(frame, "inventory") {
+		t.Fatal("the inventory panel must start closed")
+	}
+	r.inventoryOpen = true
+	open := r.frame(100, 30, 0)
+	if !strings.Contains(open, "inventory 1/28") || !strings.Contains(open, logTint[world.NormalTree]+logGlyph) {
+		t.Fatal("the open panel must count the slots and show the normal log in its tint")
+	}
+	if strings.Count(open, emptySlot) != world.InventorySize-1 {
+		t.Fatalf("empty slots = %d, want %d", strings.Count(open, emptySlot), world.InventorySize-1)
+	}
+	if again := r.frame(100, 30, 0); strings.Contains(again, "inventory") {
+		t.Fatal("an unchanged open panel must not be redrawn")
+	}
+	r.inventoryOpen = false
+	closed := r.frame(100, 30, 0)
+	// The forest must be repainted in the panel's first row, at its left edge.
+	if strings.Contains(closed, "inventory") || !strings.Contains(closed, fmt.Sprintf("\x1b[2;%dH", 100-panelWidth+1)) {
+		t.Fatal("closing the panel must repaint the forest beneath it")
 	}
 }

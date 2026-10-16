@@ -149,6 +149,12 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			}
 			return false
 		}
+		if event.action == toggleInventory {
+			if !event.repeat {
+				view.inventoryOpen = !view.inventoryOpen
+			}
+			return false
+		}
 		if event.action == firstChoice {
 			if view.menu != nil && !event.repeat {
 				world.Chop()

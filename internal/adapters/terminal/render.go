@@ -26,6 +26,9 @@ type renderer struct {
 	screenWidth, screenHeight int
 	lastStatus, lastHint      string
 	lastSkill                 string
+	// inventoryOpen shows the inventory panel; panelShown and lastPanel remember the last one drawn.
+	inventoryOpen, panelShown bool
+	lastPanel                 string
 	// menu lists the actions offered for the tree in reach, named by menuTitle; nil when closed.
 	menu      []string
 	menuTitle string
@@ -272,8 +275,8 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 		out.WriteString("\x1b[2J\x1b[1;1H  " + r.title)
 	}
-	hint := "  arrows/WASD/IJKL · shift run · E act · Q quit"
-	if width >= 62 {
+	hint := "  arrows/WASD/IJKL · shift run · E act · Tab bag · Q quit"
+	if width >= 72 {
 		hint += " · N/P tracks"
 	}
 	if message := r.world.Message(); message != "" {
@@ -301,6 +304,15 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 		r.lastSkill = skill
 	}
+	// The panel covers the forest's top right corner; when it closes, those cells are drawn afresh.
+	panelLeft := max(0, cols-panelWidth)
+	if r.panelShown && !r.inventoryOpen {
+		for row := range min(panelHeight, rows) {
+			for col := panelLeft; col < cols; col++ {
+				r.cells[row*cols+col] = forestCell{bits: 0xff, ink: 0xff}
+			}
+		}
+	}
 	lastInk := -1
 	for row := range rows {
 		var current [maxForestColumns]forestCell
@@ -327,14 +339,18 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			current[col] = forestCell{uint8(bits), uint8(ink)}
 		}
 		previous := r.cells[row*cols : (row+1)*cols]
-		for col := 0; col < cols; {
+		visible := cols
+		if r.inventoryOpen && row < panelHeight {
+			visible = panelLeft
+		}
+		for col := 0; col < visible; {
 			if !full && current[col] == previous[col] {
 				col++
 				continue
 			}
 			end := col + 1
 			// Bridge tiny gaps when that costs less than another cursor escape.
-			for scan := end; scan < cols; scan++ {
+			for scan := end; scan < visible; scan++ {
 				if full || current[scan] != previous[scan] {
 					if scan-end > 3 {
 						break
@@ -359,8 +375,19 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			}
 		}
 	}
+	if r.inventoryOpen {
+		lines := inventoryPanel(r.world.Hero().Inventory())
+		panel := strings.Join(lines, "\n")
+		if full || !r.panelShown || panel != r.lastPanel {
+			for i, line := range lines[:min(len(lines), rows)] {
+				fmt.Fprintf(&out, "\x1b[%d;%dH%s", i+2, margin+panelLeft+1, line)
+			}
+			r.lastPanel = panel
+		}
+	}
+	r.panelShown = r.inventoryOpen
 	x, z := r.world.Hero().Position()
-	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  facing %s  |  %s  |  logs %d", x, z, r.world.Hero().Steps(), r.world.Hero().Facing(), r.world.Region(), r.world.Hero().Logs())
+	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  facing %s  |  %s", x, z, r.world.Hero().Steps(), r.world.Hero().Facing(), r.world.Region())
 	if r.world.Chopping() {
 		status += "  |  chopping"
 	}

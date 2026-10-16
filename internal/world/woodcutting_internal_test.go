@@ -68,14 +68,14 @@ func TestOaksGiveTheirXPAndFallOnlyOnceTheirTimerRunsOut(t *testing.T) {
 	oaks, logs := nearestOaks(w, 8), 0
 	for _, tree := range oaks {
 		standBeside(w, tree, levelXP[15])
-		before, startXP := w.hero.logs, w.hero.woodcutting.XP()
+		before, startXP := w.hero.inventory.Len(), w.hero.woodcutting.XP()
 		if !w.Chop() {
 			t.Fatalf("a level 15 hero must chop the oak at x %.1f z %.1f: %s", tree.X, tree.Z, w.Message())
 		}
 		if elapsed := chopFor(w, 10*time.Minute); elapsed < 27*time.Second {
 			t.Fatalf("the oak at x %.1f z %.1f fell after %v of chopping, want at least 27s", tree.X, tree.Z, elapsed)
 		}
-		gained := w.hero.logs - before
+		gained := w.hero.inventory.Len() - before
 		if xp := w.hero.woodcutting.XP() - startXP; math.Abs(xp-37.5*float64(gained)) > 1e-9 {
 			t.Fatalf("xp = %v for %d oak logs, want 37.5 each", xp, gained)
 		}
@@ -141,5 +141,45 @@ func TestOaksWillowsAndYewsRegrowAfterTheirRespawnTime(t *testing.T) {
 				t.Fatalf("the %v must regrow after %v", c.kind, c.respawn)
 			}
 		})
+	}
+}
+
+const inventoryFull = "Your inventory is too full to carry any more logs."
+
+// fillInventory packs the hero's inventory with normal logs until a number of slots is used.
+func fillInventory(w *World, used int) {
+	for w.hero.inventory.Len() < used {
+		w.hero.inventory.add(NormalTree)
+	}
+}
+
+func TestAFullInventoryRefusesChopping(t *testing.T) {
+	w := New(7)
+	tree := nearestOf(w, NormalTree)
+	standBeside(w, tree, 0)
+	fillInventory(w, InventorySize)
+	if w.Chop() || w.Chopping() {
+		t.Fatal("a full inventory must not start a chop")
+	}
+	if w.Message() != inventoryFull {
+		t.Fatalf("message = %q, want %q", w.Message(), inventoryFull)
+	}
+}
+
+func TestChoppingStopsOnceTheLastSlotFills(t *testing.T) {
+	w := New(7)
+	tree := nearestOf(w, Oak)
+	standBeside(w, tree, levelXP[99])
+	fillInventory(w, InventorySize-1)
+	w.Chop()
+	chopFor(w, time.Hour)
+	if w.Chopping() || !w.hero.inventory.Full() {
+		t.Fatalf("chopping = %v, slots = %d; want chopping stopped with a full inventory", w.Chopping(), w.hero.inventory.Len())
+	}
+	if standing, _ := w.TreeAt(tree.cell.gx, tree.cell.gz); standing.Stump {
+		t.Fatal("an oak giving one log must keep standing")
+	}
+	if w.Message() != inventoryFull {
+		t.Fatalf("message = %q, want %q", w.Message(), inventoryFull)
 	}
 }

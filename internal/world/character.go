@@ -29,7 +29,7 @@ type Character struct {
 	facing       Facing
 	aimed        bool
 	lastWalk     time.Time
-	logs         int
+	inventory    Inventory
 	woodcutting  Skill
 	// attempts counts every roll for a log, so a restarted chop rolls afresh.
 	attempts int
@@ -39,7 +39,7 @@ func (c *Character) Position() (x, z float64) { return c.x, c.z }
 func (c *Character) Steps() int               { return c.steps }
 func (c *Character) Facing() Facing           { return c.facing }
 func (c *Character) LastWalk() time.Time      { return c.lastWalk }
-func (c *Character) Logs() int                { return c.logs }
+func (c *Character) Inventory() Inventory     { return c.inventory }
 func (c *Character) Woodcutting() Skill       { return c.woodcutting }
 
 // Face turns the character without moving it.

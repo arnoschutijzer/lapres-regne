@@ -57,3 +57,13 @@ func TestEOpensTheActionMenuAndDigitsChoose(t *testing.T) {
 		t.Fatalf("event = %+v, want 1 to pick the first menu entry", event)
 	}
 }
+
+func TestTabTogglesTheInventory(t *testing.T) {
+	var d keyDecoder
+	if event := d.feed('\t'); event.action != toggleInventory {
+		t.Fatalf("event = %+v, want Tab to toggle the inventory", event)
+	}
+	if events := feed(&d, "\x1b[9u"); events[len(events)-1].action != toggleInventory {
+		t.Fatalf("event = %+v, want an encoded Tab to toggle the inventory", events[len(events)-1])
+	}
+}

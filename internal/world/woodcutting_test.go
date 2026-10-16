@@ -62,12 +62,12 @@ func TestChoppingANormalTreeLeavesAStumpWithItsFirstLog(t *testing.T) {
 		t.Fatal("chopping must start at a tree in reach")
 	}
 	w.Advance(0, 0, 599*time.Millisecond, false)
-	if !w.Chopping() || w.Hero().Logs() != 0 {
-		t.Fatalf("chopping = %v, logs = %d; want still chopping with no logs before the tick", w.Chopping(), w.Hero().Logs())
+	if !w.Chopping() || w.Hero().Inventory().Len() != 0 {
+		t.Fatalf("chopping = %v, logs = %d; want still chopping with no logs before the tick", w.Chopping(), w.Hero().Inventory().Len())
 	}
 	chopUntilFelled(t, w)
-	if w.Chopping() || w.Hero().Logs() != 1 {
-		t.Fatalf("chopping = %v, logs = %d; want one log and chopping stopped", w.Chopping(), w.Hero().Logs())
+	if w.Chopping() || w.Hero().Inventory().Len() != 1 {
+		t.Fatalf("chopping = %v, logs = %d; want one log and chopping stopped", w.Chopping(), w.Hero().Inventory().Len())
 	}
 	if tree, _ := w.TreeAt(1, 0); !tree.Stump {
 		t.Fatal("a felled tree must leave a stump")
@@ -222,8 +222,8 @@ func TestMovingCancelsAnApproachAndAChop(t *testing.T) {
 			w.Chop()
 			c.move(w)
 			w.Advance(0, 0, time.Second, false)
-			if w.Chopping() || w.Hero().Logs() != 0 {
-				t.Fatalf("chopping = %v, logs = %d; want the chop cancelled", w.Chopping(), w.Hero().Logs())
+			if w.Chopping() || w.Hero().Inventory().Len() != 0 {
+				t.Fatalf("chopping = %v, logs = %d; want the chop cancelled", w.Chopping(), w.Hero().Inventory().Len())
 			}
 		})
 	}
@@ -255,8 +255,8 @@ func TestAChopRollsEveryFourTicksUntilALogComes(t *testing.T) {
 	if strikes := 1 + int(elapsed/world.StrikeInterval); sounds.chops != strikes {
 		t.Fatalf("chops = %d over %v, want %d strikes at their own pace", sounds.chops, elapsed, strikes)
 	}
-	if w.Hero().Logs() != 1 || w.Hero().Woodcutting().XP() != 25 {
-		t.Fatalf("logs = %d, xp = %v; want one log worth 25 xp", w.Hero().Logs(), w.Hero().Woodcutting().XP())
+	if w.Hero().Inventory().Len() != 1 || w.Hero().Woodcutting().XP() != 25 {
+		t.Fatalf("logs = %d, xp = %v; want one log worth 25 xp", w.Hero().Inventory().Len(), w.Hero().Woodcutting().XP())
 	}
 	again := besideTree()
 	again.Chop()

@@ -19,6 +19,11 @@ func (k TreeKind) String() string {
 	return [...]string{"tree", "oak", "willow", "yew"}[k]
 }
 
+// Logs names the logs this kind of tree gives.
+func (k TreeKind) Logs() string {
+	return [...]string{"logs", "oak logs", "willow logs", "yew logs"}[k]
+}
+
 // treeSpecies holds Old School RuneScape's woodcutting values for one kind of tree.
 type treeSpecies struct {
 	level int

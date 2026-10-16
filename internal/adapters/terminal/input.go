@@ -18,6 +18,7 @@ const (
 	previousTrack
 	interact
 	firstChoice
+	toggleInventory
 )
 
 type keyEvent struct {
@@ -77,6 +78,8 @@ func keyAction(key int) action {
 		return interact
 	case '1':
 		return firstChoice
+	case '\t':
+		return toggleInventory
 	}
 	return none
 }
