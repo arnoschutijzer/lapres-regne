@@ -7,12 +7,20 @@ import (
 )
 
 // gait follows the hero from frame to frame, so the detailed body turns smoothly toward where
-// they walk, or toward their facing while they stand.
+// they walk, or toward their facing while they stand, and strides with the ground it covers.
 type gait struct {
 	started      bool
 	lastX, lastZ float64
 	// heading is the direction the body faces: 0 faces down the screen, π/2 faces right.
 	heading float64
+	// phase advances one full turn per stride cycle of ground covered; amount eases the stride
+	// in from rest and back out, and speed is the eased pace in world units per second.
+	phase, amount, speed float64
+}
+
+// cycle is the ground covered by one full stride, left and right foot, lengthening at speed.
+func (g *gait) cycle() float64 {
+	return 1.2 + 0.2*g.speed
 }
 
 // update follows the hero to x, z after dt seconds.
@@ -32,6 +40,19 @@ func (g *gait) update(x, z float64, facing world.Facing, dt float64) {
 		return
 	}
 	g.heading = wrapAngle(g.heading + angleBetween(g.heading, target)*(1-math.Exp(-14*dt)))
+	covered := math.Hypot(dx, dz)
+	if dt > 0 {
+		g.speed += (covered/dt - g.speed) * (1 - math.Exp(-8*dt))
+	}
+	moving := 0.0
+	if covered > 0 {
+		moving = 1
+	}
+	g.amount += (moving - g.amount) * (1 - math.Exp(-8*dt))
+	if g.amount < 0.001 {
+		g.amount = 0
+	}
+	g.phase = math.Mod(g.phase+covered/g.cycle()*2*math.Pi, 2*math.Pi)
 }
 
 // facingAngle is the heading of a facing.

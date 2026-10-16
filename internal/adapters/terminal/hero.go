@@ -19,6 +19,8 @@ type heroBody struct {
 	c       *forestCanvas
 	x, z    float64
 	heading float64
+	// bob lifts the whole body, and lean tips everything above the hips forward.
+	bob, lean float64
 	// side and forward are unit directions across the body to its right and out of its front.
 	sideX, sideZ, forwardX, forwardZ float64
 }
@@ -26,6 +28,14 @@ type heroBody struct {
 func newHeroBody(c *forestCanvas, x, z, heading float64) heroBody {
 	cos, sin := math.Cos(heading), math.Sin(heading)
 	return heroBody{c: c, x: x, z: z, heading: heading, sideX: cos, sideZ: -sin, forwardX: sin, forwardZ: cos}
+}
+
+// carry applies the body's bob and lean to a point at height y and forward offset.
+func (b heroBody) carry(y, forward float64) (float64, float64) {
+	if y > 0.86 {
+		forward += b.lean * (y - 0.86)
+	}
+	return y + b.bob, forward
 }
 
 // at turns an offset to the hero's side and front into a world position.
@@ -62,8 +72,9 @@ func (b heroBody) eye(side float64) {
 	if (normalSide*b.sideZ+normalForward*b.forwardZ)/length < 0.15 {
 		return
 	}
-	x, z := b.at(side, forward)
-	px, py, depth := b.c.project(x, 1.54, z)
+	y, carried := b.carry(1.54, forward)
+	x, z := b.at(side, carried)
+	px, py, depth := b.c.project(x, y, z)
 	for dy := range 2 {
 		b.c.plot(int(math.Round(px)), int(math.Round(py))+dy, depth-0.05, 0, eyeInk)
 	}
@@ -104,31 +115,37 @@ func bend(from joint, side, angle, length float64) joint {
 }
 
 // drawDetailedHero draws the hero's base body with realistic, slender proportions: skin, short
-// hair, a plain undershirt and shorts, and bare feet. Legs swing from the hips with the knee
-// bending on the back swing, and arms swing against them.
-func drawDetailedHero(c *forestCanvas, x, z, heading, stride float64, look heroLook) {
-	b := newHeroBody(c, x, z, heading)
-	swing := stride / 0.24 * 0.22
+// hair, a plain undershirt and shorts, and bare feet, posed by their gait. Legs swing from the
+// hips with the knee lifting as each passes through, and arms swing against them.
+func drawDetailedHero(c *forestCanvas, x, z float64, g gait, look heroLook) {
+	b := newHeroBody(c, x, z, g.heading)
+	// Wider strides at speed; the knee lifts as a leg swings through, and running arms bend.
+	reach := g.amount * math.Min(0.45, 0.22+0.02*g.speed)
+	elbowBend := 0.15 + 0.5*g.amount
 	var parts []bodyPart
-	for _, side := range []float64{-1, 1} {
-		angle := swing * side
+	for i, side := range []float64{-1, 1} {
+		phase := g.phase + float64(i)*math.Pi
+		angle := reach * math.Sin(phase)
+		knee := g.amount * (0.1 + 0.65*math.Max(0, math.Cos(phase)))
 		hip := joint{side * 0.075, 0.86, 0}
-		knee := bend(hip, side*0.005, angle, 0.39)
-		ankle := bend(knee, 0, angle-math.Max(0, -angle)*0.9, 0.38)
-		hem := along(hip, knee, 0.36)
+		kneeJoint := bend(hip, side*0.005, angle, 0.39)
+		ankle := bend(kneeJoint, 0, angle-knee, 0.38)
+		hem := along(hip, kneeJoint, 0.36)
 		parts = limb(parts, hip, hem, 0.07, 0.066, look.shorts)
-		parts = limb(parts, hem, knee, 0.06, 0.046, look.skin)
-		parts = limb(parts, knee, ankle, 0.045, 0.032, look.skin)
+		parts = limb(parts, hem, kneeJoint, 0.06, 0.046, look.skin)
+		parts = limb(parts, kneeJoint, ankle, 0.045, 0.032, look.skin)
 		parts = append(parts, bodyPart{ankle.side, ankle.y - 0.02, ankle.forward + 0.04, 0.035, 0.028, 0.075, look.skin})
 
+		armAngle := -angle * 0.6
 		shoulder := joint{side * 0.18, 1.34, 0}
-		elbow := bend(shoulder, side*0.025, -angle*0.8, 0.28)
-		wrist := bend(elbow, 0, -angle*0.8+0.15, 0.25)
+		elbow := bend(shoulder, side*0.025, armAngle, 0.28)
+		wrist := bend(elbow, 0, armAngle+elbowBend, 0.25)
 		sleeve := along(shoulder, elbow, 0.32)
 		parts = limb(parts, shoulder, sleeve, 0.05, 0.045, look.undershirt)
 		parts = limb(parts, sleeve, elbow, 0.04, 0.034, look.skin)
 		parts = limb(parts, elbow, wrist, 0.033, 0.026, look.skin)
-		parts = append(parts, bodyPart{wrist.side, wrist.y - 0.05, wrist.forward, 0.024, 0.05, 0.03, look.skin})
+		hand := bend(wrist, 0, armAngle+elbowBend, 0.05)
+		parts = append(parts, bodyPart{hand.side, hand.y, hand.forward, 0.024, 0.05, 0.03, look.skin})
 	}
 	parts = append(parts,
 		// Hips, waist and chest taper and widen like a real torso.
@@ -141,6 +158,12 @@ func drawDetailedHero(c *forestCanvas, x, z, heading, stride float64, look heroL
 		// Short hair caps the top and back of the head, leaving the face bare.
 		bodyPart{0, 1.59, -0.03, 0.088, 0.06, 0.09, look.hair},
 	)
+	// The body rises and falls twice a cycle, once per footfall, and leans into its stride.
+	b.bob = g.amount * 0.025 * math.Cos(2*g.phase)
+	b.lean = g.amount * 0.1
+	for i := range parts {
+		parts[i].y, parts[i].forward = b.carry(parts[i].y, parts[i].forward)
+	}
 	for _, p := range parts {
 		b.outline(p.side, p.y, p.forward, p.width, p.height, p.depth)
 	}
