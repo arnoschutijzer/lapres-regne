@@ -208,3 +208,41 @@ func TestFencesGatesAndGravesStopTheHero(t *testing.T) {
 		}
 	}
 }
+
+// walkFor advances the world in small steps for a while without any keys held.
+func walkFor(w *world.World, duration time.Duration) {
+	for elapsed := time.Duration(0); elapsed < duration; elapsed += 50 * time.Millisecond {
+		w.Advance(0, 0, 50*time.Millisecond, false)
+	}
+}
+
+func TestWalkingToAPointBeyondAWallGoesAroundThroughTheGap(t *testing.T) {
+	w := world.NewOnMap(7, courtyard())
+	w.WalkTo(11, 3)
+	walkFor(w, 10*time.Second)
+	if x, z := w.Hero().Position(); x != 11 || z != 3 {
+		t.Fatalf("position = %v, %v; want the hero round the wall at 11, 3", x, z)
+	}
+}
+
+func TestWalkingToAWallStopsOnTheNearestTileBesideIt(t *testing.T) {
+	w := world.NewOnMap(7, courtyard())
+	w.WalkTo(1, 5)
+	walkFor(w, 5*time.Second)
+	if x, z := w.Hero().Position(); math.Hypot(x-3, z-5) > 0.01 {
+		t.Fatalf("position = %v, %v; want the hero on the floor beside the wall, at 3, 5", x, z)
+	}
+}
+
+func TestApproachingATreeBeyondAWallGoesAroundToChopIt(t *testing.T) {
+	m := courtyard()
+	m.Trees = []world.PlantedTree{{Col: 6, Row: 1, Kind: world.NormalTree}}
+	w := world.NewOnMap(7, m)
+	tree, _ := w.TreeAt(6, 1)
+	w.Approach(tree)
+	walkFor(w, 10*time.Second)
+	if !w.Chopping() {
+		x, z := w.Hero().Position()
+		t.Fatalf("hero at %v, %v is not chopping; want them round the wall and at the tree", x, z)
+	}
+}

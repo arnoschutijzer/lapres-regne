@@ -106,15 +106,17 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 
 type destination struct {
 	active bool
-	x, z   float64
+	// waypoints lead round whatever blocks the way, ending on the destination.
+	waypoints []point
 }
 
-// WalkTo walks the hero straight to a point on the ground, running while sprinting, giving up
-// whatever they were doing.
+// WalkTo walks the hero to a point on the ground, running while sprinting, giving up whatever they
+// were doing. On a map they go round whatever blocks the way, and stop as near as they can get to
+// a point they cannot reach.
 func (w *World) WalkTo(x, z float64) {
 	w.Stop()
 	w.panX, w.panZ = 0, 0
-	w.destination = destination{active: true, x: x, z: z}
+	w.destination = destination{active: true, waypoints: w.route(x, z)}
 }
 
 // walkToFor walks toward the destination at speed and stops on it.
@@ -122,17 +124,10 @@ func (w *World) walkToFor(dt time.Duration, speed float64) {
 	if !w.destination.active {
 		return
 	}
-	dx, dz := w.destination.x-w.hero.x, w.destination.z-w.hero.z
-	remaining := math.Hypot(dx, dz)
-	step := w.wading(speed * dt.Seconds())
-	if remaining <= step && w.passable(w.destination.x, w.destination.z) {
-		w.hero.advance(dx, dz, remaining)
-		w.hero.x, w.hero.z = w.destination.x, w.destination.z
-		w.destination = destination{}
-		return
-	}
+	waypoints, moving := w.follow(w.destination.waypoints, w.wading(speed*dt.Seconds()))
+	w.destination.waypoints = waypoints
 	// A hero who cannot get any closer gives up on the destination.
-	if w.hero.advance(dx, dz, math.Min(remaining, step)) == 0 {
+	if len(waypoints) == 0 || !moving {
 		w.destination = destination{}
 	}
 }

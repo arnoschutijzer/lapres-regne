@@ -82,7 +82,8 @@ WY...
 | `@`  | where the hero starts | | |
 
 Walls, fences, gates and graves block the way, and nothing beyond the map's
-edges can be walked on. Progress keeps the map's name,
+edges can be walked on. Clicking the ground or a tree walks round whatever
+blocks the way, or as close as the hero can get. Progress keeps the map's name,
 so your position and stumps return only to the map they were saved on.
 
 Requires Go 1.25+, macOS or Linux with `stty`, and a UTF-8 terminal with

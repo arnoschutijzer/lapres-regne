@@ -31,6 +31,8 @@ type cell struct{ gx, gz int }
 type approach struct {
 	active bool
 	tree   cell
+	// waypoints lead round whatever blocks the way to the tree.
+	waypoints []point
 }
 
 type chop struct {
@@ -110,7 +112,7 @@ func (w *World) startChop(tree Tree) bool {
 // Message is the game's reply to the hero's latest action, or empty when there is none.
 func (w *World) Message() string { return w.message }
 
-// Approach walks the hero straight to a standing tree and chops it on arrival,
+// Approach walks the hero to a standing tree, round whatever blocks the way, and chops it on arrival,
 // reporting whether the tree still stands.
 func (w *World) Approach(tree Tree) bool {
 	standing, exists := w.TreeAt(tree.cell.gx, tree.cell.gz)
@@ -120,7 +122,8 @@ func (w *World) Approach(tree Tree) bool {
 	w.chop = chop{}
 	w.destination = destination{}
 	w.message = ""
-	w.approach = approach{active: true, tree: tree.cell}
+	route := w.route(standing.X, standing.Z)
+	w.approach = approach{active: true, tree: tree.cell, waypoints: route[:len(route)-1]}
 	return true
 }
 
@@ -135,6 +138,14 @@ func (w *World) Stop() {
 // approachFor walks toward the approached tree at speed and starts chopping once beside it.
 func (w *World) approachFor(dt time.Duration, speed float64) {
 	if !w.approach.active {
+		return
+	}
+	if len(w.approach.waypoints) > 0 {
+		waypoints, moving := w.follow(w.approach.waypoints, w.wading(speed*dt.Seconds()))
+		w.approach.waypoints = waypoints
+		if !moving {
+			w.approach = approach{}
+		}
 		return
 	}
 	tree, _ := w.TreeAt(w.approach.tree.gx, w.approach.tree.gz)
