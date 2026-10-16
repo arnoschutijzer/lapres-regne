@@ -13,7 +13,7 @@ Walk with the **arrow keys**, **WASD**, or **IJKL** (I up, J left, K down,
 L right). Hold a key to keep walking. Press **Q** or **Ctrl-C** to quit.
 The camera follows the traveler and the view adapts when the terminal resizes.
 
-Trees cast shadows and their trunks block movement. Tall grass sways in front
+Trees cast shadows and you can walk freely through their trunks. Tall grass sways in front
 of the traveler, while a small canopy cutaway keeps the character readable
 under the trees. Rivers ripple and can be crossed by wading at half speed.
 

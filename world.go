@@ -61,15 +61,3 @@ func (f *forest) treeAt(gx, gz int) (woodlandTree, bool) {
 	}
 	return woodlandTree{x, z, 4.5 + f.random(gx, gz, 4)*3, 2.0 + f.random(gx, gz, 5)*1.35, 0.18 + f.random(gx, gz, 6)*0.14, f.random(gx, gz, 7)}, true
 }
-
-func (f *forest) canWalk(x, z float64) bool {
-	gx, gz := int(math.Floor(x/treeSpacing)), int(math.Floor(z/treeSpacing))
-	for j := gz - 1; j <= gz+1; j++ {
-		for i := gx - 1; i <= gx+1; i++ {
-			if tree, exists := f.treeAt(i, j); exists && math.Hypot(x-tree.x, z-tree.z) < tree.trunk+0.20 {
-				return false
-			}
-		}
-	}
-	return true
-}

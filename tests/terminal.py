@@ -133,6 +133,8 @@ def check_forest(binary):
             regions += terminal.read(until=f"steps {step}  |".encode())
         assert b"river / wading" in regions, "walk must reach and cross a procedural river"
         assert tree_pixels(regions) != tree_pixels(initial), "walking must reveal new terrain"
+        terminal.send(b"d" * 180)
+        terminal.read(until=b"steps 244  |")
         terminal.resize(20, 8)
         terminal.read(until=b"Resize to 40 x 14.")
         terminal.resize(100, 30)

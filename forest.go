@@ -58,10 +58,8 @@ func (f *forest) walk(direction action) {
 	if distance < width {
 		dx, dz = dx*0.5, dz*0.5
 	}
-	if f.canWalk(f.x+dx, f.z+dz) {
-		f.x, f.z = f.x+dx, f.z+dz
-		f.steps++
-	}
+	f.x, f.z = f.x+dx, f.z+dz
+	f.steps++
 }
 
 func (f *forest) follow() {
