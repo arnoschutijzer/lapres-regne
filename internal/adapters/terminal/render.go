@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"lapresregne/internal/world"
 )
@@ -290,26 +291,32 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 
 func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 	x, z := r.world.Hero().Position()
+	stride := 0.0
+	if time.Since(r.world.Hero().LastWalk()) < 200*time.Millisecond {
+		stride = math.Sin(seconds*18) * 0.24
+	}
+	strideX, strideZ := 0.0, stride
+	if facing := r.world.Hero().Facing(); facing == world.FacingLeft || facing == world.FacingRight {
+		strideX, strideZ = stride, 0
+	}
 	r.gait.update(x, z, r.world.Hero().Facing(), min(0.1, max(0, seconds-r.lastSeconds)))
 	r.lastSeconds = seconds
-	size := c.figureSize()
-	drawDetailedHero(c, x, z, r.gait, defaultLook, size)
-	if _, sinceStrike, chopping := r.world.LastStrike(); chopping {
-		drawAxe(c, x, z, r.world.Hero().Facing(), sinceStrike.Seconds(), size)
+	if c.scale >= heroDetailScale {
+		drawDetailedHero(c, x, z, r.gait, defaultLook)
+	} else {
+		// A small warm-colored traveler: boots, coat, arms, and a round hat.
+		c.line(x-0.16+strideX, 0.05, z+strideZ, x-0.12, 0.7, z, 1, 8)
+		c.line(x+0.16-strideX, 0.05, z-strideZ, x+0.12, 0.7, z, 1, 8)
+		c.line(x, 0.55, z, x, 1.15, z, 1, 8)
+		c.line(x-0.34, 0.65, z-stride, x+0.34, 1.0, z+stride, 0.95, 8)
+		for i := range 8 {
+			a := float64(i) * math.Pi / 4
+			c.line(x, 1.48, z, x+math.Cos(a)*0.28, 1.48, z+math.Sin(a)*0.28, 1, 8)
+		}
 	}
-}
-
-// minFigurePixels is the least height a figure is drawn at, in canvas pixels: five braille rows,
-// enough to read their pose, and so what they are about to do, however far out the view is.
-const minFigurePixels = 20
-
-// figureHeight is how tall a figure stands in the world, from their feet to the top of their head.
-const figureHeight = 1.65
-
-// figureSize is how many times larger than life figures are drawn, so they never stand shorter
-// than minFigurePixels; up close they are drawn true to size.
-func (c *forestCanvas) figureSize() float64 {
-	return max(1, minFigurePixels/(figureHeight*0.69*c.scale))
+	if _, sinceStrike, chopping := r.world.LastStrike(); chopping {
+		drawAxe(c, x, z, r.world.Hero().Facing(), sinceStrike.Seconds())
+	}
 }
 
 // canvasPoint finds the canvas pixel at the centre of a 1-based terminal cell of the last frame.
@@ -651,10 +658,9 @@ func (c *forestCanvas) quiet() float64 {
 // halo leaves a dark ring a pixel wide around the figure standing at x, z, so their silhouette
 // reads against whatever lies behind them.
 func (c *forestCanvas) halo(x, z float64) {
-	size := c.figureSize()
 	footX, footY, _ := c.project(x, 0, z)
-	_, headY, _ := c.project(x, 2.4*size, z)
-	reach := 1.5 * c.scale * size
+	_, headY, _ := c.project(x, 2.4, z)
+	reach := 1.5 * c.scale
 	left, right := max(1, int(footX-reach)), min(c.width-2, int(footX+reach))
 	top, bottom := max(1, int(headY-reach)), min(c.height-2, int(footY+reach))
 	if left > right || top > bottom {

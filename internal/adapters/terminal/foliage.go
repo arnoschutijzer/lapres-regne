@@ -104,11 +104,7 @@ func (c *forestCanvas) rim(normal vec) float64 {
 func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves foliageInks) {
 	f := r.world
 	heroWorldX, heroWorldZ := f.Hero().Position()
-	size := c.figureSize()
-	heroX, heroY, _ := c.project(heroWorldX, 0.8*size, heroWorldZ)
-	// The cutaway reaches a little past the figure's feet, keeping what lies at them in sight.
-	figure := figureHeight * 0.69 * c.scale * size
-	cutawayX, cutawayY := max(7*c.scale/forestScale, 0.45*figure), max(9*c.scale/forestScale, 0.75*figure)
+	heroX, heroY, _ := c.project(heroWorldX, 0.9, heroWorldZ)
 	ellipsoid(c, x, y, z, rx, ry, rz, 0, func(px, py int, depth float64, point, normal vec) {
 		light := (sunlight(normal) + 0.04*wave(point.x*11+point.y*8+point.z*7)) * c.rim(normal)
 		// Up close the crown breaks into clumps of leaves, with gaps showing what lies behind.
@@ -123,11 +119,13 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 		if light > 0.58 {
 			ink = leaves.sunlit
 		}
-		// A cutaway around the hero, sized to the figure as drawn, keeps leaves from speckling them
-		// under overlapping crowns.
-		hx, hy := (float64(px)-heroX)/cutawayX, (float64(py)-heroY)/cutawayY
-		if hx*hx+hy*hy < 1 {
-			return
+		// A small cutaway keeps the traveler readable under overlapping crowns, and up close it
+		// opens fully so no leaves speckle the detailed hero.
+		hx, hy := (float64(px)-heroX)/(7*c.scale/forestScale), (float64(py)-heroY)/(9*c.scale/forestScale)
+		if distance := hx*hx + hy*hy; distance < 1 {
+			if distance < 0.13 || c.scale >= heroDetailScale || f.Random(int(math.Floor(x+point.x*3)), int(math.Floor(z+point.z*3)), 83) > 0.18 {
+				return
+			}
 		}
 		c.plot(px, py, depth, light, ink)
 	})
