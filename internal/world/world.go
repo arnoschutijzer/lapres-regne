@@ -93,8 +93,8 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	}
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
 	w.ageCelebration(dt)
-	w.walkToFor(dt)
-	w.approachFor(dt)
+	w.walkToFor(dt, speed)
+	w.approachFor(dt, speed)
 	w.regrow(dt)
 	w.despawn(dt)
 	w.recoverTimers(dt)
@@ -106,22 +106,22 @@ type destination struct {
 	x, z   float64
 }
 
-// WalkTo walks the hero straight to a point on the ground at walking pace, giving up whatever
-// they were doing.
+// WalkTo walks the hero straight to a point on the ground, running while sprinting, giving up
+// whatever they were doing.
 func (w *World) WalkTo(x, z float64) {
 	w.Stop()
 	w.panX, w.panZ = 0, 0
 	w.destination = destination{active: true, x: x, z: z}
 }
 
-// walkToFor walks toward the destination and stops on it.
-func (w *World) walkToFor(dt time.Duration) {
+// walkToFor walks toward the destination at speed and stops on it.
+func (w *World) walkToFor(dt time.Duration, speed float64) {
 	if !w.destination.active {
 		return
 	}
 	dx, dz := w.destination.x-w.hero.x, w.destination.z-w.hero.z
 	remaining := math.Hypot(dx, dz)
-	step := w.wading(walkingSpeed * dt.Seconds())
+	step := w.wading(speed * dt.Seconds())
 	if remaining <= step {
 		w.hero.advance(dx, dz, remaining)
 		w.hero.x, w.hero.z = w.destination.x, w.destination.z

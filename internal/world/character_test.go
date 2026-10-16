@@ -127,3 +127,12 @@ func TestApproachingATreeCancelsWalkingToAPoint(t *testing.T) {
 		t.Fatal("the hero must reach the tree and chop it")
 	}
 }
+
+func TestWalkingToAPointRunsWhileSprinting(t *testing.T) {
+	w := world.New(7)
+	w.WalkTo(6, 8)
+	w.Advance(0, 0, 500*time.Millisecond, true)
+	if x, z := w.Hero().Position(); math.Abs(x-2.7) > 1e-9 || math.Abs(z-3.6) > 1e-9 {
+		t.Fatalf("hero at (%v, %v) after running half a second, want 4.5 units along the way at (2.7, 3.6)", x, z)
+	}
+}

@@ -131,8 +131,8 @@ func (w *World) Stop() {
 	w.message = ""
 }
 
-// approachFor walks toward the approached tree and starts chopping once beside it.
-func (w *World) approachFor(dt time.Duration) {
+// approachFor walks toward the approached tree at speed and starts chopping once beside it.
+func (w *World) approachFor(dt time.Duration, speed float64) {
 	if !w.approach.active {
 		return
 	}
@@ -141,7 +141,7 @@ func (w *World) approachFor(dt time.Duration) {
 	dx, dz := tree.X-x, tree.Z-z
 	remaining := math.Hypot(dx, dz) - arrival
 	if remaining > 0 {
-		w.hero.advance(dx, dz, math.Min(remaining, w.wading(walkingSpeed*dt.Seconds())))
+		w.hero.advance(dx, dz, math.Min(remaining, w.wading(speed*dt.Seconds())))
 		remaining = math.Hypot(tree.X-w.hero.x, tree.Z-w.hero.z) - arrival
 	}
 	if remaining <= 1e-9 {

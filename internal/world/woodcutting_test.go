@@ -316,3 +316,17 @@ func TestWalkingToAPointCancelsAChop(t *testing.T) {
 		t.Fatal("walking to a point must cancel the chop")
 	}
 }
+
+func TestApproachingATreeRunsWhileSprinting(t *testing.T) {
+	walked, ran := world.New(7), world.New(7)
+	tree, _ := walked.TreeAt(1, 0)
+	walked.Approach(tree)
+	ran.Approach(tree)
+	walked.Advance(0, 0, 200*time.Millisecond, false)
+	ran.Advance(0, 0, 200*time.Millisecond, true)
+	walkedX, _ := walked.Hero().Position()
+	ranX, _ := ran.Hero().Position()
+	if math.Abs(ranX-2*walkedX) > 1e-9 {
+		t.Fatalf("x = %v running, %v walking; want running to cover twice the ground", ranX, walkedX)
+	}
+}
