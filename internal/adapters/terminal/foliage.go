@@ -3,7 +3,7 @@ package terminal
 import (
 	"math"
 
-	"dither-cli/internal/forest"
+	"dither-cli/internal/world"
 )
 
 type vec struct{ x, y, z float64 }
@@ -12,7 +12,7 @@ func (a vec) mul(s float64) vec { return vec{a.x * s, a.y * s, a.z * s} }
 func (a vec) dot(b vec) float64 { return a.x*b.x + a.y*b.y + a.z*b.z }
 func (a vec) unit() vec         { return a.mul(1 / math.Sqrt(a.dot(a))) }
 
-func (c *forestCanvas) shadow(tree forest.Tree) {
+func (c *forestCanvas) shadow(tree world.Tree) {
 	x, y, _ := c.project(tree.X+tree.Height*0.55, 0, tree.Z+tree.Height*0.3)
 	rx, ry := tree.Radius*c.scale*1.3, tree.Radius*c.scale*0.72
 	for py := max(0, int(y-ry)); py <= min(c.height-1, int(y+ry)); py++ {
@@ -71,7 +71,7 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 	}
 }
 
-func (r *renderer) drawTree(c *forestCanvas, tree forest.Tree) {
+func (r *renderer) drawTree(c *forestCanvas, tree world.Tree) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	for _, offset := range []float64{-tree.Trunk, 0, tree.Trunk} {
 		c.line(x+offset, 0, z, x+offset*0.6, h, z, 0.62, 4)

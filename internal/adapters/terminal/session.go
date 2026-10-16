@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"dither-cli/internal/forest"
 	"dither-cli/internal/soundtrack"
+	"dither-cli/internal/world"
 )
 
 // Session owns the interactive terminal: raw mode, signals, keys and frames.
@@ -69,7 +69,7 @@ func terminalSize() (int, int, error) {
 }
 
 // Run lets the traveler explore the world until they quit. Music is nil when muted.
-func (s *Session) Run(world *forest.Forest, music soundtrack.Player, title string) error {
+func (s *Session) Run(world *world.World, music soundtrack.Player, title string) error {
 	if _, err := stty("raw", "-echo"); err != nil {
 		return err
 	}

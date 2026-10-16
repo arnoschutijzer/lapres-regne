@@ -11,7 +11,7 @@ const (
 	adapters = module + "/internal/adapters/"
 )
 
-var domains = []string{module + "/internal/forest", module + "/internal/soundtrack"}
+var domains = []string{module + "/internal/world", module + "/internal/soundtrack"}
 
 // Domain code stays independent of the operating system and the network.
 var infrastructure = []string{"os", "net", "syscall", "database"}

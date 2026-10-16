@@ -8,8 +8,8 @@ import (
 	"dither-cli/internal/adapters/songfiles"
 	"dither-cli/internal/adapters/speaker"
 	"dither-cli/internal/adapters/terminal"
-	"dither-cli/internal/forest"
 	"dither-cli/internal/soundtrack"
+	"dither-cli/internal/world"
 )
 
 const appTitle = "L’Après-Règne"
@@ -63,5 +63,5 @@ func run(seed uint64, mute bool, musicDir string) error {
 			music = playback
 		}
 	}
-	return session.Run(forest.New(seed), music, appTitle)
+	return session.Run(world.New(seed), music, appTitle)
 }

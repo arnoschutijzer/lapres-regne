@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"dither-cli/internal/forest"
+	"dither-cli/internal/world"
 )
 
 // Bayer thresholds turn smooth lighting into a stable, ordered dot pattern.
@@ -17,16 +17,16 @@ var bayer = [4][4]float64{
 
 // renderer draws the forest as braille cells and sends only changed cells.
 type renderer struct {
-	world                     *forest.Forest
+	world                     *world.World
 	title                     string
 	canvas                    forestCanvas
-	trees                     []forest.Tree
+	trees                     []world.Tree
 	cells                     []forestCell
 	screenWidth, screenHeight int
 	lastStatus                string
 }
 
-func newRenderer(world *forest.Forest, title string) *renderer {
+func newRenderer(world *world.World, title string) *renderer {
 	return &renderer{world: world, title: title}
 }
 
@@ -98,8 +98,8 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	back := c.z - float64(c.height)/c.scale - 5
 	front := c.z + float64(c.height)/c.scale + 12
 	trees := r.trees[:0]
-	for gz := int(math.Floor(back / forest.TreeSpacing)); gz <= int(math.Ceil(front/forest.TreeSpacing)); gz++ {
-		for gx := int(math.Floor(left / forest.TreeSpacing)); gx <= int(math.Ceil(right/forest.TreeSpacing)); gx++ {
+	for gz := int(math.Floor(back / world.TreeSpacing)); gz <= int(math.Ceil(front/world.TreeSpacing)); gz++ {
+		for gx := int(math.Floor(left / world.TreeSpacing)); gx <= int(math.Ceil(right/world.TreeSpacing)); gx++ {
 			if tree, exists := f.TreeAt(gx, gz); exists {
 				trees = append(trees, tree)
 			}
@@ -110,7 +110,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	sort.Slice(trees, func(i, j int) bool {
 		return trees[i].Z*0.69+trees[i].Height*0.72 > trees[j].Z*0.69+trees[j].Height*0.72
 	})
-	channels := make([]forest.RiverChannel, 0, 6)
+	channels := make([]world.RiverChannel, 0, 6)
 	for y := range c.height {
 		wz := (float64(y)-float64(c.height)*0.57)/(c.scale*0.72) + c.z
 		channels = f.RiverChannels(channels[:0], wz, left, right)
@@ -129,7 +129,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 			if sun > 0.24 {
 				ink = 7
 			}
-			distance, width := forest.NearestRiver(channels, wx)
+			distance, width := world.NearestRiver(channels, wx)
 			if distance < width {
 				ink, light = 5, 0.28+n*0.3
 				if math.Sin(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
@@ -159,7 +159,7 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 		stride = math.Sin(seconds*18) * 0.24
 	}
 	strideX, strideZ := 0.0, stride
-	if facing := r.world.Facing(); facing == forest.FacingLeft || facing == forest.FacingRight {
+	if facing := r.world.Facing(); facing == world.FacingLeft || facing == world.FacingRight {
 		strideX, strideZ = stride, 0
 	}
 	// A small warm-colored traveler: boots, coat, arms, and a round hat.
