@@ -13,8 +13,8 @@ const frame = 1.0 / 60
 func walk(g *gait, x, z *float64, dx, dz float64, frames int) {
 	length := math.Hypot(dx, dz)
 	for range frames {
-		*x += dx / length * 9 * frame
-		*z += dz / length * 9 * frame
+		*x += dx / length * 4.5 * frame
+		*z += dz / length * 4.5 * frame
 		g.update(*x, *z, world.FacingDown, frame)
 	}
 }
@@ -76,7 +76,7 @@ func TestTheStrideEasesInThenFollowsTheGroundCovered(t *testing.T) {
 	}
 	before := g.phase
 	walk(&g, &x, &z, 1, 0, 30)
-	covered := 30 * 9 * frame
+	covered := 30 * 4.5 * frame
 	if want := before + covered/g.cycle()*2*math.Pi; math.Abs(angleBetween(g.phase, want)) > 0.05 {
 		t.Fatalf("phase = %.2f after covering %.1f, want %.2f, one cycle per %.1f covered", g.phase, covered, want, g.cycle())
 	}

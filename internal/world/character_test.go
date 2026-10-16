@@ -1,7 +1,9 @@
 package world_test
 
 import (
+	"math"
 	"testing"
+	"time"
 
 	"lapresregne/internal/world"
 )
@@ -61,5 +63,17 @@ func TestAimingAtTheHeroKeepsTheLastFacing(t *testing.T) {
 	w.Hero().AimAt(x, z)
 	if facing := w.Hero().Facing(); facing != world.FacingRight {
 		t.Fatalf("facing = %v, want right to be kept", facing)
+	}
+}
+
+func TestTheHeroWalksAtAnUnhurriedPaceAndSprintsTwiceAsFast(t *testing.T) {
+	w := world.New(7)
+	w.Advance(1, 0, time.Second, false)
+	if x, _ := w.Hero().Position(); math.Abs(x-4.5) > 1e-9 {
+		t.Fatalf("x = %v after walking a second, want 4.5", x)
+	}
+	w.Advance(1, 0, time.Second, true)
+	if x, _ := w.Hero().Position(); math.Abs(x-13.5) > 1e-9 {
+		t.Fatalf("x = %v after sprinting a second more, want 13.5", x)
 	}
 }

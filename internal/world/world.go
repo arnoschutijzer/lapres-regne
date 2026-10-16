@@ -54,7 +54,7 @@ func (w *World) Noise(x, z float64, salt uint64) float64 {
 }
 
 // walkingSpeed is how far the hero walks per second.
-const walkingSpeed = 9.0
+const walkingSpeed = 4.5
 
 // Walk takes one step in a direction, as triggered by a single key press.
 func (w *World) Walk(dx, dz float64, sprinting bool) {

@@ -234,9 +234,9 @@ func nearFirst(t *testing.T, kind world.TreeKind) *world.World {
 		for gz := -radius; gz <= radius; gz++ {
 			for gx := -radius; gx <= radius; gx++ {
 				if tree, ok := w.TreeAt(gx, gz); ok && tree.Kind == kind {
-					// Walking speed is 9 per second, so one long frame carries the hero there.
+					// Walking speed is 4.5 per second, so one long frame carries the hero there.
 					distance := math.Hypot(tree.X-1, tree.Z)
-					w.Advance(tree.X-1, tree.Z, time.Duration(distance/9*float64(time.Second)), false)
+					w.Advance(tree.X-1, tree.Z, time.Duration(distance/4.5*float64(time.Second)), false)
 					w.Follow(time.Second)
 					return w
 				}
