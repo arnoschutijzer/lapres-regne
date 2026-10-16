@@ -112,7 +112,7 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			return false
 		}
 		if event.zoom != 0 {
-			view.zoom.scroll(event.zoom)
+			world.ZoomBy(event.zoom)
 			return false
 		}
 		if event.click {
@@ -237,7 +237,7 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			dx, dz := held.direction()
 			world.Advance(dx, dz, dt, held.sprinting())
 			world.Follow(dt)
-			view.zoom.step(dt)
+			view.zoom.step(world.Zoom(), dt)
 			if x, z, ok := view.groundAt(cursorColumn, cursorRow); ok {
 				world.AimAt(x, z)
 			}

@@ -369,10 +369,8 @@ func TestZoomingInDrawsTheHeroLarger(t *testing.T) {
 	r := newRenderer(world.New(7), "L’Après-Règne")
 	hero := []int{8, defaultLook.skin, defaultLook.hair, defaultLook.undershirt, defaultLook.shorts}
 	far := countInk(r.render(100, 27, 0), hero...)
-	for range zoomSteps {
-		r.zoom.scroll(1)
-	}
-	r.zoom.step(5 * time.Second)
+	r.world.ZoomBy(world.CloseUp)
+	r.zoom.step(r.world.Zoom(), 5*time.Second)
 	if near := countInk(r.render(100, 27, 0), hero...); near <= far*4 {
 		t.Fatalf("hero pixels = %d zoomed in, want far more than %d in the forest view", near, far)
 	}
@@ -381,8 +379,8 @@ func TestZoomingInDrawsTheHeroLarger(t *testing.T) {
 // closeUp renders the hero at full zoom.
 func closeUp(w *world.World) *forestCanvas {
 	r := newRenderer(w, "L’Après-Règne")
-	r.zoom.scroll(zoomSteps)
-	r.zoom.step(5 * time.Second)
+	w.ZoomBy(world.CloseUp)
+	r.zoom.step(w.Zoom(), 5*time.Second)
 	return r.render(100, 27, 0)
 }
 
@@ -465,8 +463,8 @@ func TestUpCloseTrunksAreSolidWood(t *testing.T) {
 
 func TestTheDetailedHeroStaysAFewStepsFromTheForestView(t *testing.T) {
 	r := newRenderer(world.New(7), "L’Après-Règne")
-	r.zoom.scroll(3)
-	r.zoom.step(5 * time.Second)
+	r.world.ZoomBy(3)
+	r.zoom.step(r.world.Zoom(), 5*time.Second)
 	if countInk(r.render(100, 27, 0), defaultLook.skin) == 0 {
 		t.Fatal("three wheel steps in, the hero must already be drawn in detail")
 	}

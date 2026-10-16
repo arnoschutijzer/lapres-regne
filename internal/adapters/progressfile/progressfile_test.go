@@ -13,7 +13,7 @@ import (
 func TestSavedProgressLoadsBackUnchanged(t *testing.T) {
 	file := File{Path: filepath.Join(t.TempDir(), "nested", "progress.json")}
 	snapshot := world.Snapshot{
-		Seed: 7, X: 4.95, Z: -1.65, WoodcuttingXP: 112.5,
+		Seed: 7, X: 4.95, Z: -1.65, WoodcuttingXP: 112.5, Zoom: 5,
 		Inventory: []world.Slot{{Item: world.OakLogs, Filled: true}, {}, {Item: world.WillowLogs, Filled: true}, {Item: world.YewLogs, Filled: true}},
 		Stumps:    []world.Stump{{GX: 1, GZ: 0, Regrow: 41*time.Second + 250*time.Millisecond}, {GX: -2, GZ: 3, Regrow: 8400 * time.Millisecond}},
 		SavedAt:   time.Date(2026, 10, 16, 21, 0, 0, 0, time.UTC),
@@ -88,5 +88,17 @@ func TestAnUnknownItemIsReported(t *testing.T) {
 	os.WriteFile(path, []byte(`{"version": 2, "seed": 7, "inventory": ["oak", "magic"]}`), 0o600)
 	if _, _, err := (File{Path: path}).Load(); err == nil {
 		t.Fatal("an unknown item must be reported")
+	}
+}
+
+func TestASaveFromBeforeZoomingOpensOnTheForestView(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "progress.json")
+	os.WriteFile(path, []byte(`{"version": 2, "seed": 7, "hero": {"x": 1, "z": 2}, "inventory": []}`), 0o600)
+	loaded, saved, err := File{Path: path}.Load()
+	if err != nil || !saved {
+		t.Fatalf("load = %v, %v; want the old save", saved, err)
+	}
+	if loaded.Zoom != 0 {
+		t.Fatalf("zoom = %d, want the forest view", loaded.Zoom)
 	}
 }

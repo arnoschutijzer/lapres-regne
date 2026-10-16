@@ -39,8 +39,9 @@ type renderer struct {
 	lastSeconds float64
 }
 
+// newRenderer opens the view at the camera's zoom, so a resumed session starts where it was left.
 func newRenderer(world *world.World, title string) *renderer {
-	return &renderer{world: world, title: title}
+	return &renderer{world: world, title: title, zoom: zoom{current: float64(world.Zoom())}}
 }
 
 type forestPixel struct {

@@ -36,6 +36,8 @@ type Snapshot struct {
 	Seed          uint64
 	X, Z          float64
 	WoodcuttingXP float64
+	// Zoom is the camera's zoom, in steps in from the forest view.
+	Zoom int
 	// Inventory lists the inventory slot by slot, gaps included.
 	Inventory []Slot
 	Stumps    []Stump

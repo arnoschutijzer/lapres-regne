@@ -34,6 +34,8 @@ type progressJSON struct {
 	SavedAt     time.Time `json:"savedAt"`
 	Hero        heroJSON  `json:"hero"`
 	Woodcutting skillJSON `json:"woodcutting"`
+	// Camera is absent from saves made before the view could zoom, which open on the forest view.
+	Camera cameraJSON `json:"camera"`
 	// Logs is the log count of version 1 saves.
 	Logs      int         `json:"logs,omitempty"`
 	Inventory []string    `json:"inventory"`
@@ -43,6 +45,10 @@ type progressJSON struct {
 type heroJSON struct {
 	X float64 `json:"x"`
 	Z float64 `json:"z"`
+}
+
+type cameraJSON struct {
+	Zoom int `json:"zoom"`
 }
 
 type skillJSON struct {
@@ -72,7 +78,7 @@ func (f File) Load() (world.Snapshot, bool, error) {
 	}
 	snapshot := world.Snapshot{
 		Seed: saved.Seed, X: saved.Hero.X, Z: saved.Hero.Z,
-		WoodcuttingXP: saved.Woodcutting.XP, SavedAt: saved.SavedAt,
+		WoodcuttingXP: saved.Woodcutting.XP, Zoom: saved.Camera.Zoom, SavedAt: saved.SavedAt,
 	}
 	// Version 1 counted logs before they had kinds; they were all normal logs.
 	for range saved.Logs {
@@ -102,6 +108,7 @@ func (f File) Save(snapshot world.Snapshot) error {
 		Version: version, Seed: snapshot.Seed, SavedAt: snapshot.SavedAt,
 		Hero:        heroJSON{X: snapshot.X, Z: snapshot.Z},
 		Woodcutting: skillJSON{XP: snapshot.WoodcuttingXP},
+		Camera:      cameraJSON{Zoom: snapshot.Zoom},
 		Inventory:   []string{},
 		Stumps:      []stumpJSON{},
 	}

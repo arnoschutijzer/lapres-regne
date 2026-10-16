@@ -10,6 +10,8 @@ type World struct {
 	seed             uint64
 	hero             Character
 	cameraX, cameraZ float64
+	// zoom is how many steps the camera has moved in from the forest view toward a close-up.
+	zoom int
 	// felled holds the cells whose tree is a stump, with the time left until it regrows.
 	felled map[cell]time.Duration
 	// depletion is how long each tree that gives several logs has been worn down by chopping.
@@ -94,6 +96,18 @@ func (w *World) wading(distance float64) float64 {
 		return distance * 0.5
 	}
 	return distance
+}
+
+// CloseUp is the zoom of the closest view of the hero.
+const CloseUp = 12
+
+// Zoom is how many steps the camera is in from the forest view, from 0 up to CloseUp.
+func (w *World) Zoom() int { return w.zoom }
+
+// ZoomBy moves the camera steps closer, or farther for negative steps, between the forest view
+// and the close-up.
+func (w *World) ZoomBy(steps int) {
+	w.zoom = min(CloseUp, max(0, w.zoom+steps))
 }
 
 func (w *World) Follow(dt time.Duration) {
