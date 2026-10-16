@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -158,7 +159,7 @@ func run(treeMode bool, seed uint64) error {
 				}
 				continue
 			}
-			target := (position - 0.5) * 6.283185307179586
+			target := (position - 0.5) * 2 * math.Pi
 			if target-angle > 0.0005 || angle-target > 0.0005 {
 				angle += (target - angle) * 0.24
 				dirty = true

@@ -53,9 +53,15 @@ func (f *forest) walk(direction action) {
 	default:
 		return
 	}
-	f.x, f.z = f.x+dx, f.z+dz
 	f.facing, f.lastWalk = direction, time.Now()
-	f.steps++
+	distance, width := f.river(f.x, f.z)
+	if distance < width {
+		dx, dz = dx*0.5, dz*0.5
+	}
+	if f.canWalk(f.x+dx, f.z+dz) {
+		f.x, f.z = f.x+dx, f.z+dz
+		f.steps++
+	}
 }
 
 func (f *forest) follow() {
@@ -115,15 +121,55 @@ func (c *forestCanvas) line(x1, y1, z1, x2, y2, z2, light float64, ink int) {
 func (f *forest) render(cols, rows int, seconds float64) *forestCanvas {
 	c := &forestCanvas{width: cols * 2, height: rows * 4, x: f.cameraX, z: f.cameraZ, scale: 3.6}
 	c.pixels = make([]forestPixel, c.width*c.height)
+	left := c.x - float64(c.width)/c.scale/2 - 5
+	right := c.x + float64(c.width)/c.scale/2 + 5
+	back := c.z - float64(c.height)/c.scale - 5
+	front := c.z + float64(c.height)/c.scale + 12
+	var trees []woodlandTree
+	for gz := int(math.Floor(back / treeSpacing)); gz <= int(math.Ceil(front/treeSpacing)); gz++ {
+		for gx := int(math.Floor(left / treeSpacing)); gx <= int(math.Ceil(right/treeSpacing)); gx++ {
+			if tree, exists := f.treeAt(gx, gz); exists {
+				trees = append(trees, tree)
+			}
+		}
+	}
 	for y := range c.height {
 		for x := range c.width {
 			wx := (float64(x)-float64(c.width)/2)/c.scale + c.x
 			wz := (float64(y)-float64(c.height)*0.57)/(c.scale*0.72) + c.z
 			n := f.noise(wx*0.65, wz*0.65, 19)
-			c.pixels[y*c.width+x] = forestPixel{-(wz - c.z) * 0.69, 0.12 + n*0.26, 0}
+			cover := f.cover(wx, wz)
+			ink, light := 0, 0.13+n*0.23
+			if cover < 0.38 {
+				ink, light = 1, 0.21+n*0.24
+			}
+			// Diagonal pools of sunlight survive only where the canopy opens.
+			beam := math.Max(0, math.Sin(wx*0.28-wz*0.19+f.noise(wx/9, wz/9, 81)*2)-0.45)
+			sun := beam * math.Max(0, 1-cover*1.3)
+			light += sun * 0.8
+			if sun > 0.24 {
+				ink = 7
+			}
+			distance, width := f.river(wx, wz)
+			if distance < width {
+				ink, light = 5, 0.28+n*0.3
+				if math.Sin(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
+					ink, light = 6, 0.8
+				}
+			} else if distance < width+0.65 {
+				ink, light = 7, 0.32+n*0.25
+			}
+			c.pixels[y*c.width+x] = forestPixel{-(wz - c.z) * 0.69, light, ink}
 		}
 	}
+	for _, tree := range trees {
+		c.shadow(tree)
+	}
+	for _, tree := range trees {
+		f.drawTree(c, tree)
+	}
 	f.drawCharacter(c, seconds)
+	f.drawGrass(c, left, right, back, front, seconds)
 	return c
 }
 
@@ -132,9 +178,13 @@ func (f *forest) drawCharacter(c *forestCanvas, seconds float64) {
 	if time.Since(f.lastWalk) < 200*time.Millisecond {
 		stride = math.Sin(seconds*18) * 0.24
 	}
+	strideX, strideZ := 0.0, stride
+	if f.facing == left || f.facing == right {
+		strideX, strideZ = stride, 0
+	}
 	// A small warm-colored traveler: boots, coat, arms, and a round hat.
-	c.line(f.x-0.16, 0.05, f.z+stride, f.x-0.12, 0.7, f.z, 1, 8)
-	c.line(f.x+0.16, 0.05, f.z-stride, f.x+0.12, 0.7, f.z, 1, 8)
+	c.line(f.x-0.16+strideX, 0.05, f.z+strideZ, f.x-0.12, 0.7, f.z, 1, 8)
+	c.line(f.x+0.16-strideX, 0.05, f.z-strideZ, f.x+0.12, 0.7, f.z, 1, 8)
 	c.line(f.x, 0.55, f.z, f.x, 1.15, f.z, 1, 8)
 	c.line(f.x-0.34, 0.65, f.z-stride, f.x+0.34, 1.0, f.z+stride, 0.95, 8)
 	for i := range 8 {
@@ -193,7 +243,7 @@ func (f *forest) frame(width, height int, seconds float64) string {
 			out.WriteRune(rune(0x2800 + bits))
 		}
 	}
-	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d", f.x, f.z, f.steps)
+	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  %s  |  seed %d", f.x, f.z, f.steps, f.region(), f.seed)
 	controls := "  arrows / WASD / IJKL walk · Q quit"
 	fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height-1, string([]rune(controls)[:min(width-1, len([]rune(controls)))]))
 	fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K%s", height, status[:min(width-1, len(status))])

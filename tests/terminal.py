@@ -127,6 +127,16 @@ def check_forest(binary):
         terminal.read(until=b"x 0.6  z -0.6  |  steps 2")
         terminal.send(b"js")
         terminal.read(until=b"x 0.0  z 0.0  |  steps 4")
+        regions = b""
+        for step in range(5, 65):
+            terminal.send(b"d")
+            regions += terminal.read(until=f"steps {step}  |".encode())
+        assert b"river / wading" in regions, "walk must reach and cross a procedural river"
+        assert tree_pixels(regions) != tree_pixels(initial), "walking must reveal new terrain"
+        terminal.resize(20, 8)
+        terminal.read(until=b"Resize to 40 x 14.")
+        terminal.resize(100, 30)
+        terminal.read(until=b"\x1b[30;1H")
         terminal.send(b"q")
         terminal.assert_restored()
     finally:
@@ -144,4 +154,4 @@ with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     check_forest(binary)
     check_exit(binary, b"\x03")
     check_exit(binary, signal.SIGTERM)
-    print("Passed: rendering, rotation, arrows, J/L, bounds, resize, quit, Ctrl-C, SIGTERM, restoration")
+    print("Passed: forest exploration, river crossing, tree orbit, controls, resize, quit, Ctrl-C, SIGTERM, restoration")
