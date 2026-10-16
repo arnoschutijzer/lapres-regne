@@ -1,7 +1,9 @@
 package terminal
 
 import (
+	"cmp"
 	"math"
+	"slices"
 
 	"lapresregne/internal/world"
 )
@@ -123,6 +125,21 @@ func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64, leaves fo
 	})
 }
 
+// crownShape is the centre and radii of one rounded crown of leaves.
+type crownShape struct{ x, y, z, rx, ry, rz float64 }
+
+// crowns draws a tree's crowns nearest first, so each farther crown skips the leaves in front of it.
+func (r *renderer) crowns(c *forestCanvas, shapes []crownShape, leaves foliageInks) {
+	slices.SortFunc(shapes, func(a, b crownShape) int {
+		_, _, aDepth := c.project(a.x, a.y, a.z)
+		_, _, bDepth := c.project(b.x, b.y, b.z)
+		return cmp.Compare(aDepth, bDepth)
+	})
+	for _, s := range shapes {
+		r.crown(c, s.x, s.y, s.z, s.rx, s.ry, s.rz, leaves)
+	}
+}
+
 // foliageInks are the palette entries a crown uses in shade and in sunlight.
 type foliageInks struct{ shaded, sunlit int }
 
@@ -161,31 +178,40 @@ func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
 func (r *renderer) drawCommonTree(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	leaves := leavesOf(tree.Kind)
-	drawTrunk(c, tree, tree.Trunk, h, shake)
 	a := tree.Variation * 6.28
+	var crowns [4]crownShape
+	var branches [3]limbShape
 	for i := range 3 {
 		angle := a + float64(i)*2.094
 		dx, dz := math.Cos(angle)*radius*0.62+shake, math.Sin(angle)*radius*0.62
-		branch(c, x+shake*0.45, h*0.45, z, x+dx, h*0.92, z+dz, 0.7, tree.Trunk*0.55)
-		r.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, radius*0.72, radius*0.57, radius*0.72, leaves)
+		branches[i] = limbShape{x + shake*0.45, h * 0.45, z, x + dx, h * 0.92, z + dz, 0.7, tree.Trunk * 0.55}
+		crowns[i] = crownShape{x + dx, h * (0.84 + float64(i)*0.05), z + dz, radius * 0.72, radius * 0.57, radius * 0.72}
 	}
-	r.crown(c, x+shake, h+0.3, z, radius*0.83, radius*0.70, radius*0.83, leaves)
+	crowns[3] = crownShape{x + shake, h + 0.3, z, radius * 0.83, radius * 0.70, radius * 0.83}
+	// The leaves go first and the wood they mostly hide after, so hidden wood is never shaded.
+	r.crowns(c, crowns[:], leaves)
+	drawBranches(c, branches[:])
+	drawTrunk(c, tree, tree.Trunk, h, shake)
 }
 
 // drawOak spreads a thick, short trunk into a broad, flat-topped canopy of many lobes.
 func (r *renderer) drawOak(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	leaves := leavesOf(tree.Kind)
-	drawTrunk(c, tree, tree.Trunk*1.5, h*0.85, shake)
 	a := tree.Variation * 6.28
+	var crowns [6]crownShape
+	var branches [5]limbShape
 	for i := range 5 {
 		angle := a + float64(i)*1.257
 		reach := radius * (0.9 + 0.15*math.Sin(angle*3))
 		dx, dz := math.Cos(angle)*reach+shake*0.8, math.Sin(angle)*reach*0.45
-		branch(c, x+shake*0.4, h*0.6, z, x+dx*0.85, h*0.88, z+dz*0.85, 0.66, tree.Trunk*0.7)
-		r.crown(c, x+dx, h*(0.92+float64(i%2)*0.06), z+dz, radius*0.62, radius*0.42, radius*0.62, leaves)
+		branches[i] = limbShape{x + shake*0.4, h * 0.6, z, x + dx*0.85, h * 0.88, z + dz*0.85, 0.66, tree.Trunk * 0.7}
+		crowns[i] = crownShape{x + dx, h * (0.92 + float64(i%2)*0.06), z + dz, radius * 0.62, radius * 0.42, radius * 0.62}
 	}
-	r.crown(c, x+shake, h*1.08, z, radius*1.05, radius*0.5, radius*0.95, leaves)
+	crowns[5] = crownShape{x + shake, h * 1.08, z, radius * 1.05, radius * 0.5, radius * 0.95}
+	r.crowns(c, crowns[:], leaves)
+	drawBranches(c, branches[:])
+	drawTrunk(c, tree, tree.Trunk*1.5, h*0.85, shake)
 }
 
 // drawWillow forks a trunk into a few branches whose tips spill long strands that arch over
@@ -193,13 +219,7 @@ func (r *renderer) drawOak(c *forestCanvas, tree world.Tree, shake float64) {
 func (r *renderer) drawWillow(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	leaves := leavesOf(tree.Kind)
-	drawTrunk(c, tree, tree.Trunk, h*0.6, shake*0.6)
 	a := tree.Variation * 6.28
-	for i := range 4 {
-		angle := a + float64(i)*1.571
-		tipX, tipZ := x+shake+math.Cos(angle)*radius*0.4, z+math.Sin(angle)*radius*0.4
-		branch(c, x+shake*0.6, h*0.6, z, tipX, h, tipZ, 0.7, tree.Trunk*0.6)
-	}
 	const strands = 34
 	for i := range strands {
 		angle := a + float64(i)*2.399
@@ -222,6 +242,15 @@ func (r *renderer) drawWillow(c *forestCanvas, tree world.Tree, shake float64) {
 		vine(c, crestX, top+h*0.03, crestZ, bendX, top-h*0.1, bendZ, ink)
 		vine(c, bendX, top-h*0.1, bendZ, footX, end, footZ, ink)
 	}
+	// The strands hang in front of the wood, so it goes after them.
+	var branches [4]limbShape
+	for i := range 4 {
+		angle := a + float64(i)*1.571
+		tipX, tipZ := x+shake+math.Cos(angle)*radius*0.4, z+math.Sin(angle)*radius*0.4
+		branches[i] = limbShape{x + shake*0.6, h * 0.6, z, tipX, h, tipZ, 0.7, tree.Trunk * 0.6}
+	}
+	drawBranches(c, branches[:])
+	drawTrunk(c, tree, tree.Trunk, h*0.6, shake*0.6)
 }
 
 // vine hangs a willow strand between two points: a line of leaves in the forest view, and up close
@@ -247,14 +276,16 @@ func vine(c *forestCanvas, x1, y1, z1, x2, y2, z2 float64, ink int) {
 func (r *renderer) drawYew(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	leaves := leavesOf(tree.Kind)
-	drawTrunk(c, tree, tree.Trunk*1.2, h, shake)
 	const tiers = 5
+	var crowns [tiers]crownShape
 	for i := range tiers {
 		rise := float64(i) / (tiers - 1)
 		width := radius * (1.05 - 0.75*rise)
 		lean := shake * (0.4 + 0.6*rise)
-		r.crown(c, x+lean, h*(0.55+0.75*rise), z, width, width*0.5, width, leaves)
+		crowns[i] = crownShape{x + lean, h * (0.55 + 0.75*rise), z, width, width * 0.5, width}
 	}
+	r.crowns(c, crowns[:], leaves)
+	drawTrunk(c, tree, tree.Trunk*1.2, h, shake)
 }
 
 // drawTrunk raises a trunk, its top leaning with shake: three bark strands in the forest view,
@@ -276,6 +307,15 @@ func drawTrunk(c *forestCanvas, tree world.Tree, thickness, height, shake float6
 	}
 }
 
+// limbShape is a branch from one point to another, with its light and thickness.
+type limbShape struct{ x1, y1, z1, x2, y2, z2, light, thickness float64 }
+
+func drawBranches(c *forestCanvas, limbs []limbShape) {
+	for _, l := range limbs {
+		branch(c, l.x1, l.y1, l.z1, l.x2, l.y2, l.z2, l.light, l.thickness)
+	}
+}
+
 // branch reaches from one point to another: a bark stroke in the forest view, and up close a
 // limb of wood tapering from thickness to half of it.
 func branch(c *forestCanvas, x1, y1, z1, x2, y2, z2, light, thickness float64) {
@@ -292,8 +332,14 @@ func wood(c *forestCanvas, x1, y1, z1, x2, y2, z2, fromRadius, toRadius float64)
 	length := math.Sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) + (z2-z1)*(z2-z1))
 	axis := vec{x2 - x1, y2 - y1, z2 - z1}.mul(1 / length)
 	steps := max(1, int(math.Ceil(length/(math.Min(fromRadius, toRadius)*0.5))))
+	// The spheres go nearest first, so each farther one skips the pixels already covered.
+	_, _, fromDepth := c.project(x1, y1, z1)
+	_, _, toDepth := c.project(x2, y2, z2)
 	for i := range steps + 1 {
 		u := float64(i) / float64(steps)
+		if toDepth < fromDepth {
+			u = 1 - u
+		}
 		r := fromRadius + (toRadius-fromRadius)*u
 		x, y, z := x1+(x2-x1)*u, y1+(y2-y1)*u, z1+(z2-z1)*u
 		ellipsoid(c, x, y, z, r, r, r, 0, func(px, py int, depth float64, point, sphere vec) {
