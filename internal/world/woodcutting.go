@@ -117,13 +117,15 @@ func (w *World) Approach(tree Tree) bool {
 		return false
 	}
 	w.chop = chop{}
+	w.destination = destination{}
 	w.message = ""
 	w.approach = approach{active: true, tree: tree.cell}
 	return true
 }
 
-// Stop cancels walking to a tree and chopping one, and clears the last message.
+// Stop cancels walking to a point or a tree and chopping one, and clears the last message.
 func (w *World) Stop() {
+	w.destination = destination{}
 	w.approach = approach{}
 	w.chop = chop{}
 	w.message = ""

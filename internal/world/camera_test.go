@@ -130,3 +130,15 @@ func TestPanningFollowsTheTurnedView(t *testing.T) {
 		t.Fatalf("camera = (%v, %v) after panning up, want 2 units east of the hero", x, z)
 	}
 }
+
+func TestWalkingToAPointBringsThePannedCameraBackToTheHero(t *testing.T) {
+	w := world.New(7)
+	w.PanBy(4, 3)
+	w.WalkTo(4, 3)
+	w.Advance(0, 0, 100*time.Millisecond, false)
+	settle(w)
+	heroX, heroZ := w.Hero().Position()
+	if x, z := w.Camera(); math.Abs(x-heroX) > 1e-6 || math.Abs(z-heroZ) > 1e-6 {
+		t.Fatalf("camera = (%v, %v) while walking to a point, want it on the hero at (%v, %v)", x, z, heroX, heroZ)
+	}
+}

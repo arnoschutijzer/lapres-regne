@@ -307,3 +307,12 @@ func TestANormalTreeRegrowsBetween36And60SecondsAfterFalling(t *testing.T) {
 		t.Fatal("a regrown tree must be chopped again")
 	}
 }
+
+func TestWalkingToAPointCancelsAChop(t *testing.T) {
+	w := besideTree()
+	w.Chop()
+	w.WalkTo(0, 0)
+	if w.Chopping() {
+		t.Fatal("walking to a point must cancel the chop")
+	}
+}

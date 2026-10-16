@@ -129,10 +129,13 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 				view.cursor = slotCursor{active: true, slot: slot}
 				return false
 			}
-			// Clicking a tree walks there to chop it; clicking anything else stops.
+			// Clicking a tree walks there to chop it, clicking the ground walks there, and clicking
+			// anything else stops.
 			view.menu = nil
 			if tree, ok := view.treeAt(event.column, event.row); ok {
 				world.Approach(tree)
+			} else if x, z, ok := view.groundAt(event.column, event.row); ok {
+				world.WalkTo(x, z)
 			} else {
 				world.Stop()
 			}

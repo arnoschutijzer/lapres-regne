@@ -22,6 +22,8 @@ type World struct {
 	depletion map[cell]time.Duration
 	approach  approach
 	chop      chop
+	// destination is the point on the ground the hero walks to after a click.
+	destination destination
 	// ground holds the dropped items until they disappear.
 	ground      []GroundItem
 	message     string
@@ -91,11 +93,42 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	}
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
 	w.ageCelebration(dt)
+	w.walkToFor(dt)
 	w.approachFor(dt)
 	w.regrow(dt)
 	w.despawn(dt)
 	w.recoverTimers(dt)
 	w.chopFor(dt)
+}
+
+type destination struct {
+	active bool
+	x, z   float64
+}
+
+// WalkTo walks the hero straight to a point on the ground at walking pace, giving up whatever
+// they were doing.
+func (w *World) WalkTo(x, z float64) {
+	w.Stop()
+	w.panX, w.panZ = 0, 0
+	w.destination = destination{active: true, x: x, z: z}
+}
+
+// walkToFor walks toward the destination and stops on it.
+func (w *World) walkToFor(dt time.Duration) {
+	if !w.destination.active {
+		return
+	}
+	dx, dz := w.destination.x-w.hero.x, w.destination.z-w.hero.z
+	remaining := math.Hypot(dx, dz)
+	step := w.wading(walkingSpeed * dt.Seconds())
+	if remaining <= step {
+		w.hero.advance(dx, dz, remaining)
+		w.hero.x, w.hero.z = w.destination.x, w.destination.z
+		w.destination = destination{}
+		return
+	}
+	w.hero.advance(dx, dz, step)
 }
 
 // wading halves the distance while the hero stands in a river.
