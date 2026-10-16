@@ -139,33 +139,39 @@ func (r *renderer) drawOak(c *forestCanvas, tree world.Tree, shake float64) {
 	r.crown(c, x+shake, h*1.08, z, radius*1.05, radius*0.5, radius*0.95, leaves)
 }
 
-// drawWillow sweeps long, drooping strands out from a small crown in a wide fountain that
-// nearly touches the ground.
+// drawWillow forks a trunk into a few branches whose tips spill long strands that arch over
+// briefly, then hang straight down nearly to the ground.
 func (r *renderer) drawWillow(c *forestCanvas, tree world.Tree, shake float64) {
 	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
 	leaves := leavesOf(tree.Kind)
-	drawTrunk(c, tree, tree.Trunk, h*1.05, shake)
-	r.crown(c, x+shake, h*1.05, z, radius*0.55, radius*0.4, radius*0.55, leaves)
-	const strands, segments = 44, 7
+	drawTrunk(c, tree, tree.Trunk, h*0.6, shake*0.6)
+	a := tree.Variation * 6.28
+	for i := range 4 {
+		angle := a + float64(i)*1.571
+		tipX, tipZ := x+shake+math.Cos(angle)*radius*0.4, z+math.Sin(angle)*radius*0.4
+		c.line(x+shake*0.6, h*0.6, z, tipX, h, tipZ, 0.7, 4)
+	}
+	const strands = 34
 	for i := range strands {
-		angle := tree.Variation*6.28 + float64(i)*2.399
+		angle := a + float64(i)*2.399
 		cos, sin := math.Cos(angle), math.Sin(angle)
-		// Each strand rises a little from the crown, arcs far outward, then falls to a varied length.
-		reach := radius * (1.3 + 0.45*math.Abs(math.Sin(float64(i)*1.7+tree.Variation*5)))
-		end := h * (0.04 + 0.2*math.Abs(math.Sin(float64(i)*2.3+tree.Variation*9)))
+		vary := math.Abs(math.Sin(float64(i)*1.7 + tree.Variation*5))
+		start := radius * (0.1 + 0.45*vary)
+		// Strands rooted farther out start lower, so the crest slopes away from the trunk.
+		top := h * (1.1 - 0.35*vary + 0.05*math.Abs(math.Sin(float64(i)*0.9)))
+		end := h * (0.06 + 0.22*math.Abs(math.Sin(float64(i)*2.3+tree.Variation*9)))
 		ink := leaves.shaded
 		if cos < 0.3 && sin < 0.4 && i%3 != 0 {
 			ink = leaves.sunlit
 		}
-		previousX, previousY, previousZ := x+shake, h*1.1, z
-		for s := 1; s <= segments; s++ {
-			t := float64(s) / segments
-			out := reach * math.Sin(t*math.Pi/2)
-			y := h*1.1 + h*0.15*math.Sin(t*math.Pi) - (h*1.1-end)*t*t
-			pointX, pointZ := x+shake*(1-t*0.6)+cos*out, z+sin*out
-			c.line(previousX, previousY, previousZ, pointX, y, pointZ, 0.95, ink)
-			previousX, previousY, previousZ = pointX, y, pointZ
-		}
+		// A short arch over the strand's crest, then a long fall that drifts only slightly outward.
+		fromX, fromZ := x+shake+cos*start, z+sin*start
+		crestX, crestZ := x+shake+cos*(start+radius*0.18), z+sin*(start+radius*0.18)
+		bendX, bendZ := x+shake*0.8+cos*(start+radius*0.3), z+sin*(start+radius*0.3)
+		footX, footZ := x+shake*0.3+cos*(start+radius*0.38), z+sin*(start+radius*0.38)
+		c.line(fromX, top-h*0.03, fromZ, crestX, top+h*0.03, crestZ, 0.95, ink)
+		c.line(crestX, top+h*0.03, crestZ, bendX, top-h*0.1, bendZ, 0.95, ink)
+		c.line(bendX, top-h*0.1, bendZ, footX, end, footZ, 0.95, ink)
 	}
 }
 
