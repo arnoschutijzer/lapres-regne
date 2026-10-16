@@ -13,6 +13,7 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 		Z:             w.hero.z,
 		WoodcuttingXP: w.hero.woodcutting.XP(),
 		Zoom:          w.zoom,
+		Yaw:           w.yaw,
 		Inventory:     w.hero.inventory.Slots(),
 		SavedAt:       now,
 	}
@@ -26,7 +27,7 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 }
 
 // Resume builds a world from a seed and the saved progress. The hero's skills and inventory, and
-// the camera's zoom, travel to any world; their position and stumps return only to the world they were saved in, with the
+// the camera's zoom and yaw, travel to any world; their position and stumps return only to the world they were saved in, with the
 // time away since saving counted toward regrowth.
 func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 	w := New(seed)
@@ -39,6 +40,7 @@ func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 	}
 	w.hero.woodcutting.gain(snapshot.WoodcuttingXP)
 	w.ZoomBy(snapshot.Zoom)
+	w.yaw = snapshot.Yaw
 	for index, slot := range snapshot.Inventory[:min(len(snapshot.Inventory), InventorySize)] {
 		w.hero.inventory.slots[index] = slot
 	}

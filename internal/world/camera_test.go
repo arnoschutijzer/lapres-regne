@@ -45,6 +45,24 @@ func TestTheZoomIsKeptAndResumedInAnyWorld(t *testing.T) {
 	}
 }
 
+func TestTheCameraYawIsKeptAndResumedInAnyWorld(t *testing.T) {
+	kept := world.New(7)
+	kept.TurnBy(5)
+	progress := &memoryProgress{}
+	if err := kept.Keep(progress, quitAt); err != nil {
+		t.Fatal(err)
+	}
+	for _, seed := range []uint64{7, 8} {
+		w, err := world.Resume(seed, progress, quitAt.Add(time.Minute))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if w.Yaw() != kept.Yaw() {
+			t.Fatalf("yaw = %v resuming in world %d, want the kept %v", w.Yaw(), seed, kept.Yaw())
+		}
+	}
+}
+
 func settle(w *world.World) {
 	for range 100 {
 		w.Follow(50 * time.Millisecond)

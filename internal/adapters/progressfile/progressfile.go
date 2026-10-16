@@ -48,7 +48,8 @@ type heroJSON struct {
 }
 
 type cameraJSON struct {
-	Zoom int `json:"zoom"`
+	Zoom int     `json:"zoom"`
+	Yaw  float64 `json:"yaw"`
 }
 
 type skillJSON struct {
@@ -78,7 +79,7 @@ func (f File) Load() (world.Snapshot, bool, error) {
 	}
 	snapshot := world.Snapshot{
 		Seed: saved.Seed, X: saved.Hero.X, Z: saved.Hero.Z,
-		WoodcuttingXP: saved.Woodcutting.XP, Zoom: saved.Camera.Zoom, SavedAt: saved.SavedAt,
+		WoodcuttingXP: saved.Woodcutting.XP, Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw, SavedAt: saved.SavedAt,
 	}
 	// Version 1 counted logs before they had kinds; they were all normal logs.
 	for range saved.Logs {
@@ -108,7 +109,7 @@ func (f File) Save(snapshot world.Snapshot) error {
 		Version: version, Seed: snapshot.Seed, SavedAt: snapshot.SavedAt,
 		Hero:        heroJSON{X: snapshot.X, Z: snapshot.Z},
 		Woodcutting: skillJSON{XP: snapshot.WoodcuttingXP},
-		Camera:      cameraJSON{Zoom: snapshot.Zoom},
+		Camera:      cameraJSON{Zoom: snapshot.Zoom, Yaw: snapshot.Yaw},
 		Inventory:   []string{},
 		Stumps:      []stumpJSON{},
 	}
