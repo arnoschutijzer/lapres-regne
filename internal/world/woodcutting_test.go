@@ -127,12 +127,14 @@ func TestAChopHoldsTheFacingUntilTheTreeFalls(t *testing.T) {
 type recordedSounds struct {
 	chops int
 	falls int
+	drops int
 	// levelUps records each level-up jingle, true when the new level unlocked something.
 	levelUps []bool
 }
 
 func (s *recordedSounds) Chop()                 { s.chops++ }
 func (s *recordedSounds) Fall()                 { s.falls++ }
+func (s *recordedSounds) Drop()                 { s.drops++ }
 func (s *recordedSounds) LevelUp(unlocked bool) { s.levelUps = append(s.levelUps, unlocked) }
 
 func TestTheAxeLandsAsTheChopStartsAndEveryStrikeAfter(t *testing.T) {

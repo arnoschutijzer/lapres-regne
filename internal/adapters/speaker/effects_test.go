@@ -126,3 +126,29 @@ func TestAFallingTreeCreaksThenLandsWithALowThud(t *testing.T) {
 		}
 	}
 }
+
+func TestADroppedLogLandsWithAShortDullClunk(t *testing.T) {
+	samples := dropSound()
+	if seconds := float64(len(samples)/soundtrack.Channels) / soundtrack.SampleRate; seconds < 0.1 || seconds > 0.4 {
+		t.Fatalf("drop lasts %.2f s, want a short clunk", seconds)
+	}
+	// The clunk is duller than the axe's bright tok.
+	if clunk, tok := amplitude(samples, 250, 30), amplitude(samples, 1620, 30); clunk < 3*tok {
+		t.Fatalf("250 Hz = %.4f, 1620 Hz = %.4f; want a dull clunk rather than a bright tok", clunk, tok)
+	}
+	peak := 0.0
+	for i := 0; i < len(samples); i += soundtrack.Channels {
+		if samples[i] != samples[i+1] {
+			t.Fatalf("frame %d differs between channels; want a centred clunk", i/2)
+		}
+		peak = math.Max(peak, math.Abs(float64(samples[i])))
+	}
+	if peak < 0.05 || peak > 0.4 {
+		t.Fatalf("peak = %.2f, want an audible but quiet clunk", peak)
+	}
+	for _, sample := range samples[len(samples)-soundtrack.SampleRate/50*soundtrack.Channels:] {
+		if math.Abs(float64(sample)) > 0.005 {
+			t.Fatalf("tail sample = %.4f, want the clunk to fade to silence", sample)
+		}
+	}
+}

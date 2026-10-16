@@ -57,3 +57,19 @@ func TestADroppedLogLiesUnderTheHeroForThreeMinutes(t *testing.T) {
 		t.Fatal("a dropped log must disappear after three minutes")
 	}
 }
+
+func TestADroppedLogSoundsAsItLands(t *testing.T) {
+	w := besideTree()
+	sounds := &recordedSounds{}
+	w.SetSounds(sounds)
+	w.Chop()
+	chopUntilFelled(t, w)
+	w.Drop(1)
+	if sounds.drops != 0 {
+		t.Fatalf("drops = %d, want silence when an empty slot drops nothing", sounds.drops)
+	}
+	w.Drop(0)
+	if sounds.drops != 1 {
+		t.Fatalf("drops = %d, want one log heard landing", sounds.drops)
+	}
+}
