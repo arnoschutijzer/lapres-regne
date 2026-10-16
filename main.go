@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"dither-cli/internal/adapters/progressfile"
-	"dither-cli/internal/adapters/songfiles"
-	"dither-cli/internal/adapters/speaker"
-	"dither-cli/internal/adapters/terminal"
-	"dither-cli/internal/soundtrack"
-	"dither-cli/internal/world"
+	"lapresregne/internal/adapters/progressfile"
+	"lapresregne/internal/adapters/songfiles"
+	"lapresregne/internal/adapters/speaker"
+	"lapresregne/internal/adapters/terminal"
+	"lapresregne/internal/soundtrack"
+	"lapresregne/internal/world"
 )
 
 const appTitle = "L’Après-Règne"
@@ -24,7 +24,7 @@ func main() {
 	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
 	savePath := flag.String("save", "", "file keeping progress between sessions (default in the user config folder)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute] [--save file]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on a tree within reach (1 chops it down)\n  Tab                   show or hide the inventory\n  [ / ]                 highlight the previous / next inventory slot (or click one)\n  X                     drop the highlighted log, or the first one\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: lapresregne [--seed number] [--mute] [--save file]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on a tree within reach (1 chops it down)\n  Tab                   show or hide the inventory\n  [ / ]                 highlight the previous / next inventory slot (or click one)\n  X                     drop the highlighted log, or the first one\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -35,13 +35,13 @@ func main() {
 	if *savePath == "" {
 		config, err := os.UserConfigDir()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "dither-cli: find a place to save progress (use --save):", err)
+			fmt.Fprintln(os.Stderr, "lapresregne: find a place to save progress (use --save):", err)
 			os.Exit(1)
 		}
-		*savePath = filepath.Join(config, "dither-cli", "progress.json")
+		*savePath = filepath.Join(config, "lapresregne", "progress.json")
 	}
 	if err := run(*seed, *mute, *musicDir, *savePath); err != nil {
-		fmt.Fprintln(os.Stderr, "dither-cli:", err)
+		fmt.Fprintln(os.Stderr, "lapresregne:", err)
 		os.Exit(1)
 	}
 }

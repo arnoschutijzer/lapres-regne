@@ -6,7 +6,7 @@ import (
 
 	"github.com/ebitengine/oto/v3"
 
-	"dither-cli/internal/soundtrack"
+	"lapresregne/internal/soundtrack"
 )
 
 // Device is the default audio output, shared by the soundtrack and sound effects.

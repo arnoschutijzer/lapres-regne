@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 const (

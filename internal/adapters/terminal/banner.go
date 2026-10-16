@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 // bannerFadeIn, bannerRest and bannerFadeOut pace the level-up banner, in seconds, to the jingle's six.

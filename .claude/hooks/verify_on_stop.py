@@ -29,9 +29,9 @@ def main() -> int:
         result = subprocess.run(command, cwd=REPO, capture_output=True, text=True)
         if result.returncode != 0:
             summary = first_failure(result.stdout + result.stderr)
-            print(f"dither-cli: {name} failed\n{summary}", file=sys.stderr)
+            print(f"lapresregne: {name} failed\n{summary}", file=sys.stderr)
             reason = (
-                f"Verification failed for dither-cli ({name}: `{' '.join(command)}`).\n"
+                f"Verification failed for lapresregne ({name}: `{' '.join(command)}`).\n"
                 f"{summary}\n\nFix the failure, then finish the turn."
             )
             print(json.dumps({"decision": "block", "reason": reason}))

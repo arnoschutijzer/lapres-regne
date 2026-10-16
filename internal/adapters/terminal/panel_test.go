@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 // withLogs chops the normal tree beside the hero again and again until it carries a number of logs.

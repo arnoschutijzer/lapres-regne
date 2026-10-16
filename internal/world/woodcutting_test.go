@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 // besideTree stands the hero 1.1 left of the seed 7 tree in cell 1, 0 (x 6.0, z 1.7), facing it.

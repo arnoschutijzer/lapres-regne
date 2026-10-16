@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"dither-cli/internal/soundtrack"
-	"dither-cli/internal/world"
+	"lapresregne/internal/soundtrack"
+	"lapresregne/internal/world"
 )
 
 // Session owns the interactive terminal: raw mode, signals, keys and frames.

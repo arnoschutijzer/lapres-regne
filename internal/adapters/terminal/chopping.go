@@ -3,7 +3,7 @@ package terminal
 import (
 	"math"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 // strokePeriod is one unhurried axe stroke, in seconds.

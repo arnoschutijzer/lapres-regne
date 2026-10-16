@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 // Bayer thresholds turn smooth lighting into a stable, ordered dot pattern.

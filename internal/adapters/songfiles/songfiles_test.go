@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"dither-cli/internal/soundtrack"
+	"lapresregne/internal/soundtrack"
 )
 
 func writeWAV(t *testing.T, path string) {

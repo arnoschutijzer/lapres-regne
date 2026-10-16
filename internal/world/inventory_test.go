@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 func TestAnEmptyInventoryHas28Slots(t *testing.T) {

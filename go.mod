@@ -1,4 +1,4 @@
-module dither-cli
+module lapresregne
 
 go 1.25.0
 

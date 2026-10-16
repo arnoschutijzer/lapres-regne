@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 // memoryProgress keeps one snapshot in memory.

@@ -3,7 +3,7 @@ package world_test
 import (
 	"testing"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 func TestWalkingFacesTheWalkingDirectionUntilAimed(t *testing.T) {

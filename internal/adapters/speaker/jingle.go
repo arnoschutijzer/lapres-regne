@@ -3,7 +3,7 @@ package speaker
 import (
 	"math"
 
-	"dither-cli/internal/soundtrack"
+	"lapresregne/internal/soundtrack"
 )
 
 // voice is one instrument of the level-up jingle.

@@ -3,7 +3,7 @@ package terminal
 import (
 	"math"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 type vec struct{ x, y, z float64 }

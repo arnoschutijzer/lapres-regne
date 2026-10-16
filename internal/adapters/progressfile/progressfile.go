@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 // File keeps progress as JSON at Path.

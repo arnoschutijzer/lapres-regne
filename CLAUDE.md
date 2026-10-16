@@ -16,7 +16,7 @@
 5. Wire the new pieces in the composition root.
 6. Run the full verification. The feature is done when it passes.
 
-## Service: dither-cli
+## Service: lapresregne
 - Entry point: `main.go` (`main`)
 - Composition root: `main.go` (`run`, `startMusic`)
 - Domain: `internal/world` (terrain, character, movement), `internal/soundtrack` (shuffle, history, fades)

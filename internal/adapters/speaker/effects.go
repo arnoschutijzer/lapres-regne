@@ -7,7 +7,7 @@ import (
 
 	"github.com/ebitengine/oto/v3"
 
-	"dither-cli/internal/soundtrack"
+	"lapresregne/internal/soundtrack"
 )
 
 // Effects plays short synthesized sound effects on the device.

@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"dither-cli/internal/soundtrack"
+	"lapresregne/internal/soundtrack"
 )
 
 // amplitude measures how strongly a frequency sounds in the first milliseconds of a mono signal.

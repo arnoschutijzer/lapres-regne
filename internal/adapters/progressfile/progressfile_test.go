@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 func TestSavedProgressLoadsBackUnchanged(t *testing.T) {

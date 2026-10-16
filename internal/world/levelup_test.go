@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 // besideTreeWithXP resumes a hero with some woodcutting xp and stands them beside the seed 7 tree at x 6.0.

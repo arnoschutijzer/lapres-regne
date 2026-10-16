@@ -14,7 +14,7 @@ import (
 	"github.com/gopxl/beep/vorbis"
 	"github.com/gopxl/beep/wav"
 
-	"dither-cli/internal/soundtrack"
+	"lapresregne/internal/soundtrack"
 )
 
 // List returns the songs directly inside the folder. A missing folder has no songs.

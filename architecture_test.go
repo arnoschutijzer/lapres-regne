@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	module   = "dither-cli"
+	module   = "lapresregne"
 	adapters = module + "/internal/adapters/"
 )
 

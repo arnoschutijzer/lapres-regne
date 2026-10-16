@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"dither-cli/internal/world"
+	"lapresregne/internal/world"
 )
 
 func BenchmarkForestFrame(b *testing.B) {

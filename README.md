@@ -59,8 +59,8 @@ and 14 rows; a larger window gives the dithering more detail.
 To build a standalone executable:
 
 ```sh
-go build -o dither-cli .
-./dither-cli
+go build -o lapresregne .
+./lapresregne
 ```
 
 Run all tests, including the application-level terminal checks, with Go:
