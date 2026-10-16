@@ -53,6 +53,19 @@ func TestTreesGrowOnlyWhereTheyArePlanted(t *testing.T) {
 	}
 }
 
+func TestPlantedTreesSpreadNoWiderThanTheTilesAroundThem(t *testing.T) {
+	m := pond()
+	for col := range 5 {
+		m.Trees = append(m.Trees, world.PlantedTree{Col: col, Row: 3, Kind: world.Oak})
+	}
+	w := world.NewOnMap(7, m)
+	for col := range 5 {
+		if tree, _ := w.TreeAt(col, 3); tree.Radius > 1.25*world.TileSize {
+			t.Fatalf("oak on tile %d has a crown %v across, want it within its neighbours", col, tree.Radius)
+		}
+	}
+}
+
 func TestTheHeroCannotWalkOffTheMap(t *testing.T) {
 	w := world.NewOnMap(7, pond())
 	w.Advance(-1, 0, 5*time.Second, false)

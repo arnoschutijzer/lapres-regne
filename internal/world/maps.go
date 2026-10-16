@@ -179,7 +179,9 @@ func (w *World) passable(x, z float64) bool {
 	return ok && !ground.Blocks()
 }
 
-// plantedTree is the tree planted on a tile of the map, placed a little off the tile's centre.
+// plantedTree is the tree planted on a tile of the map, placed a little off the tile's centre and
+// grown smaller than the endless forest's trees, so its crown spreads over no more than the tiles
+// around it.
 func (w *World) plantedTree(gx, gz int) (Tree, bool) {
 	kind, planted := w.terrain.trees[cell{gx, gz}]
 	if !planted {
@@ -187,5 +189,7 @@ func (w *World) plantedTree(gx, gz int) (Tree, bool) {
 	}
 	x := (float64(gx) + 0.35 + w.Random(gx, gz, 1)*0.3) * TileSize
 	z := (float64(gz) + 0.35 + w.Random(gx, gz, 2)*0.3) * TileSize
-	return w.grow(gx, gz, x, z, kind), true
+	tree := w.grow(gx, gz, x, z, kind)
+	tree.Height, tree.Radius, tree.Trunk = tree.Height*0.8, tree.Radius*0.6, tree.Trunk*0.8
+	return tree, true
 }
