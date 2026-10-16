@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+// Bayer thresholds turn smooth lighting into a stable, ordered dot pattern.
+var bayer = [4][4]float64{
+	{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5},
+}
+
 // World coordinates are sampled directly: exploration never allocates a growing map.
 type forest struct {
 	seed                      uint64

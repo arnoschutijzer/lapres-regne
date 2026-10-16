@@ -2,6 +2,12 @@ package main
 
 import "math"
 
+type vec struct{ x, y, z float64 }
+
+func (a vec) mul(s float64) vec { return vec{a.x * s, a.y * s, a.z * s} }
+func (a vec) dot(b vec) float64 { return a.x*b.x + a.y*b.y + a.z*b.z }
+func (a vec) unit() vec         { return a.mul(1 / math.Sqrt(a.dot(a))) }
+
 func (c *forestCanvas) shadow(tree woodlandTree) {
 	x, y, _ := c.project(tree.x+tree.height*0.55, 0, tree.z+tree.height*0.3)
 	rx, ry := tree.radius*c.scale*1.3, tree.radius*c.scale*0.72

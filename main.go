@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,12 +16,11 @@ import (
 const appTitle = "L’Après-Règne"
 
 func main() {
-	treeMode := flag.Bool("tree", false, "show the original orbiting tree")
 	seed := flag.Uint64("seed", 7, "procedural forest seed")
 	mute := flag.Bool("mute", false, "disable the soundtrack")
 	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--tree] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -30,7 +28,7 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if err := run(*treeMode, *seed, *mute, *musicDir); err != nil {
+	if err := run(*seed, *mute, *musicDir); err != nil {
 		fmt.Fprintln(os.Stderr, "dither-cli:", err)
 		os.Exit(1)
 	}
@@ -61,7 +59,7 @@ func terminalSize() (int, int, error) {
 	return cols, rows, nil
 }
 
-func run(treeMode bool, seed uint64, mute bool, musicDir string) error {
+func run(seed uint64, mute bool, musicDir string) error {
 	state, err := stty("-g")
 	if err != nil {
 		return fmt.Errorf("open an interactive terminal to explore the forest (%w)", err)
@@ -77,7 +75,7 @@ func run(treeMode bool, seed uint64, mute bool, musicDir string) error {
 	signal.Notify(resize, syscall.SIGWINCH)
 	defer signal.Stop(resize)
 	var music *musicPlayback
-	if !mute && !treeMode {
+	if !mute {
 		music, err = startMusic(musicDir)
 		if err != nil {
 			return fmt.Errorf("start soundtrack (use --mute for silent play): %w", err)
@@ -112,11 +110,6 @@ func run(treeMode bool, seed uint64, mute bool, musicDir string) error {
 
 	frames := time.NewTicker(time.Second / 60)
 	defer frames.Stop()
-	position, angle := 0.5, 0.0
-	var original *tree
-	if treeMode {
-		original = newTree()
-	}
 	forest := newForest(seed)
 	dirty := true
 	var decoder keyDecoder
@@ -140,32 +133,13 @@ func run(treeMode bool, seed uint64, mute bool, musicDir string) error {
 			}
 			return false
 		}
-		if !treeMode {
-			if !event.enhanced {
-				forest.walk(event.action, event.shift)
-			}
-		} else if event.action == left || event.action == right {
-			// Snap to a terminal column before moving to avoid half-cell rounding drift.
-			span := max(1, width-1)
-			column := int(position*float64(span) + 0.5)
-			delta := 1
-			if event.action == left {
-				delta = -1
-			}
-			next := float64(max(0, min(span, column+delta))) / float64(span)
-			if next != position {
-				position, dirty = next, true
-			}
+		if !event.enhanced {
+			forest.walk(event.action, event.shift)
 		}
 		return false
 	}
 	draw := func() error {
-		var output string
-		if treeMode {
-			output = original.frame(width, height, position, angle)
-		} else {
-			output = forest.frame(width, height, time.Since(forest.started).Seconds())
-		}
+		output := forest.frame(width, height, time.Since(forest.started).Seconds())
 		_, err := io.WriteString(os.Stdout, output)
 		dirty = false
 		return err
@@ -204,18 +178,10 @@ func run(treeMode bool, seed uint64, mute bool, musicDir string) error {
 			now := time.Now()
 			dt := min(now.Sub(lastFrame), 100*time.Millisecond)
 			lastFrame = now
-			if !treeMode {
-				dx, dz := held.direction()
-				forest.advance(dx, dz, dt, held.sprinting())
-				forest.follow(dt)
-				dirty = true
-			} else {
-				target := (position - 0.5) * 2 * math.Pi
-				if math.Abs(target-angle) > 0.0005 {
-					angle += (target - angle) * (1 - math.Exp(-8.2*dt.Seconds()))
-					dirty = true
-				}
-			}
+			dx, dz := held.direction()
+			forest.advance(dx, dz, dt, held.sprinting())
+			forest.follow(dt)
+			dirty = true
 			if dirty {
 				if err := draw(); err != nil {
 					return err

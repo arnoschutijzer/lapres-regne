@@ -52,9 +52,6 @@ a place recreates the same forest. Choose another forest with a seed:
 go run . --seed 42
 ```
 
-The original 3D tree and its underscore camera slider are available with
-`go run . --tree`. Use **← / →** or **J / L** to orbit it.
-
 Requires Go 1.25+, macOS or Linux with `stty`, and a UTF-8 terminal with
 true color and a font that supports Unicode braille. Use at least 40 columns
 and 14 rows; a larger window gives the dithering more detail.
