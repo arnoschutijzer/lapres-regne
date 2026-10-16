@@ -20,6 +20,8 @@ type Effects struct {
 	landings map[world.Landing][]byte
 	// levelUp holds the level-up jingle, and unlockingLevelUp the one for a level that unlocks a tree.
 	levelUp, unlockingLevelUp []byte
+	// fireworks crackle over the jingle of every level-up.
+	fireworks []byte
 	// playing keeps players referenced until their sound has finished.
 	playing []*oto.Player
 }
@@ -32,6 +34,7 @@ func newEffects(context *oto.Context) *Effects {
 		landings:         map[world.Landing][]byte{world.WoodenThud: encode(landingSound(world.WoodenThud))},
 		levelUp:          encode(levelUpSound(false)),
 		unlockingLevelUp: encode(levelUpSound(true)),
+		fireworks:        encode(fireworksSound()),
 	}
 }
 
@@ -59,13 +62,15 @@ func landingSound(landing world.Landing) []float32 {
 	return nil
 }
 
-// LevelUp plays the level-up jingle, with its melody when the level unlocks a tree.
+// LevelUp plays the level-up jingle, with its melody when the level unlocks a tree, and the
+// fireworks going off over it.
 func (e *Effects) LevelUp(unlocked bool) {
 	if unlocked {
 		e.play(e.unlockingLevelUp)
 	} else {
 		e.play(e.levelUp)
 	}
+	e.play(e.fireworks)
 }
 
 func (e *Effects) play(sound []byte) {

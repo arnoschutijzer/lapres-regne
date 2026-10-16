@@ -160,3 +160,53 @@ func TestADroppedLogLandsWithAShortDullClunk(t *testing.T) {
 		}
 	}
 }
+
+// loudness is the root mean square of a mono signal over a window, in seconds.
+func loudness(samples []float32, from, length float64) float64 {
+	start, frames := int(from*soundtrack.SampleRate), int(length*soundtrack.SampleRate)
+	total := 0.0
+	for frame := start; frame < start+frames; frame++ {
+		sample := float64(samples[frame*soundtrack.Channels])
+		total += sample * sample
+	}
+	return math.Sqrt(total / float64(frames))
+}
+
+func TestTheFireworksHissUpThenPopInThrees(t *testing.T) {
+	samples := fireworksSound()
+	if seconds := float64(len(samples)/soundtrack.Channels) / soundtrack.SampleRate; seconds < 2.2 || seconds > 2.8 {
+		t.Fatalf("fireworks last %.2f s, want about the original's 2.5 s", seconds)
+	}
+	// The launch hisses up before the first pop.
+	if early, late := loudness(samples, 0.02, 0.05), loudness(samples, 0.15, 0.05); late < 2*early {
+		t.Fatalf("hiss = %.3f early, %.3f late; want it rising toward the first pop", early, late)
+	}
+	// Three groups of three pops, each louder than the sizzle around it, with lulls between groups.
+	for _, pop := range fireworkPops {
+		if burst, sizzle := loudness(samples, pop.at+0.01, 0.03), loudness(samples, pop.at+0.1, 0.03); burst < 1.8*sizzle {
+			t.Fatalf("pop at %.2f s = %.3f, sizzle after = %.3f; want a distinct pop", pop.at, burst, sizzle)
+		}
+	}
+	if pop, lull := loudness(samples, 0.55, 0.03), loudness(samples, 0.76, 0.05); pop < 3*lull {
+		t.Fatalf("pop = %.3f, lull = %.3f; want a quiet lull between groups", pop, lull)
+	}
+	// Each pop is a broad crackle of noise, not a tone.
+	if low, high := amplitudeAt(samples, 500, 0.41, 0.03), amplitudeAt(samples, 4000, 0.41, 0.03); low > 4*high || high > 4*low {
+		t.Fatalf("500 Hz = %.4f, 4 kHz = %.4f in a pop; want broadband noise", low, high)
+	}
+	peak := 0.0
+	for i := 0; i < len(samples); i += soundtrack.Channels {
+		if samples[i] != samples[i+1] {
+			t.Fatalf("frame %d differs between channels; want centred fireworks", i/2)
+		}
+		peak = math.Max(peak, math.Abs(float64(samples[i])))
+	}
+	if peak < 0.1 || peak > 0.3 {
+		t.Fatalf("peak = %.2f, want fireworks a little under the jingle", peak)
+	}
+	for _, sample := range samples[len(samples)-soundtrack.SampleRate/20*soundtrack.Channels:] {
+		if math.Abs(float64(sample)) > 0.005 {
+			t.Fatalf("tail sample = %.4f, want the fireworks to fade to silence", sample)
+		}
+	}
+}
