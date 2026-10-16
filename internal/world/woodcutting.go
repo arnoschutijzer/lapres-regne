@@ -20,38 +20,50 @@ type chop struct {
 	elapsed time.Duration
 }
 
-// FacedTree finds the nearest standing tree within reach in the direction the hero faces.
-func (w *World) FacedTree() (Tree, bool) {
-	tree, _, ok := w.facedTree()
+// TreeInReach finds the standing tree the hero acts on: the nearest one in front within reach,
+// else the nearest one within reach in any direction, so overshooting a tree still reaches it.
+func (w *World) TreeInReach() (Tree, bool) {
+	tree, _, ok := w.treeInReach()
 	return tree, ok
 }
 
-func (w *World) facedTree() (Tree, cell, bool) {
+func (w *World) treeInReach() (Tree, cell, bool) {
 	x, z := w.hero.Position()
-	var faced Tree
-	var facedCell cell
-	found, nearest := false, reach
+	var nearest Tree
+	var nearestCell cell
+	found, best := false, math.Inf(1)
 	for gz := int(math.Floor((z - reach) / TreeSpacing)); gz <= int(math.Floor((z+reach)/TreeSpacing)); gz++ {
 		for gx := int(math.Floor((x - reach) / TreeSpacing)); gx <= int(math.Floor((x+reach)/TreeSpacing)); gx++ {
 			tree, exists := w.TreeAt(gx, gz)
-			if !exists || tree.Stump || FacingToward(tree.X-x, tree.Z-z) != w.hero.Facing() {
+			if !exists || tree.Stump {
 				continue
 			}
-			if distance := math.Hypot(tree.X-x, tree.Z-z); distance <= nearest {
-				faced, facedCell, found, nearest = tree, cell{gx, gz}, true, distance
+			distance := math.Hypot(tree.X-x, tree.Z-z)
+			if distance > reach {
+				continue
+			}
+			// Any tree in front outranks every tree beside or behind the hero.
+			score := distance
+			if FacingToward(tree.X-x, tree.Z-z) != w.hero.Facing() {
+				score += reach
+			}
+			if score < best {
+				nearest, nearestCell, found, best = tree, cell{gx, gz}, true, score
 			}
 		}
 	}
-	return faced, facedCell, found
+	return nearest, nearestCell, found
 }
 
-// Chop starts chopping the faced tree and reports whether there was one.
+// Chop turns the hero toward the tree in reach and starts chopping it, reporting whether there was one.
 func (w *World) Chop() bool {
-	_, tree, ok := w.facedTree()
+	tree, at, ok := w.treeInReach()
 	if !ok {
 		return false
 	}
-	w.chop = chop{active: true, tree: tree}
+	x, z := w.hero.Position()
+	w.hero.Face(FacingToward(tree.X-x, tree.Z-z))
+	w.chop = chop{active: true, tree: at}
 	return true
 }
 

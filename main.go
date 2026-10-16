@@ -19,7 +19,7 @@ func main() {
 	mute := flag.Bool("mute", false, "disable the soundtrack")
 	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on the tree in front (1 chops it down)\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on a tree within reach (1 chops it down)\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

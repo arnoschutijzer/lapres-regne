@@ -24,7 +24,7 @@ type renderer struct {
 	cells                     []forestCell
 	screenWidth, screenHeight int
 	lastStatus, lastHint      string
-	// menu lists the actions offered for the faced tree; nil when closed.
+	// menu lists the actions offered for the tree in reach; nil when closed.
 	menu []string
 }
 

@@ -21,30 +21,44 @@ func besideTree() *world.World {
 
 func TestNoTreeIsFacedAtTheSpawnClearing(t *testing.T) {
 	w := world.New(7)
-	if _, ok := w.FacedTree(); ok {
+	if _, ok := w.TreeInReach(); ok {
 		t.Fatal("the spawn clearing must have no tree within reach")
 	}
 	if w.Chop() {
-		t.Fatal("chopping must not start without a faced tree")
+		t.Fatal("chopping must not start without a tree in reach")
 	}
 }
 
-func TestTheFacedTreeIsTheOneInFrontWithinReach(t *testing.T) {
+func TestTheTreeInFrontIsInReach(t *testing.T) {
 	w := besideTree()
-	tree, ok := w.FacedTree()
+	tree, ok := w.TreeInReach()
 	if !ok || tree.X < 6 || tree.X > 6.1 {
-		t.Fatalf("faced tree = %+v, %v; want the tree at x 6.0", tree, ok)
+		t.Fatalf("tree in reach = %+v, %v; want the tree at x 6.0", tree, ok)
 	}
-	w.Hero().Face(world.FacingLeft)
-	if _, ok := w.FacedTree(); ok {
-		t.Fatal("a tree behind the hero must not be faced")
+}
+
+func TestOvershootingATreeStillReachesItAndChoppingTurnsTowardIt(t *testing.T) {
+	w := besideTree()
+	// Four more steps right leave the trunk 1.1 behind the hero.
+	for range 4 {
+		w.Walk(1, 0, false)
+	}
+	tree, ok := w.TreeInReach()
+	if !ok || tree.X < 6 || tree.X > 6.1 {
+		t.Fatalf("tree in reach = %+v, %v; want the tree at x 6.0 behind the hero", tree, ok)
+	}
+	if !w.Chop() {
+		t.Fatal("chopping must start at a tree behind the hero")
+	}
+	if facing := w.Hero().Facing(); facing != world.FacingLeft {
+		t.Fatalf("facing = %v, want the hero to turn left toward the tree", facing)
 	}
 }
 
 func TestChoppingANormalTreeTakesOneTickAndLeavesAStump(t *testing.T) {
 	w := besideTree()
 	if !w.Chop() {
-		t.Fatal("chopping must start at a faced tree")
+		t.Fatal("chopping must start at a tree in reach")
 	}
 	w.Advance(0, 0, 599*time.Millisecond, false)
 	if !w.Chopping() || w.Hero().Logs() != 0 {
@@ -57,7 +71,7 @@ func TestChoppingANormalTreeTakesOneTickAndLeavesAStump(t *testing.T) {
 	if tree, _ := w.TreeAt(1, 0); !tree.Stump {
 		t.Fatal("a felled tree must leave a stump")
 	}
-	if _, ok := w.FacedTree(); ok {
+	if _, ok := w.TreeInReach(); ok {
 		t.Fatal("a stump must not be faced as a tree to chop")
 	}
 	if w.Chop() {
@@ -74,7 +88,7 @@ func TestATreeCanBeChoppedFromTheEdgeOfItsCrown(t *testing.T) {
 	for range 7 {
 		w.Walk(1, 0, false)
 	}
-	if _, ok := w.FacedTree(); !ok {
+	if _, ok := w.TreeInReach(); !ok {
 		t.Fatal("a tree 2.2 ahead must be within reach")
 	}
 }
@@ -84,10 +98,10 @@ func TestTheChoppedTreeIsKnownWhileChopping(t *testing.T) {
 	if _, ok := w.ChoppedTree(); ok {
 		t.Fatal("no tree is chopped before chopping starts")
 	}
-	faced, _ := w.FacedTree()
+	faced, _ := w.TreeInReach()
 	w.Chop()
 	if chopped, ok := w.ChoppedTree(); !ok || chopped != faced {
-		t.Fatalf("chopped tree = %+v, %v; want the faced tree %+v", chopped, ok, faced)
+		t.Fatalf("chopped tree = %+v, %v; want the tree in reach %+v", chopped, ok, faced)
 	}
 	w.Advance(0, 0, time.Second, false)
 	if _, ok := w.ChoppedTree(); ok {

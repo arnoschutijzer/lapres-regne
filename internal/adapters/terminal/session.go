@@ -131,8 +131,8 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			return false
 		}
 		if event.action == interact {
-			// E opens the action menu for the faced tree, or closes an open menu.
-			if _, faced := world.FacedTree(); faced && view.menu == nil && !event.repeat {
+			// E opens the action menu for the tree in reach, or closes an open menu.
+			if _, reachable := world.TreeInReach(); reachable && view.menu == nil && !event.repeat {
 				view.menu = []string{"Chop down"}
 			} else if !event.repeat {
 				view.menu = nil
