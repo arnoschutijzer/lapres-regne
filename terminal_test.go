@@ -143,6 +143,7 @@ func (s *testTerminal) restored() {
 	}
 	terminalCheck(s.t, strings.Contains(cleanup, "\x1b[?25h"), "cursor must be restored")
 	terminalCheck(s.t, strings.Contains(cleanup, "\x1b[<u"), "keyboard mode must be restored")
+	terminalCheck(s.t, strings.Contains(cleanup, "\x1b[?1006l\x1b[?1003l"), "mouse reporting must be restored")
 	terminalCheck(s.t, s.settings() == s.original, "terminal settings must be restored")
 }
 
@@ -296,6 +297,18 @@ func TestTerminal(t *testing.T) {
 		s.send("\x1b[119;1:3u")
 		s.readFor(100 * time.Millisecond)
 		terminalCheck(t, len(positions(s.readFor(150*time.Millisecond))) == 0, "releasing W must stop after sprinting")
+		s.send("q")
+		s.restored()
+	})
+	t.Run("mouse tracking", func(t *testing.T) {
+		s := openTestTerminal(t, binary, "--mute")
+		initial := s.until("steps 0")
+		terminalCheck(t, strings.Contains(initial, "\x1b[?1003h\x1b[?1006h"), "request mouse motion reporting")
+		// Motion to the far left and top, then a click and its release.
+		s.send("\x1b[<35;1;1M\x1b[<35;60;20M\x1b[<0;60;20M\x1b[<0;60;20m")
+		s.readFor(100 * time.Millisecond)
+		s.send("d")
+		s.until("x 0.6  z 0.0  |  steps 1")
 		s.send("q")
 		s.restored()
 	})

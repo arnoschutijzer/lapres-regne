@@ -23,6 +23,7 @@ type Character struct {
 	steps        int
 	stepDistance float64
 	facing       Facing
+	aimed        bool
 	lastWalk     time.Time
 }
 
@@ -33,6 +34,16 @@ func (c *Character) LastWalk() time.Time      { return c.lastWalk }
 
 // Face turns the character without moving it.
 func (c *Character) Face(facing Facing) { c.facing = facing }
+
+// AimAt faces a world position. Once aimed, walking no longer turns the character.
+func (c *Character) AimAt(x, z float64) {
+	dx, dz := x-c.x, z-c.z
+	if dx == 0 && dz == 0 {
+		return
+	}
+	c.Face(FacingToward(dx, dz))
+	c.aimed = true
+}
 
 // FacingToward picks the facing closest to a direction; ties favour up and down.
 func FacingToward(dx, dz float64) Facing {
@@ -69,7 +80,9 @@ func (c *Character) move(dx, dz, distance float64) float64 {
 		return 0
 	}
 	dx, dz = dx/length, dz/length
-	c.Face(FacingToward(dx, dz))
+	if !c.aimed {
+		c.Face(FacingToward(dx, dz))
+	}
 	c.lastWalk = time.Now()
 	c.x, c.z = c.x+dx*distance, c.z+dz*distance
 	return distance

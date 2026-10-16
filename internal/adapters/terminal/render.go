@@ -65,6 +65,12 @@ func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
 		-(z-c.z)*0.69 - y*0.72
 }
 
+// ground inverts the projection at ground level for the canvas pixel x, y.
+func (c *forestCanvas) ground(x, y float64) (float64, float64) {
+	return c.x + (x-float64(c.width)/2)/c.scale,
+		c.z + (y-float64(c.height)*0.57)/(0.72*c.scale)
+}
+
 func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
 	if x < 0 || y < 0 || x >= c.width || y >= c.height {
 		return
@@ -171,6 +177,22 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 		a := float64(i) * math.Pi / 4
 		c.line(x, 1.48, z, x+math.Cos(a)*0.28, 1.48, z+math.Sin(a)*0.28, 1, 8)
 	}
+}
+
+// groundAt finds the world position under a 1-based terminal cell of the last frame.
+func (r *renderer) groundAt(column, row int) (x, z float64, ok bool) {
+	c := &r.canvas
+	if r.screenWidth == 0 || c.width == 0 {
+		return 0, 0, false
+	}
+	cols, rows := c.width/2, c.height/4
+	col, canvasRow := column-1-(r.screenWidth-cols)/2, row-2
+	if col < 0 || col >= cols || canvasRow < 0 || canvasRow >= rows {
+		return 0, 0, false
+	}
+	// Aim at the centre of the cell's 2 x 4 braille dots.
+	x, z = c.ground(float64(col*2)+1, float64(canvasRow*4)+2)
+	return x, z, true
 }
 
 func (r *renderer) frame(width, height int, seconds float64) string {

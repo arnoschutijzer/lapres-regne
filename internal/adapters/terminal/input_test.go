@@ -1,0 +1,37 @@
+package terminal
+
+import "testing"
+
+func feed(d *keyDecoder, input string) []keyEvent {
+	var events []keyEvent
+	for i := range len(input) {
+		events = append(events, d.feed(input[i]))
+	}
+	return events
+}
+
+func TestMouseMotionReportsTheCell(t *testing.T) {
+	var d keyDecoder
+	events := feed(&d, "\x1b[<35;12;7M")
+	last := events[len(events)-1]
+	if !last.mouse || last.column != 12 || last.row != 7 {
+		t.Fatalf("event = %+v, want mouse motion at column 12, row 7", last)
+	}
+}
+
+func TestMouseClicksReleasesAndWheelAreIgnored(t *testing.T) {
+	var d keyDecoder
+	for _, event := range feed(&d, "\x1b[<0;12;7M\x1b[<0;12;7m\x1b[<64;12;7M\x1b[<96;12;7M") {
+		if event.mouse || event.action != none {
+			t.Fatalf("event = %+v, want it ignored", event)
+		}
+	}
+}
+
+func TestKeysStillDecodeAfterMouseInput(t *testing.T) {
+	var d keyDecoder
+	events := feed(&d, "\x1b[<35;1;1Md")
+	if last := events[len(events)-1]; last.action != right {
+		t.Fatalf("event = %+v, want D to walk right", last)
+	}
+}

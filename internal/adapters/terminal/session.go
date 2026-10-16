@@ -74,8 +74,8 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 		return err
 	}
 	defer stty(s.state)
-	defer fmt.Fprint(os.Stdout, keyboardStop+"\x1b[0m\x1b[?25h\x1b[?1049l")
-	if _, err := fmt.Fprint(os.Stdout, "\x1b[?1049h\x1b[?25l\x1b[2J"+keyboardStart); err != nil {
+	defer fmt.Fprint(os.Stdout, mouseStop+keyboardStop+"\x1b[0m\x1b[?25h\x1b[?1049l")
+	if _, err := fmt.Fprint(os.Stdout, "\x1b[?1049h\x1b[?25l\x1b[2J"+keyboardStart+mouseStart); err != nil {
 		return err
 	}
 
@@ -102,9 +102,18 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 	dirty := true
 	var decoder keyDecoder
 	held := make(heldKeys)
+	// The last pointer cell; the hero keeps aiming there while the camera follows.
+	var cursorColumn, cursorRow int
 	handleKey := func(key byte) bool {
 		event := decoder.feed(key)
 		held.update(event)
+		if event.mouse {
+			cursorColumn, cursorRow = event.column, event.row
+			return false
+		}
+		if event.focusOut {
+			cursorColumn, cursorRow = 0, 0
+		}
 		if event.release || event.focusOut {
 			return false
 		}
@@ -170,6 +179,9 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			dx, dz := held.direction()
 			world.Advance(dx, dz, dt, held.sprinting())
 			world.Follow(dt)
+			if x, z, ok := view.groundAt(cursorColumn, cursorRow); ok {
+				world.Hero().AimAt(x, z)
+			}
 			dirty = true
 			if dirty {
 				if err := draw(); err != nil {

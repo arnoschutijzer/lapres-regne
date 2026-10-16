@@ -26,6 +26,9 @@ type keyEvent struct {
 	focusOut bool
 	shift    bool
 	repeat   bool
+	mouse    bool
+	column   int
+	row      int
 }
 
 const (
@@ -40,6 +43,10 @@ const (
 // Flags 1 + 2 + 8 request disambiguation, event types, and encoded letter keys.
 const keyboardStart = "\x1b[>11u\x1b[?u\x1b[?1004h"
 const keyboardStop = "\x1b[?1004l\x1b[<u"
+
+// Any-motion tracking with SGR encoding reports the pointer cell even with no button held.
+const mouseStart = "\x1b[?1003h\x1b[?1006h"
+const mouseStop = "\x1b[?1006l\x1b[?1003l"
 
 type keyDecoder struct {
 	escape   byte
@@ -106,6 +113,9 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 		d.enhanced = err == nil && flags&11 == 11
 		return keyEvent{}
 	}
+	if strings.HasPrefix(params, "<") && (final == 'M' || final == 'm') {
+		return mouseMotion(params[1:], final)
+	}
 	if final == 'O' && params == "" {
 		return keyEvent{focusOut: true}
 	}
@@ -154,6 +164,21 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 		event.action = quit
 	}
 	return event
+}
+
+// mouseMotion reports pointer movement and ignores clicks, releases and the wheel.
+func mouseMotion(params string, final byte) keyEvent {
+	fields := strings.Split(params, ";")
+	if len(fields) != 3 || final != 'M' {
+		return keyEvent{}
+	}
+	button, buttonErr := strconv.Atoi(fields[0])
+	column, columnErr := strconv.Atoi(fields[1])
+	row, rowErr := strconv.Atoi(fields[2])
+	if buttonErr != nil || columnErr != nil || rowErr != nil || button&32 == 0 || button&64 != 0 {
+		return keyEvent{}
+	}
+	return keyEvent{mouse: true, column: column, row: row}
 }
 
 type heldKeys map[int]action
