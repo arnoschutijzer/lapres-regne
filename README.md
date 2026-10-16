@@ -25,8 +25,11 @@ Playback is built in; no `ffplay` or separate music player is needed. Use
 Press **N** for the next track or **P** for the previous track. Previous follows
 playback history; Next retraces forward history before drawing another shuffled
 song. Previous restarts the first track when there is no earlier history.
-Manual changes also crossfade. A change during a fade follows the current fade;
-repeated requests during that fade keep only the latest request.
+Every transition fades the current song out over three seconds, pauses in silence
+for a quarter second, then fades the next song in over three seconds. Songs never
+overlap. Short clips use shorter fades. N/P use the same transition; requests
+during a fade-out select the song that starts after silence, keeping the latest
+request.
 
 Walk with the **arrow keys**, **WASD**, or **IJKL** (I up, J left, K down,
 L right). Hold a key to keep walking. Press **Q** or **Ctrl-C** to quit.
