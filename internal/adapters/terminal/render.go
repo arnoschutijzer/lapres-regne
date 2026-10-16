@@ -198,8 +198,8 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 	}
 }
 
-// groundAt finds the world position under a 1-based terminal cell of the last frame.
-func (r *renderer) groundAt(column, row int) (x, z float64, ok bool) {
+// canvasPoint finds the canvas pixel at the centre of a 1-based terminal cell of the last frame.
+func (r *renderer) canvasPoint(column, row int) (x, y float64, ok bool) {
 	c := &r.canvas
 	if r.screenWidth == 0 || c.width == 0 {
 		return 0, 0, false
@@ -209,9 +209,40 @@ func (r *renderer) groundAt(column, row int) (x, z float64, ok bool) {
 	if col < 0 || col >= cols || canvasRow < 0 || canvasRow >= rows {
 		return 0, 0, false
 	}
-	// Aim at the centre of the cell's 2 x 4 braille dots.
-	x, z = c.ground(float64(col*2)+1, float64(canvasRow*4)+2)
+	// The centre of the cell's 2 x 4 braille dots.
+	return float64(col*2) + 1, float64(canvasRow*4) + 2, true
+}
+
+// groundAt finds the world position under a 1-based terminal cell of the last frame.
+func (r *renderer) groundAt(column, row int) (x, z float64, ok bool) {
+	px, py, ok := r.canvasPoint(column, row)
+	if !ok {
+		return 0, 0, false
+	}
+	x, z = r.canvas.ground(px, py)
 	return x, z, true
+}
+
+// treeAt finds the frontmost standing tree drawn under a 1-based terminal cell of the last frame.
+func (r *renderer) treeAt(column, row int) (world.Tree, bool) {
+	c := &r.canvas
+	x, y, ok := r.canvasPoint(column, row)
+	if !ok {
+		return world.Tree{}, false
+	}
+	// Trees are kept front to back from the last render, so the first outline hit is in front.
+	for _, tree := range r.trees {
+		if tree.Stump {
+			continue
+		}
+		baseX, baseY, _ := c.project(tree.X, 0, tree.Z)
+		_, topY, _ := c.project(tree.X, tree.Height+0.3+tree.Radius*0.7, tree.Z)
+		halfWidth := tree.Radius * 1.3 * c.scale
+		if x >= baseX-halfWidth && x <= baseX+halfWidth && y >= topY && y <= baseY {
+			return tree, true
+		}
+	}
+	return world.Tree{}, false
 }
 
 func (r *renderer) frame(width, height int, seconds float64) string {

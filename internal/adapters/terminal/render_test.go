@@ -171,3 +171,18 @@ func TestWoodChipsFlyOnlyRightAfterAStrike(t *testing.T) {
 		t.Fatalf("chips = %d, want none once the stroke is raised again", chips)
 	}
 }
+
+func TestTreeAtPicksTheTreeUnderAClick(t *testing.T) {
+	r := newRenderer(world.New(7), "L’Après-Règne")
+	r.frame(100, 30, 0)
+	// The crown of the tree at x 6.0, z 1.7 fills column 61, row 15 seen from the spawn point.
+	if tree, ok := r.treeAt(61, 15); !ok || tree.X < 6 || tree.X > 6.1 {
+		t.Fatalf("treeAt(61, 15) = %+v, %v; want the tree at x 6.0", tree, ok)
+	}
+	if tree, ok := r.treeAt(10, 25); ok {
+		t.Fatalf("treeAt(10, 25) = %+v; want open ground", tree)
+	}
+	if _, ok := r.treeAt(61, 30); ok {
+		t.Fatal("the status line must not pick a tree")
+	}
+}

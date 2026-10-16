@@ -12,8 +12,16 @@ const reach = 2.5
 // tick; a normal tree falls on the first tick.
 const chopTick = 600 * time.Millisecond
 
+// arrival is how close to a trunk an approach ends, comfortably within reach.
+const arrival = 1.2
+
 // cell identifies a tree by its place on the tree grid.
 type cell struct{ gx, gz int }
+
+type approach struct {
+	active bool
+	tree   cell
+}
 
 type chop struct {
 	active  bool
@@ -58,15 +66,56 @@ func (w *World) treeInReach() (Tree, cell, bool) {
 
 // Chop turns the hero toward the tree in reach and starts chopping it, reporting whether there was one.
 func (w *World) Chop() bool {
-	tree, at, ok := w.treeInReach()
+	tree, _, ok := w.treeInReach()
 	if !ok {
 		return false
 	}
+	w.startChop(tree)
+	return true
+}
+
+func (w *World) startChop(tree Tree) {
 	x, z := w.hero.Position()
 	w.hero.Face(FacingToward(tree.X-x, tree.Z-z))
-	w.chop = chop{active: true, tree: at}
+	w.approach = approach{}
+	w.chop = chop{active: true, tree: tree.cell}
 	w.sounds.Chop()
+}
+
+// Approach walks the hero straight to a standing tree and chops it on arrival,
+// reporting whether the tree still stands.
+func (w *World) Approach(tree Tree) bool {
+	standing, exists := w.TreeAt(tree.cell.gx, tree.cell.gz)
+	if !exists || standing.Stump {
+		return false
+	}
+	w.chop = chop{}
+	w.approach = approach{active: true, tree: tree.cell}
 	return true
+}
+
+// Stop cancels walking to a tree and chopping one.
+func (w *World) Stop() {
+	w.approach = approach{}
+	w.chop = chop{}
+}
+
+// approachFor walks toward the approached tree and starts chopping once beside it.
+func (w *World) approachFor(dt time.Duration) {
+	if !w.approach.active {
+		return
+	}
+	tree, _ := w.TreeAt(w.approach.tree.gx, w.approach.tree.gz)
+	x, z := w.hero.Position()
+	dx, dz := tree.X-x, tree.Z-z
+	remaining := math.Hypot(dx, dz) - arrival
+	if remaining > 0 {
+		w.hero.advance(dx, dz, math.Min(remaining, w.wading(walkingSpeed*dt.Seconds())))
+		remaining = math.Hypot(tree.X-w.hero.x, tree.Z-w.hero.z) - arrival
+	}
+	if remaining <= 1e-9 {
+		w.startChop(tree)
+	}
 }
 
 func (w *World) Chopping() bool { return w.chop.active }

@@ -1,6 +1,7 @@
 package world_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -154,5 +155,76 @@ func TestTheLastStrikeIsKnownWhileChopping(t *testing.T) {
 	w.Advance(0, 0, 250*time.Millisecond, false)
 	if index, since, ok := w.LastStrike(); !ok || index != 0 || since != 250*time.Millisecond {
 		t.Fatalf("last strike = %d, %v, %v; want the first strike 250ms ago", index, since, ok)
+	}
+}
+
+// approachUntilChopping advances the world in frames until the hero chops or a few seconds pass.
+func approachUntilChopping(w *world.World) {
+	for range 40 {
+		if w.Chopping() {
+			return
+		}
+		w.Advance(0, 0, 100*time.Millisecond, false)
+	}
+}
+
+func TestApproachingATreeWalksUpToItAndStartsChopping(t *testing.T) {
+	w := world.New(7)
+	tree, _ := w.TreeAt(1, 0)
+	if !w.Approach(tree) {
+		t.Fatal("a standing tree must be approachable")
+	}
+	approachUntilChopping(w)
+	if !w.Chopping() {
+		t.Fatal("the hero must start chopping on arrival")
+	}
+	x, z := w.Hero().Position()
+	if distance := math.Hypot(tree.X-x, tree.Z-z); distance > 1.5 {
+		t.Fatalf("distance to trunk = %.2f, want the hero right beside it", distance)
+	}
+	if facing := w.Hero().Facing(); facing != world.FacingRight {
+		t.Fatalf("facing = %v, want right toward the tree", facing)
+	}
+}
+
+func TestAStumpCannotBeApproached(t *testing.T) {
+	w := besideTree()
+	w.Chop()
+	w.Advance(0, 0, time.Second, false)
+	if stump, _ := w.TreeAt(1, 0); w.Approach(stump) {
+		t.Fatal("a stump must not be approached")
+	}
+}
+
+func TestMovingCancelsAnApproachAndAChop(t *testing.T) {
+	cases := []struct {
+		name string
+		move func(w *world.World)
+	}{
+		{"key press", func(w *world.World) { w.Walk(-1, 0, false) }},
+		{"held key", func(w *world.World) { w.Advance(-1, 0, 10*time.Millisecond, false) }},
+		{"stop", func(w *world.World) { w.Stop() }},
+	}
+	for _, c := range cases {
+		t.Run(c.name+" during approach", func(t *testing.T) {
+			w := world.New(7)
+			tree, _ := w.TreeAt(1, 0)
+			w.Approach(tree)
+			w.Advance(0, 0, 100*time.Millisecond, false)
+			c.move(w)
+			approachUntilChopping(w)
+			if w.Chopping() {
+				t.Fatal("the approach must be cancelled")
+			}
+		})
+		t.Run(c.name+" during chop", func(t *testing.T) {
+			w := besideTree()
+			w.Chop()
+			c.move(w)
+			w.Advance(0, 0, time.Second, false)
+			if w.Chopping() || w.Hero().Logs() != 0 {
+				t.Fatalf("chopping = %v, logs = %d; want the chop cancelled", w.Chopping(), w.Hero().Logs())
+			}
+		})
 	}
 }

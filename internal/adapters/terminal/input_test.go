@@ -19,10 +19,19 @@ func TestMouseMotionReportsTheCell(t *testing.T) {
 	}
 }
 
-func TestMouseClicksReleasesAndWheelAreIgnored(t *testing.T) {
+func TestLeftClicksReportTheCell(t *testing.T) {
 	var d keyDecoder
-	for _, event := range feed(&d, "\x1b[<0;12;7M\x1b[<0;12;7m\x1b[<64;12;7M\x1b[<96;12;7M") {
-		if event.mouse || event.action != none {
+	events := feed(&d, "\x1b[<0;12;7M")
+	last := events[len(events)-1]
+	if !last.click || last.mouse || last.column != 12 || last.row != 7 {
+		t.Fatalf("event = %+v, want a left click at column 12, row 7", last)
+	}
+}
+
+func TestMouseReleasesOtherButtonsAndWheelAreIgnored(t *testing.T) {
+	var d keyDecoder
+	for _, event := range feed(&d, "\x1b[<0;12;7m\x1b[<2;12;7M\x1b[<64;12;7M\x1b[<96;12;7M") {
+		if event.mouse || event.click || event.action != none {
 			t.Fatalf("event = %+v, want it ignored", event)
 		}
 	}

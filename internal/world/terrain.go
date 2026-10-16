@@ -9,6 +9,7 @@ type Tree struct {
 	Variation                   float64
 	// Stump marks a felled tree.
 	Stump bool
+	cell  cell
 }
 
 func (w *World) Cover(x, z float64) float64 {
@@ -82,5 +83,5 @@ func (w *World) TreeAt(gx, gz int) (Tree, bool) {
 	if w.Random(gx, gz, 3) > probability || distance < width+1.0 || math.Hypot(x, z) < 3.5 {
 		return Tree{}, false
 	}
-	return Tree{x, z, 4.5 + w.Random(gx, gz, 4)*3, 2.0 + w.Random(gx, gz, 5)*1.35, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), w.felled[cell{gx, gz}]}, true
+	return Tree{x, z, 4.5 + w.Random(gx, gz, 4)*3, 2.0 + w.Random(gx, gz, 5)*1.35, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), w.felled[cell{gx, gz}], cell{gx, gz}}, true
 }

@@ -11,9 +11,10 @@ type World struct {
 	hero             Character
 	cameraX, cameraZ float64
 	// felled holds the cells whose tree is a stump.
-	felled map[cell]bool
-	chop   chop
-	sounds Sounds
+	felled   map[cell]bool
+	approach approach
+	chop     chop
+	sounds   Sounds
 }
 
 func New(seed uint64) *World {
@@ -46,11 +47,15 @@ func (w *World) Noise(x, z float64, salt uint64) float64 {
 	return a*(1-v) + b*v
 }
 
+// walkingSpeed is how far the hero walks per second.
+const walkingSpeed = 9.0
+
 // Walk takes one step in a direction, as triggered by a single key press.
 func (w *World) Walk(dx, dz float64, sprinting bool) {
 	if dx == 0 && dz == 0 {
 		return
 	}
+	w.Stop()
 	distance := stride
 	if sprinting {
 		distance *= 2
@@ -60,11 +65,15 @@ func (w *World) Walk(dx, dz float64, sprinting bool) {
 
 // Advance by elapsed time, independently of terminal key-repeat timing.
 func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
-	speed := 9.0
+	if dx != 0 || dz != 0 {
+		w.Stop()
+	}
+	speed := walkingSpeed
 	if sprinting {
 		speed *= 2
 	}
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
+	w.approachFor(dt)
 	w.chopFor(dt)
 }
 

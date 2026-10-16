@@ -29,6 +29,7 @@ type keyEvent struct {
 	shift    bool
 	repeat   bool
 	mouse    bool
+	click    bool
 	column   int
 	row      int
 }
@@ -120,7 +121,7 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 		return keyEvent{}
 	}
 	if strings.HasPrefix(params, "<") && (final == 'M' || final == 'm') {
-		return mouseMotion(params[1:], final)
+		return mouseEvent(params[1:], final)
 	}
 	if final == 'O' && params == "" {
 		return keyEvent{focusOut: true}
@@ -172,8 +173,8 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 	return event
 }
 
-// mouseMotion reports pointer movement and ignores clicks, releases and the wheel.
-func mouseMotion(params string, final byte) keyEvent {
+// mouseEvent reports pointer movement and left clicks, and ignores releases, other buttons and the wheel.
+func mouseEvent(params string, final byte) keyEvent {
 	fields := strings.Split(params, ";")
 	if len(fields) != 3 || final != 'M' {
 		return keyEvent{}
@@ -181,10 +182,16 @@ func mouseMotion(params string, final byte) keyEvent {
 	button, buttonErr := strconv.Atoi(fields[0])
 	column, columnErr := strconv.Atoi(fields[1])
 	row, rowErr := strconv.Atoi(fields[2])
-	if buttonErr != nil || columnErr != nil || rowErr != nil || button&32 == 0 || button&64 != 0 {
+	if buttonErr != nil || columnErr != nil || rowErr != nil || button&64 != 0 {
 		return keyEvent{}
 	}
-	return keyEvent{mouse: true, column: column, row: row}
+	if button&32 != 0 {
+		return keyEvent{mouse: true, column: column, row: row}
+	}
+	if button&3 == 0 {
+		return keyEvent{click: true, column: column, row: row}
+	}
+	return keyEvent{}
 }
 
 type heldKeys map[int]action

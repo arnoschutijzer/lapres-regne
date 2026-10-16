@@ -111,6 +111,16 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			cursorColumn, cursorRow = event.column, event.row
 			return false
 		}
+		if event.click {
+			// Clicking a tree walks there to chop it; clicking anything else stops.
+			view.menu = nil
+			if tree, ok := view.treeAt(event.column, event.row); ok {
+				world.Approach(tree)
+			} else {
+				world.Stop()
+			}
+			return false
+		}
 		if event.focusOut {
 			cursorColumn, cursorRow = 0, 0
 		}
@@ -145,6 +155,9 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 				view.menu = nil
 			}
 			return false
+		}
+		if event.action >= left && event.action <= down {
+			view.menu = nil
 		}
 		if !event.enhanced {
 			dx, dz := event.action.vector()
