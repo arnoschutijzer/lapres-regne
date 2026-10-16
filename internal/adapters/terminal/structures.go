@@ -13,12 +13,28 @@ const (
 	floorInk
 	ironInk
 	plankInk
+	shadedStoneInk
+	shadowGrassInk
+	shadowPathInk
+	shadowFloorInk
 )
 
 // prominent marks the inks of structures, which count double when a braille cell picks its color,
 // so walls, fences and doors keep their color among the ground around them when zoomed out.
 func prominent(ink int) bool {
-	return ink >= stoneInk && ink != pathInk && ink != floorInk
+	return ink == stoneInk || ink == shadedStoneInk || ink == ironInk || ink == plankInk
+}
+
+// inShadow is the ink a patch of ground takes in a structure's shadow: a cooler, darker color, as a
+// braille cell shows only one color and sparser dots alone barely read as shade.
+func inShadow(ink int) int {
+	switch ink {
+	case pathInk:
+		return shadowPathInk
+	case floorInk:
+		return shadowFloorInk
+	}
+	return shadowGrassInk
 }
 
 // The proportions of walls and doorways, in world units.
@@ -61,6 +77,10 @@ func (c *forestCanvas) fill(f face, ink int, pattern func(u, v float64) float64)
 	lengthU, lengthV := math.Sqrt(f.u.dot(f.u)), math.Sqrt(f.v.dot(f.v))
 	// Structures are lit a little brighter than leaves, so even a shaded face shows in braille.
 	light := 0.45 + 0.55*sunlight(f.normal)
+	// Stone turned away from the sun takes a darker color, giving walls their form.
+	if ink == stoneInk && sunlight(f.normal) < 0.5 {
+		ink = shadedStoneInk
+	}
 	// Only faces several pixels across get an outline; a thin rail would vanish inside its own.
 	edgeU, edgeV := 0.7/c.scale, 0.7/c.scale
 	if lengthU < 4*edgeU {
@@ -123,51 +143,211 @@ func plain(u, v float64) float64 { return 1 }
 // neighbours are the tile steps north, east, south and west.
 var neighbours = [4][2]int{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
 
-// drawStructures draws the walls, doors, fences, gates and graves standing on the map's tiles
-// within the drawn area.
-func (r *renderer) drawStructures(c *forestCanvas, left, right, back, front float64) {
-	f := r.world
-	groundOf := func(col, row int) world.Ground {
-		ground, _ := f.GroundAt((float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize)
+// builtTile is what stands on one tile of the map, and which of its sides join what stands beside
+// it: walls join walls and the doors and gates set in them, and fences join anything built.
+type builtTile struct {
+	ground world.Ground
+	onMap  bool
+	joined [4]bool
+	// walled marks a tile with a wall beside it, so a door there is set in a wall.
+	walled bool
+}
+
+// builtArea surveys the tiles within the drawn area once a frame, for drawing structures and the
+// shadows they cast.
+type builtArea struct {
+	col, row, cols, rows int
+	tiles                []builtTile
+}
+
+// survey records what stands on every tile from left to right and back to front, with a tile's
+// margin around them.
+func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
+	a.col, a.row = int(math.Floor(left/world.TileSize))-1, int(math.Floor(back/world.TileSize))-1
+	a.cols = int(math.Ceil(right/world.TileSize)) + 2 - a.col
+	a.rows = int(math.Ceil(front/world.TileSize)) + 2 - a.row
+	if cap(a.tiles) < a.cols*a.rows {
+		a.tiles = make([]builtTile, a.cols*a.rows)
+	}
+	a.tiles = a.tiles[:a.cols*a.rows]
+	for i := range a.tiles {
+		col, row := a.col+i%a.cols, a.row+i/a.cols
+		ground, onMap := f.GroundAt((float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize)
+		a.tiles[i] = builtTile{ground: ground, onMap: onMap}
+	}
+	for i := range a.tiles {
+		tile := &a.tiles[i]
+		col, row := a.col+i%a.cols, a.row+i/a.cols
+		for side, step := range neighbours {
+			beside := a.at(col+step[0], row+step[1]).ground
+			tile.walled = tile.walled || beside == world.Wall
+			switch tile.ground {
+			case world.Wall:
+				tile.joined[side] = beside == world.Wall || beside == world.Door || beside == world.Gate
+			default:
+				tile.joined[side] = beside.Blocks() && beside != world.Grave || beside == world.Door
+			}
+		}
+	}
+}
+
+// at is what stands on a tile; nothing beyond the surveyed area.
+func (a *builtArea) at(col, row int) builtTile {
+	col, row = col-a.col, row-a.row
+	if col < 0 || row < 0 || col >= a.cols || row >= a.rows {
+		return builtTile{}
+	}
+	return a.tiles[row*a.cols+col]
+}
+
+// tileAt finds the tile holding a world position, and the position within it.
+func tileAt(x, z float64) (col, row int, alongX, alongZ float64) {
+	col, row = int(math.Floor(x/world.TileSize)), int(math.Floor(z/world.TileSize))
+	return col, row, x - float64(col)*world.TileSize, z - float64(row)*world.TileSize
+}
+
+// underfoot is the ground to paint at a world position: beside a wall's slab, the ground of the tile
+// on that side, so grass and floors run up to the wall's foot.
+func (a *builtArea) underfoot(x, z float64, ground world.Ground) world.Ground {
+	if ground != world.Wall {
 		return ground
 	}
-	for row := int(math.Floor(back / world.TileSize)); row <= int(math.Ceil(front/world.TileSize)); row++ {
-		for col := int(math.Floor(left / world.TileSize)); col <= int(math.Ceil(right/world.TileSize)); col++ {
-			ground, onMap := f.GroundAt((float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize)
-			if !onMap || !ground.Blocks() && ground != world.Door {
+	col, row, alongX, alongZ := tileAt(x, z)
+	half, middle := wallThickness/2, world.TileSize/2
+	stepX, stepZ := 0, 0
+	switch {
+	case alongZ < middle-half:
+		stepZ = -1
+	case alongZ > middle+half:
+		stepZ = 1
+	}
+	switch {
+	case alongX < middle-half:
+		stepX = -1
+	case alongX > middle+half:
+		stepX = 1
+	}
+	if stepX == 0 && stepZ == 0 {
+		return ground
+	}
+	for _, step := range [3][2]int{{stepX, stepZ}, {stepX, 0}, {0, stepZ}} {
+		if step == [2]int{} {
+			continue
+		}
+		if beside := a.at(col+step[0], row+step[1]); beside.onMap && !beside.ground.Blocks() {
+			return beside.ground
+		}
+	}
+	return world.Floor
+}
+
+// occupied tells whether a structure fills the point at height y above x, z.
+func (a *builtArea) occupied(x, y, z float64) bool {
+	col, row, alongX, alongZ := tileAt(x, z)
+	tile := a.at(col, row)
+	half, middle := wallThickness/2, world.TileSize/2
+	across := func(along float64, width float64) bool { return math.Abs(along-middle) <= width }
+	north, east, south, west := tile.joined[0], tile.joined[1], tile.joined[2], tile.joined[3]
+	switch tile.ground {
+	case world.Wall:
+		if y > wallHeight+copingHeight {
+			return false
+		}
+		if east || west || !north && !south {
+			if from, to := span(west, east); alongX >= from && alongX <= to && across(alongZ, half) {
+				return true
+			}
+		}
+		if north || south {
+			from, to := span(north, south)
+			return alongZ >= from && alongZ <= to && across(alongX, half)
+		}
+	case world.Door:
+		if !tile.walled || y > wallHeight+copingHeight {
+			return false
+		}
+		if east || west {
+			jamb := alongX < jambWidth || alongX > world.TileSize-jambWidth
+			return across(alongZ, half) && (jamb || y >= doorHeight)
+		}
+		jamb := alongZ < jambWidth || alongZ > world.TileSize-jambWidth
+		return across(alongX, half) && (jamb || y >= doorHeight)
+	case world.Fence, world.Gate:
+		height, rails := 1.1, []float64{0.45, 0.9}
+		if tile.ground == world.Gate {
+			height, rails = 1.8, []float64{0.3, 0.9, 1.5}
+		}
+		if y > height {
+			return false
+		}
+		if across(alongX, 0.09) && across(alongZ, 0.09) {
+			return true
+		}
+		for _, rail := range rails {
+			if math.Abs(y-rail) > 0.05 {
 				continue
 			}
-			x, z := float64(col)*world.TileSize, float64(row)*world.TileSize
-			// Walls join walls and the doors and gates set in them; fences join anything built.
-			var joined [4]bool
-			walled := false
-			for side, step := range neighbours {
-				beside := groundOf(col+step[0], row+step[1])
-				walled = walled || beside == world.Wall
-				switch ground {
-				case world.Wall:
-					joined[side] = beside == world.Wall || beside == world.Door || beside == world.Gate
-				default:
-					joined[side] = beside.Blocks() && beside != world.Grave || beside == world.Door
-				}
+			alongRail := east && alongX >= middle && across(alongZ, 0.05) || west && alongX <= middle && across(alongZ, 0.05) ||
+				south && alongZ >= middle && across(alongX, 0.05) || north && alongZ <= middle && across(alongX, 0.05)
+			if alongRail {
+				return true
 			}
-			switch ground {
-			case world.Wall:
-				drawWall(c, x, z, joined)
-			case world.Door:
-				if walled {
-					drawDoor(c, x, z, joined)
-				} else {
-					drawOpenGate(c, x, z, joined)
-				}
-			case world.Fence:
-				drawRailing(c, x, z, joined, 1.1, []float64{0.45, 0.9}, plankInk)
-			case world.Gate:
-				drawRailing(c, x, z, joined, 1.8, []float64{0.3, 0.9, 1.5}, ironInk)
-				drawBars(c, x, z, joined, 1.8)
-			case world.Grave:
-				drawGrave(c, x, z, f.Random(col, row, 41))
+		}
+	case world.Grave:
+		return y <= 1.1 && across(alongX, 0.35) && math.Abs(alongZ-world.TileSize*0.4) <= 0.1
+	}
+	return false
+}
+
+// castShadow is how much light reaches ground in a structure's shadow.
+const castShadow = 0.45
+
+// The sun stands in the north-west: a point at height h throws its shadow sunX * h east and
+// sunZ * h south, as the trees' shadows fall.
+const sunX, sunZ = 0.55, 0.3
+
+// shade darkens the ground at x, z lying in a structure's shadow, and a little at the foot of
+// one, where little sky reaches.
+func (a *builtArea) shade(x, z float64) float64 {
+	for height := 0.1; height <= wallHeight+copingHeight; height += 0.2 {
+		if a.occupied(x-sunX*height, height, z-sunZ*height) {
+			return castShadow
+		}
+	}
+	shade := 1.0
+	for _, step := range [4][2]float64{{0.3, 0}, {-0.3, 0}, {0, 0.3}, {0, -0.3}} {
+		if a.occupied(x+step[0], 0.2, z+step[1]) {
+			shade -= 0.15
+		}
+	}
+	return shade
+}
+
+// drawStructures draws the walls, doors, fences, gates and graves standing on the surveyed tiles.
+func (r *renderer) drawStructures(c *forestCanvas) {
+	a := &r.built
+	for i, tile := range a.tiles {
+		col, row := a.col+i%a.cols, a.row+i/a.cols
+		if !tile.onMap {
+			continue
+		}
+		x, z := float64(col)*world.TileSize, float64(row)*world.TileSize
+		switch tile.ground {
+		case world.Wall:
+			drawWall(c, x, z, tile.joined)
+		case world.Door:
+			if tile.walled {
+				drawDoor(c, x, z, tile.joined)
+			} else {
+				drawOpenGate(c, x, z, tile.joined)
 			}
+		case world.Fence:
+			drawRailing(c, x, z, tile.joined, 1.1, []float64{0.45, 0.9}, plankInk)
+		case world.Gate:
+			drawRailing(c, x, z, tile.joined, 1.8, []float64{0.3, 0.9, 1.5}, ironInk)
+			drawBars(c, x, z, tile.joined, 1.8)
+		case world.Grave:
+			drawGrave(c, x, z, r.world.Random(col, row, 41))
 		}
 	}
 }

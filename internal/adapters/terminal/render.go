@@ -33,6 +33,8 @@ type renderer struct {
 	inventoryOpen, panelShown bool
 	lastPanel                 string
 	cursor                    slotCursor
+	// built surveys a map's structures within the drawn area, each frame.
+	built builtArea
 	// menu lists the actions offered for the tree in reach, named by menuTitle; nil when closed.
 	menu      []string
 	menuTitle string
@@ -133,6 +135,10 @@ var forestPalette = [...][3]int{
 	{96, 100, 108},  // flagstones
 	{150, 162, 176}, // iron
 	{164, 118, 70},  // planks
+	{132, 130, 136}, // shaded stone
+	{40, 66, 60},    // grass in shadow
+	{96, 80, 64},    // earth path in shadow
+	{60, 64, 78},    // flagstones in shadow
 }
 
 // foremost marks the inks of the hero, their axe, flying chips and fireworks.
@@ -235,7 +241,9 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		return towardI*0.69+trees[i].Height*0.72 > towardJ*0.69+trees[j].Height*0.72
 	})
 	// A map's water lies in its tiles, so only the endless forest samples its rivers.
-	if !f.Mapped() {
+	if f.Mapped() {
+		r.built.survey(f, left, right, back, front)
+	} else {
 		r.rivers.sample(f, back, front, left, right, 1/c.scale)
 	}
 	// Each row of ground depends only on the world, so the rows are shared out across the cores,
@@ -253,7 +261,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	}
 	ground.Wait()
 	if f.Mapped() {
-		r.drawStructures(c, left, right, back, front)
+		r.drawStructures(c)
 	}
 	for _, tree := range trees {
 		if !tree.Stump {
@@ -590,6 +598,7 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 		water, bank := false, false
 		if f.Mapped() {
 			ground, onMap := f.GroundAt(wx, wz)
+			ground = r.built.underfoot(wx, wz, ground)
 			switch {
 			case !onMap:
 				ink, light = 0, 0
@@ -603,6 +612,13 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 				ink, light = floorInk, flagstones(wx, wz, n)
 			}
 			water = ground == world.Water
+			if onMap {
+				shade := r.built.shade(wx, wz)
+				light *= shade
+				if shade == castShadow {
+					ink = inShadow(ink)
+				}
+			}
 		} else {
 			distance, width := world.NearestRiver(r.rivers.at(wz), wx)
 			water, bank = distance < width, distance < width+0.65

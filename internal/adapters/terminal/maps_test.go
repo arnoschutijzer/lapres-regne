@@ -92,7 +92,7 @@ func TestAWallStandsAboveTheGroundItIsBuiltOn(t *testing.T) {
 	_, top, _ := c.project(45, wallHeight*0.9, 21.35)
 	stone := 0
 	for y := int(top); y < int(foot); y++ {
-		if c.pixels[y*c.width+int(x)].ink == stoneInk {
+		if ink := c.pixels[y*c.width+int(x)].ink; ink == stoneInk || ink == shadedStoneInk {
 			stone++
 		}
 	}
@@ -123,10 +123,10 @@ func TestADoorwayOpensUnderAStoneLintelWithItsDoorSwungBack(t *testing.T) {
 	x, foot, _ := c.project(41, 0, 21.35)
 	_, lintel, _ := c.project(41, (doorHeight+wallHeight)/2, 21.35)
 	_, opening, _ := c.project(41, doorHeight/2, 21.35)
-	if p := c.pixels[int(lintel)*c.width+int(x)]; p.ink != stoneInk {
+	if p := c.pixels[int(lintel)*c.width+int(x)]; p.ink != stoneInk && p.ink != shadedStoneInk {
 		t.Fatalf("ink above the doorway = %d, want the stone lintel", p.ink)
 	}
-	if p := c.pixels[int(opening)*c.width+int(x)]; p.ink == stoneInk {
+	if p := c.pixels[int(opening)*c.width+int(x)]; p.ink == stoneInk || p.ink == shadedStoneInk {
 		t.Fatal("the doorway must open through the wall")
 	}
 	if foot <= opening {
@@ -203,5 +203,72 @@ func TestADarkHaloSetsTheHeroApartFromTheGround(t *testing.T) {
 	}
 	if hero == 0 {
 		t.Fatal("the hero must be drawn")
+	}
+}
+
+// walledMeadow is meadow's open grass with an east to west wall through row 10 and a north to
+// south wall down column 25.
+func walledMeadow() *world.World {
+	ground := make([][]world.Ground, 60)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 80)
+	}
+	for col := 30; col < 50; col++ {
+		ground[25][col] = world.Wall
+	}
+	for row := 27; row < 36; row++ {
+		ground[row][45] = world.Wall
+	}
+	return world.NewOnMap(7, world.Map{Name: "Walled meadow", Ground: ground, StartCol: 40, StartRow: 30})
+}
+
+// lightAt is the light of the canvas pixel showing the ground at x, z, rendered up close.
+func lightAt(w *world.World, x, z float64) float64 {
+	r := newRenderer(w, "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	c := r.render(160, 60, 0)
+	px, py, _ := c.project(x, 0, z)
+	return c.pixels[int(py)*c.width+int(px)].light
+}
+
+func TestWallsCastShadowsAwayFromTheSun(t *testing.T) {
+	// The wall along row 25 stands from z 50.65 to 51.35; the sun in the north-west throws its
+	// shadow a little to the south.
+	open, shaded := lightAt(meadow(), 80.5, 51.8), lightAt(walledMeadow(), 80.5, 51.8)
+	if shaded > open*0.6 {
+		t.Fatalf("light south of the wall = %.2f, open ground = %.2f; want the wall's shadow", shaded, open)
+	}
+}
+
+func TestTheGroundDarkensAtTheFootOfAWall(t *testing.T) {
+	// The wall down column 45 stands from x 90.65 to 91.35; its west side faces the sun.
+	open, foot := lightAt(meadow(), 90.45, 63), lightAt(walledMeadow(), 90.45, 63)
+	if foot > open*0.9 || foot < open*0.5 {
+		t.Fatalf("light at the wall's sunlit foot = %.2f, open ground = %.2f; want it a little darker", foot, open)
+	}
+}
+
+// inkAt is the ink of the canvas pixel showing the point x, y, z, rendered up close.
+func inkAt(w *world.World, x, y, z float64) int {
+	r := newRenderer(w, "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	c := r.render(160, 60, 0)
+	px, py, _ := c.project(x, y, z)
+	return c.pixels[int(py)*c.width+int(px)].ink
+}
+
+func TestShadowsDeepenTheGroundsColor(t *testing.T) {
+	if ink := inkAt(walledMeadow(), 80.5, 0, 51.8); ink != shadowGrassInk {
+		t.Fatalf("ink in the wall's shadow = %d, want the shaded grass", ink)
+	}
+}
+
+func TestAWallsFacesTurnedFromTheSunAreDarkerStone(t *testing.T) {
+	// The wall along row 25: its south face looks away from the sun, its top up at it.
+	if ink := inkAt(walledMeadow(), 80.5, 1.5, 51.35); ink != shadedStoneInk {
+		t.Fatalf("ink on the wall's south face = %d, want the shaded stone", ink)
+	}
+	if ink := inkAt(walledMeadow(), 80.5, wallHeight+copingHeight, 51); ink != stoneInk {
+		t.Fatalf("ink on the wall's top = %d, want the sunlit stone", ink)
 	}
 }
