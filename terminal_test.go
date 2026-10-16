@@ -287,9 +287,11 @@ func TestTerminal(t *testing.T) {
 		bothShifts := lastPosition(t, s.readFor(200*time.Millisecond))
 		terminalCheck(t, ran[1]-bothShifts[1] > 2.7, "releasing one Shift must preserve sprinting with the other")
 		s.send("\x1b[57447;1:3u")
+		// Drain frames drawn before the release arrived, so no sprinting frame is measured as walking.
+		released := lastPosition(t, s.readFor(50*time.Millisecond))
 		start = time.Now()
 		resumed := lastPosition(t, s.readFor(250*time.Millisecond))
-		resumedSpeed := (bothShifts[1] - resumed[1]) / time.Since(start).Seconds()
+		resumedSpeed := (released[1] - resumed[1]) / time.Since(start).Seconds()
 		terminalCheck(t, resumedSpeed/walkingSpeed > 0.8 && resumedSpeed/walkingSpeed < 1.2, "releasing Shift must restore walking speed")
 		s.send("\x1b[119;1:3u")
 		s.readFor(100 * time.Millisecond)
