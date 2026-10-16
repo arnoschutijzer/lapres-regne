@@ -5,9 +5,6 @@ import "math"
 // detailScale is the zoom from which trees are drawn in detail.
 var detailScale = forestScale * math.Pow(zoomStep, 6)
 
-// heroDetailScale is the zoom from which the hero is drawn in detail, a few steps out from the forest.
-var heroDetailScale = forestScale * math.Pow(zoomStep, 3)
-
 // heroLook holds the palette entries of the hero's base body: their skin and hair, and the plain
 // undershirt and shorts that gear will later cover.
 type heroLook struct{ skin, hair, undershirt, shorts int }
@@ -66,14 +63,14 @@ func (b heroBody) outline(side, y, forward, width, height, depth float64) {
 	band := 1.5 / b.c.scale
 	width, height, depth = b.visible(width), b.visible(height), b.visible(depth)
 	ellipsoid(b.c, x, y, z, width+band, height+band, depth+band, b.heading, func(px, py int, depth float64, _, _ vec) {
-		b.c.plot(px, py, depth+0.4, 0, 0)
+		b.c.plot(px, py, depth+0.4+band, 0, 0)
 	})
 }
 
 // visible keeps a part's radius at least about a canvas pixel, so slender limbs stay unbroken
 // when the view zooms out.
 func (b heroBody) visible(radius float64) float64 {
-	return math.Max(radius, 0.9/b.c.scale)
+	return math.Max(radius, 0.6/b.c.scale)
 }
 
 // eye leaves an unlit gap two dots tall on the face, when that side of the face turns toward the view.

@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"lapresregne/internal/world"
 )
@@ -59,6 +58,9 @@ type forestPixel struct {
 
 type forestCell struct {
 	bits, ink uint8
+	// solid uses filled quadrants for the figure; the scenery keeps its braille dithering.
+	solid        bool
+	color, paper [3]int
 	// veil dims the forest under an overlay, in sixteenths; an overlay's glyph replaces the forest's
 	// braille and shows its ink at veil sixteenths of full strength.
 	veil  uint8
@@ -139,11 +141,12 @@ var forestPalette = [...][3]int{
 	{40, 66, 60},    // grass in shadow
 	{96, 80, 64},    // earth path in shadow
 	{60, 64, 78},    // flagstones in shadow
+	{143, 118, 80},  // axe handle
 }
 
 // foremost marks the inks of the hero, their axe, flying chips and fireworks.
 func foremost(ink int) bool {
-	return ink >= 8 && ink <= 10 || ink >= defaultLook.skin && ink < stoneInk
+	return ink >= 8 && ink <= 10 || ink >= defaultLook.skin && ink < stoneInk || ink == axeHandleInk
 }
 
 // toView turns a world position into the view's frame: across the canvas, and toward the viewer.
@@ -299,29 +302,9 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 
 func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 	x, z := r.world.Hero().Position()
-	stride := 0.0
-	if time.Since(r.world.Hero().LastWalk()) < 200*time.Millisecond {
-		stride = math.Sin(seconds*18) * 0.24
-	}
-	strideX, strideZ := 0.0, stride
-	if facing := r.world.Hero().Facing(); facing == world.FacingLeft || facing == world.FacingRight {
-		strideX, strideZ = stride, 0
-	}
 	r.gait.update(x, z, r.world.Hero().Facing(), min(0.1, max(0, seconds-r.lastSeconds)))
 	r.lastSeconds = seconds
-	if c.scale >= heroDetailScale {
-		drawDetailedHero(c, x, z, r.gait, defaultLook)
-	} else {
-		// A small warm-colored traveler: boots, coat, arms, and a round hat.
-		c.line(x-0.16+strideX, 0.05, z+strideZ, x-0.12, 0.7, z, 1, 8)
-		c.line(x+0.16-strideX, 0.05, z-strideZ, x+0.12, 0.7, z, 1, 8)
-		c.line(x, 0.55, z, x, 1.15, z, 1, 8)
-		c.line(x-0.34, 0.65, z-stride, x+0.34, 1.0, z+stride, 0.95, 8)
-		for i := range 8 {
-			a := float64(i) * math.Pi / 4
-			c.line(x, 1.48, z, x+math.Cos(a)*0.28, 1.48, z+math.Sin(a)*0.28, 1, 8)
-		}
-	}
+	drawDetailedHero(c, x, z, r.gait, defaultLook)
 	if _, sinceStrike, chopping := r.world.LastStrike(); chopping {
 		drawAxe(c, x, z, r.world.Hero().Facing(), sinceStrike.Seconds())
 	}
@@ -452,15 +435,24 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	}
 	banner := levelUpBanner(r.world, cols)
 	lastColor := [3]int{-1, -1, -1}
+	lastPaper := [3]int{-1, -1, -1}
 	for row := range rows {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
 			bits, ink := 0, 0
 			var votes [len(forestPalette)]int
+			var coverage [len(forestPalette)]int
+			var light [len(forestPalette)]float64
+			figure := false
 			for dy := range 4 {
 				for dx := range 2 {
 					x, y := col*2+dx, row*4+dy
 					p := c.pixels[y*c.width+x]
+					if p.light > 0 {
+						coverage[p.ink]++
+						light[p.ink] += p.light
+						figure = figure || figureInk(p.ink)
+					}
 					if p.light > (bayer[y%4][x%4]+0.5)/16 {
 						bits |= 1 << brailleDot[dy][dx]
 						votes[p.ink]++
@@ -481,7 +473,21 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 					ink, best = i, score
 				}
 			}
-			current[col] = forestCell{bits: uint8(bits), ink: uint8(ink)}
+			current[col] = forestCell{bits: uint8(bits), ink: uint8(ink), paper: background}
+			// A faint material color reinforces broad surfaces while the ordered dots carry their shading.
+			for material, count := range coverage {
+				if count >= 6 {
+					strength := 0.18
+					if prominent(material) || material == 2 || material == 3 || material == 4 || material >= 11 && material <= 16 {
+						strength = 0.35
+					}
+					current[col].paper = mix(background, forestPalette[material], strength*light[material]/float64(count))
+					break
+				}
+			}
+			if figure {
+				current[col] = c.figureCell(col, row)
+			}
 			if cover, covered := banner.at(row, col); covered {
 				if cover.glyph != 0 {
 					current[col] = cover
@@ -514,15 +520,20 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			for ; col < end; col++ {
 				cell := current[col]
 				previous[col] = cell
-				if cell.bits == 0 && cell.glyph == 0 {
-					out.WriteByte(' ')
-					continue
-				}
 				color, glyph := forestPalette[cell.ink], rune(0x2800+int(cell.bits))
+				paper := cell.paper
+				if cell.solid {
+					color, glyph = cell.color, quadrants[cell.bits]
+				}
 				if cell.glyph != 0 {
-					color, glyph = mix(background, color, float64(cell.veil)/16), cell.glyph
+					color, paper, glyph = mix(background, color, float64(cell.veil)/16), background, cell.glyph
 				} else if cell.veil != 0 {
 					color = mix(color, background, veilDepth*float64(cell.veil)/16)
+					paper = mix(paper, background, veilDepth*float64(cell.veil)/16)
+				}
+				if paper != lastPaper {
+					fmt.Fprintf(&out, "\x1b[48;2;%d;%d;%dm", paper[0], paper[1], paper[2])
+					lastPaper = paper
 				}
 				if color != lastColor {
 					fmt.Fprintf(&out, "\x1b[38;2;%d;%d;%dm", color[0], color[1], color[2])
@@ -532,6 +543,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			}
 		}
 	}
+	out.WriteString("\x1b[48;2;9;15;14m")
 	if r.inventoryOpen {
 		lines := inventoryPanel(r.world.Hero().Inventory(), r.cursor)
 		panel := strings.Join(lines, "\n")

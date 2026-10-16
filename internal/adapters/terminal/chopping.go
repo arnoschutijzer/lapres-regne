@@ -9,6 +9,8 @@ import (
 // strokePeriod is one unhurried axe stroke, in seconds.
 var strokePeriod = world.StrikeInterval.Seconds()
 
+const axeHandleInk = 38
+
 // axeAngle eases the axe up overhead after it lands, then brings it down quickly onto the trunk.
 func axeAngle(sinceHit float64) float64 {
 	const low, high, raising = 0.2, 1.3, 0.75
@@ -39,7 +41,7 @@ func drawAxe(c *forestCanvas, x, z float64, facing world.Facing, sinceHit float6
 	angle := axeAngle(sinceHit)
 	reachOut, lift := math.Cos(angle)*0.75, math.Sin(angle)*0.75
 	headX, headY, headZ := x+dx*reachOut, 1.0+lift, z+dz*reachOut
-	c.line(x, 1.0, z, headX, headY, headZ, 0.62, 4)
+	c.line(x, 1.0, z, headX, headY, headZ, 0.85, axeHandleInk)
 	c.line(headX, headY-0.18, headZ, headX+dx*0.08, headY+0.18, headZ+dz*0.08, 1, 9)
 }
 
