@@ -10,7 +10,7 @@ Input: a feature description.
 1. Follow the paths and commands in `CLAUDE.md`.
 2. Restate the feature as observable behaviors at the entry point (keys or flags sent to the CLI and the expected terminal output or side effect).
 3. Write a failing acceptance test in `terminal_test.go` that runs the compiled binary in a pseudo-terminal and uses the real outbound adapters. Run it and confirm it fails for the expected reason.
-4. Stop and show me the acceptance test. Wait for approval.
+4. Stop and show me the acceptance test. Wait for approval. Leave the test failing; do not skip it. The stop hook lets the turn end while the only failures are new `TestTerminal` subtests that are not committed yet.
 5. Define or extend the port.
 6. Write failing unit tests for the domain logic.
 7. Implement the domain logic until unit tests pass.
