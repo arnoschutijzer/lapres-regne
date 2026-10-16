@@ -286,3 +286,20 @@ func TestTheRegionNamesTheAreaTheHeroStandsIn(t *testing.T) {
 		t.Fatalf("region = %q outside any area, want the lay of the land", region)
 	}
 }
+
+func TestASavedPlaceTheMapNowBlocksSendsTheHeroToTheStart(t *testing.T) {
+	kept := world.NewOnMap(7, courtyard())
+	kept.WalkTo(11, 3)
+	walkFor(kept, 10*time.Second)
+	progress := &memoryProgress{}
+	kept.Keep(progress, quitAt)
+	rebuilt := courtyard()
+	rebuilt.Ground[1][5] = world.Fence
+	w, err := world.ResumeOn(rebuilt, 7, progress, quitAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if x, z := w.Hero().Position(); x != 5 || z != 3 {
+		t.Fatalf("position = %v, %v; want the start, as a fence now stands where the hero was kept", x, z)
+	}
+}

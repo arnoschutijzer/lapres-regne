@@ -51,8 +51,12 @@ func resume(w *World, progress Progress, now time.Time) (*World, error) {
 	if snapshot.Seed != w.seed || snapshot.Map != w.mapName {
 		return w, nil
 	}
-	w.hero.x, w.hero.z = snapshot.X, snapshot.Z
-	w.cameraX, w.cameraZ = snapshot.X, snapshot.Z
+	// A map changed since the save may have built something where the hero stood; they start
+	// afresh rather than stuck inside it.
+	if w.passable(snapshot.X, snapshot.Z) {
+		w.hero.x, w.hero.z = snapshot.X, snapshot.Z
+		w.cameraX, w.cameraZ = snapshot.X, snapshot.Z
+	}
 	// A clock set back before the save counts as no time away.
 	away := max(0, now.Sub(snapshot.SavedAt))
 	for _, stump := range snapshot.Stumps {
