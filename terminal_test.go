@@ -313,7 +313,8 @@ func TestTerminal(t *testing.T) {
 		s.restored()
 	})
 	t.Run("woodcutting", func(t *testing.T) {
-		s := openTestTerminal(t, binary, "--mute")
+		// Sound effects stay on without music, so every chop plays through the real speaker.
+		s := openTestTerminal(t, binary, "--music-dir", filepath.Join(t.TempDir(), "missing"))
 		s.until("logs 0")
 		s.send("e")
 		terminalCheck(t, !strings.Contains(s.readFor(200*time.Millisecond), "Chop down"), "E must not offer actions without a tree in front")

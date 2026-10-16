@@ -16,7 +16,7 @@ const appTitle = "L’Après-Règne"
 
 func main() {
 	seed := flag.Uint64("seed", 7, "procedural forest seed")
-	mute := flag.Bool("mute", false, "disable the soundtrack")
+	mute := flag.Bool("mute", false, "disable the soundtrack and sound effects")
 	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on a tree within reach (1 chops it down)\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
@@ -33,7 +33,7 @@ func main() {
 	}
 }
 
-func startMusic(directory string) (*speaker.Playback, error) {
+func startMusic(device *speaker.Device, directory string) (*speaker.Playback, error) {
 	songs, err := songfiles.List(directory)
 	if err != nil || len(songs) == 0 {
 		return nil, err
@@ -42,7 +42,7 @@ func startMusic(directory string) (*speaker.Playback, error) {
 	if err != nil {
 		return nil, err
 	}
-	return speaker.Start(stream)
+	return device.Play(stream), nil
 }
 
 // run is the composition root: it builds every adapter and wires it to the domain.
@@ -52,9 +52,16 @@ func run(seed uint64, mute bool, musicDir string) error {
 		return err
 	}
 	defer session.Close()
+	forest := world.New(seed)
 	var music soundtrack.Player
 	if !mute {
-		playback, err := startMusic(musicDir)
+		device, err := speaker.Open()
+		if err != nil {
+			return fmt.Errorf("open audio device (use --mute for silent play): %w", err)
+		}
+		defer device.Close()
+		forest.SetSounds(device.Effects())
+		playback, err := startMusic(device, musicDir)
 		if err != nil {
 			return fmt.Errorf("start soundtrack (use --mute for silent play): %w", err)
 		}
@@ -63,5 +70,5 @@ func run(seed uint64, mute bool, musicDir string) error {
 			music = playback
 		}
 	}
-	return session.Run(world.New(seed), music, appTitle)
+	return session.Run(forest, music, appTitle)
 }

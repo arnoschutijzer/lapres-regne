@@ -122,3 +122,37 @@ func TestAChopHoldsTheFacingUntilTheTreeFalls(t *testing.T) {
 		t.Fatalf("facing = %v, want aiming to work again once the tree falls", facing)
 	}
 }
+
+type recordedSounds struct{ chops int }
+
+func (s *recordedSounds) Chop() { s.chops++ }
+
+func TestTheAxeSoundsAsTheChopStartsAndOnEveryTick(t *testing.T) {
+	w := besideTree()
+	sounds := &recordedSounds{}
+	w.SetSounds(sounds)
+	w.Chop()
+	if sounds.chops != 1 {
+		t.Fatalf("chops = %d, want the axe to land as chopping starts", sounds.chops)
+	}
+	w.Advance(0, 0, 599*time.Millisecond, false)
+	if sounds.chops != 1 {
+		t.Fatalf("chops = %d, want no strike before the tick", sounds.chops)
+	}
+	w.Advance(0, 0, time.Millisecond, false)
+	if sounds.chops != 2 {
+		t.Fatalf("chops = %d, want the felling strike on the tick", sounds.chops)
+	}
+}
+
+func TestTheLastStrikeIsKnownWhileChopping(t *testing.T) {
+	w := besideTree()
+	if _, _, ok := w.LastStrike(); ok {
+		t.Fatal("no strike is known before chopping")
+	}
+	w.Chop()
+	w.Advance(0, 0, 250*time.Millisecond, false)
+	if index, since, ok := w.LastStrike(); !ok || index != 0 || since != 250*time.Millisecond {
+		t.Fatalf("last strike = %d, %v, %v; want the first strike 250ms ago", index, since, ok)
+	}
+}

@@ -13,11 +13,15 @@ type World struct {
 	// felled holds the cells whose tree is a stump.
 	felled map[cell]bool
 	chop   chop
+	sounds Sounds
 }
 
 func New(seed uint64) *World {
-	return &World{seed: seed}
+	return &World{seed: seed, sounds: silence{}}
 }
+
+// SetSounds plays the world's sound effects through sounds.
+func (w *World) SetSounds(sounds Sounds) { w.sounds = sounds }
 
 func (w *World) Seed() uint64           { return w.seed }
 func (w *World) Hero() *Character       { return &w.hero }

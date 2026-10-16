@@ -157,15 +157,17 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		}
 	}
 	chopped, chopping := f.ChoppedTree()
+	strike, sinceStrike, _ := f.LastStrike()
+	sinceHit := sinceStrike.Seconds()
 	for _, tree := range trees {
 		shake := 0.0
 		if chopping && tree == chopped {
-			shake = jolt(seconds)
+			shake = jolt(sinceHit)
 		}
 		r.drawTree(c, tree, shake)
 	}
 	if chopping {
-		drawChips(c, f, chopped, seconds)
+		drawChips(c, f, chopped, strike, sinceHit)
 	}
 	r.drawCharacter(c, seconds)
 	r.drawGrass(c, left, right, back, front, seconds)
@@ -191,8 +193,8 @@ func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 		a := float64(i) * math.Pi / 4
 		c.line(x, 1.48, z, x+math.Cos(a)*0.28, 1.48, z+math.Sin(a)*0.28, 1, 8)
 	}
-	if r.world.Chopping() {
-		drawAxe(c, x, z, r.world.Hero().Facing(), seconds)
+	if _, sinceStrike, chopping := r.world.LastStrike(); chopping {
+		drawAxe(c, x, z, r.world.Hero().Facing(), sinceStrike.Seconds())
 	}
 }
 

@@ -8,7 +8,8 @@ import (
 // reach is how far a trunk may stand from the hero to be chopped: about the edge of its crown.
 const reach = 2.5
 
-// chopTick is one woodcutting attempt; a normal tree falls on the first.
+// chopTick is one woodcutting attempt. The axe lands as chopping starts and again on every
+// tick; a normal tree falls on the first tick.
 const chopTick = 600 * time.Millisecond
 
 // cell identifies a tree by its place on the tree grid.
@@ -64,6 +65,7 @@ func (w *World) Chop() bool {
 	x, z := w.hero.Position()
 	w.hero.Face(FacingToward(tree.X-x, tree.Z-z))
 	w.chop = chop{active: true, tree: at}
+	w.sounds.Chop()
 	return true
 }
 
@@ -75,6 +77,14 @@ func (w *World) AimAt(x, z float64) {
 		return
 	}
 	w.hero.AimAt(x, z)
+}
+
+// LastStrike tells which strike of the chop landed last, counting from zero, and how long ago.
+func (w *World) LastStrike() (index int, since time.Duration, ok bool) {
+	if !w.chop.active {
+		return 0, 0, false
+	}
+	return int(w.chop.elapsed / chopTick), w.chop.elapsed % chopTick, true
 }
 
 // ChoppedTree is the tree being chopped, if any.
@@ -94,6 +104,7 @@ func (w *World) chopFor(dt time.Duration) {
 	if w.chop.elapsed < chopTick {
 		return
 	}
+	w.sounds.Chop()
 	if w.felled == nil {
 		w.felled = make(map[cell]bool)
 	}

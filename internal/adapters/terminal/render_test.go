@@ -95,7 +95,8 @@ func TestChoppingSwingsAnAxe(t *testing.T) {
 		t.Fatal("chopping must draw an axe head")
 	}
 	before := append([]forestPixel(nil), r.canvas.pixels...)
-	r.render(100, 27, 0.2)
+	w.Advance(0, 0, 200*time.Millisecond, false)
+	r.render(100, 27, 0)
 	moved := false
 	for i, p := range r.canvas.pixels {
 		if (p.ink == 9) != (before[i].ink == 9) {
@@ -125,10 +126,11 @@ func TestTheActionMenuAndLogsShowOnScreen(t *testing.T) {
 	}
 }
 
-// leavesMoved reports whether leaf pixels differ between two seconds, ignoring the axe.
-func leavesMoved(r *renderer, first, second float64) bool {
-	before := append([]forestPixel(nil), r.render(100, 27, first).pixels...)
-	after := r.render(100, 27, second).pixels
+// leavesMovedAcross reports whether leaf pixels differ before and after the world advances, ignoring the axe.
+func leavesMovedAcross(r *renderer, w *world.World, elapsed time.Duration) bool {
+	before := append([]forestPixel(nil), r.render(100, 27, 0).pixels...)
+	w.Advance(0, 0, elapsed, false)
+	after := r.render(100, 27, 0).pixels
 	for i, p := range after {
 		if p.ink == 9 || before[i].ink == 9 {
 			continue
@@ -143,14 +145,15 @@ func leavesMoved(r *renderer, first, second float64) bool {
 func TestTheChoppedTreeJoltsWhenTheAxeLandsThenSettles(t *testing.T) {
 	w := besideTree()
 	r := newRenderer(w, "L’Après-Règne")
-	if leavesMoved(r, 0.02, 0.1) {
+	if leavesMovedAcross(r, w, 80*time.Millisecond) {
 		t.Fatal("crowns must stand still while nobody chops")
 	}
 	w.Chop()
-	if !leavesMoved(r, 0.02, 0.45) {
+	w.Advance(0, 0, 20*time.Millisecond, false)
+	if !leavesMovedAcross(r, w, 430*time.Millisecond) {
 		t.Fatal("the chopped tree must jolt as the axe lands")
 	}
-	if leavesMoved(r, 0.45, 0.55) {
+	if leavesMovedAcross(r, w, 100*time.Millisecond) {
 		t.Fatal("the chopped tree must settle between strokes")
 	}
 }
@@ -159,10 +162,12 @@ func TestWoodChipsFlyOnlyRightAfterAStrike(t *testing.T) {
 	w := besideTree()
 	r := newRenderer(w, "L’Après-Règne")
 	w.Chop()
-	if countInk(r.render(100, 27, 0.08), 10) == 0 {
+	w.Advance(0, 0, 80*time.Millisecond, false)
+	if countInk(r.render(100, 27, 0), 10) == 0 {
 		t.Fatal("wood chips must fly right after the axe lands")
 	}
-	if chips := countInk(r.render(100, 27, 0.5), 10); chips != 0 {
+	w.Advance(0, 0, 420*time.Millisecond, false)
+	if chips := countInk(r.render(100, 27, 0), 10); chips != 0 {
 		t.Fatalf("chips = %d, want none once the stroke is raised again", chips)
 	}
 }
