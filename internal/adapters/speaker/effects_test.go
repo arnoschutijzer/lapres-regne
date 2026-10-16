@@ -96,3 +96,33 @@ func TestTheUnlockingJingleAddsALeadMelody(t *testing.T) {
 		}
 	}
 }
+
+func TestAFallingTreeCreaksThenLandsWithALowThud(t *testing.T) {
+	samples := fallSound()
+	if seconds := float64(len(samples)/soundtrack.Channels) / soundtrack.SampleRate; seconds < 0.8 || seconds > 2 {
+		t.Fatalf("fall lasts %.2f s, want a brief creak and thud", seconds)
+	}
+	// The trunk creaks in the wood's midrange before it lands.
+	if creak, rumble := amplitudeAt(samples, 700, 0.15, 0.1), amplitudeAt(samples, 90, 0.15, 0.1); creak < 3*rumble {
+		t.Fatalf("700 Hz = %.4f, 90 Hz = %.4f at 0.15 s; want a creak before the landing", creak, rumble)
+	}
+	// It lands with a thud far below the creak.
+	if thud, creak := amplitudeAt(samples, 90, fallLanding, 0.08), amplitudeAt(samples, 700, fallLanding, 0.08); thud < 3*creak {
+		t.Fatalf("90 Hz = %.4f, 700 Hz = %.4f at the landing; want a low thud", thud, creak)
+	}
+	peak := 0.0
+	for i := 0; i < len(samples); i += soundtrack.Channels {
+		if samples[i] != samples[i+1] {
+			t.Fatalf("frame %d differs between channels; want a centred fall", i/2)
+		}
+		peak = math.Max(peak, math.Abs(float64(samples[i])))
+	}
+	if peak < 0.05 || peak > 0.5 {
+		t.Fatalf("peak = %.2f, want an audible but quiet fall", peak)
+	}
+	for _, sample := range samples[len(samples)-soundtrack.SampleRate/20*soundtrack.Channels:] {
+		if math.Abs(float64(sample)) > 0.005 {
+			t.Fatalf("tail sample = %.4f, want the fall to fade to silence", sample)
+		}
+	}
+}

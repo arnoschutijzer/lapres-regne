@@ -144,6 +144,30 @@ func TestOaksWillowsAndYewsRegrowAfterTheirRespawnTime(t *testing.T) {
 	}
 }
 
+// countedFalls counts the trees heard falling.
+type countedFalls struct {
+	silence
+	falls int
+}
+
+func (c *countedFalls) Fall() { c.falls++ }
+
+func TestAnOakFallsOnlyOnceAfterGivingSeveralLogs(t *testing.T) {
+	w := New(7)
+	sounds := &countedFalls{}
+	w.SetSounds(sounds)
+	tree := nearestOf(w, Oak)
+	standBeside(w, tree, levelXP[99])
+	w.Chop()
+	chopFor(w, time.Hour)
+	if logs := w.hero.inventory.Len(); logs < 2 {
+		t.Fatalf("logs = %d, want an oak giving several logs before it falls", logs)
+	}
+	if sounds.falls != 1 {
+		t.Fatalf("falls = %d, want the oak heard falling once", sounds.falls)
+	}
+}
+
 const inventoryFull = "Your inventory is too full to carry any more logs."
 
 // fillInventory packs the hero's inventory with normal logs until a number of slots is used.

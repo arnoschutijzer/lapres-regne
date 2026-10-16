@@ -253,4 +253,5 @@ func (w *World) cutLog() {
 	w.felled[w.chop.tree] = kind.respawn + time.Duration(w.roll(0x9e60)*float64(kind.respawnSpread))
 	delete(w.depletion, w.chop.tree)
 	w.chop = chop{}
+	w.sounds.Fall()
 }

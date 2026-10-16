@@ -126,11 +126,13 @@ func TestAChopHoldsTheFacingUntilTheTreeFalls(t *testing.T) {
 
 type recordedSounds struct {
 	chops int
+	falls int
 	// levelUps records each level-up jingle, true when the new level unlocked something.
 	levelUps []bool
 }
 
 func (s *recordedSounds) Chop()                 { s.chops++ }
+func (s *recordedSounds) Fall()                 { s.falls++ }
 func (s *recordedSounds) LevelUp(unlocked bool) { s.levelUps = append(s.levelUps, unlocked) }
 
 func TestTheAxeLandsAsTheChopStartsAndEveryStrikeAfter(t *testing.T) {
@@ -148,6 +150,22 @@ func TestTheAxeLandsAsTheChopStartsAndEveryStrikeAfter(t *testing.T) {
 	w.Advance(0, 0, time.Millisecond, false)
 	if sounds.chops != 2 {
 		t.Fatalf("chops = %d, want the next strike after one interval", sounds.chops)
+	}
+}
+
+func TestAFellingTreeSoundsItsFallOnce(t *testing.T) {
+	w := besideTree()
+	sounds := &recordedSounds{}
+	w.SetSounds(sounds)
+	w.Chop()
+	w.Advance(0, 0, world.StrikeInterval, false)
+	if sounds.falls != 0 {
+		t.Fatalf("falls = %d, want silence while the tree stands", sounds.falls)
+	}
+	chopUntilFelled(t, w)
+	w.Advance(0, 0, time.Second, false)
+	if sounds.falls != 1 {
+		t.Fatalf("falls = %d, want one fall as the tree comes down", sounds.falls)
 	}
 }
 
