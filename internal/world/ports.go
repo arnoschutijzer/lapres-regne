@@ -8,8 +8,8 @@ type Sounds interface {
 	Chop()
 	// Fall sounds a chopped tree coming down.
 	Fall()
-	// Drop sounds an item landing on the ground.
-	Drop()
+	// Drop sounds a dropped item landing on the ground.
+	Drop(Landing)
 	// LevelUp plays the jingle for a new level; unlocked picks the variant for a level that lets
 	// the hero chop a new kind of tree.
 	LevelUp(unlocked bool)
@@ -20,7 +20,7 @@ type silence struct{}
 
 func (silence) Chop()        {}
 func (silence) Fall()        {}
-func (silence) Drop()        {}
+func (silence) Drop(Landing) {}
 func (silence) LevelUp(bool) {}
 
 // Progress keeps the hero's progress between sessions.

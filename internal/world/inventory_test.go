@@ -1,6 +1,7 @@
 package world_test
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -65,11 +66,19 @@ func TestADroppedLogSoundsAsItLands(t *testing.T) {
 	w.Chop()
 	chopUntilFelled(t, w)
 	w.Drop(1)
-	if sounds.drops != 0 {
-		t.Fatalf("drops = %d, want silence when an empty slot drops nothing", sounds.drops)
+	if len(sounds.drops) != 0 {
+		t.Fatalf("drops = %v, want silence when an empty slot drops nothing", sounds.drops)
 	}
 	w.Drop(0)
-	if sounds.drops != 1 {
-		t.Fatalf("drops = %d, want one log heard landing", sounds.drops)
+	if !reflect.DeepEqual(sounds.drops, []world.Landing{world.WoodenThud}) {
+		t.Fatalf("drops = %v, want one log heard landing with a wooden thud", sounds.drops)
+	}
+}
+
+func TestEveryLogLandsWithAWoodenThud(t *testing.T) {
+	for _, item := range []world.Item{world.Logs, world.OakLogs, world.WillowLogs, world.YewLogs} {
+		if item.Landing() != world.WoodenThud {
+			t.Errorf("%v lands with %v, want a wooden thud", item, item.Landing())
+		}
 	}
 }

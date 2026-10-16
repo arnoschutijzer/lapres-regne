@@ -8,6 +8,7 @@ import (
 	"github.com/ebitengine/oto/v3"
 
 	"lapresregne/internal/soundtrack"
+	"lapresregne/internal/world"
 )
 
 // Effects plays short synthesized sound effects on the device.
@@ -15,7 +16,8 @@ type Effects struct {
 	context *oto.Context
 	chop    []byte
 	fall    []byte
-	drop    []byte
+	// landings holds the sound each kind of landing makes.
+	landings map[world.Landing][]byte
 	// levelUp holds the level-up jingle, and unlockingLevelUp the one for a level that unlocks a tree.
 	levelUp, unlockingLevelUp []byte
 	// playing keeps players referenced until their sound has finished.
@@ -27,7 +29,7 @@ func newEffects(context *oto.Context) *Effects {
 		context:          context,
 		chop:             encode(chopSound()),
 		fall:             encode(fallSound()),
-		drop:             encode(dropSound()),
+		landings:         map[world.Landing][]byte{world.WoodenThud: encode(landingSound(world.WoodenThud))},
 		levelUp:          encode(levelUpSound(false)),
 		unlockingLevelUp: encode(levelUpSound(true)),
 	}
@@ -43,9 +45,18 @@ func (e *Effects) Fall() {
 	e.play(e.fall)
 }
 
-// Drop plays a log landing on the ground with a dull clunk.
-func (e *Effects) Drop() {
-	e.play(e.drop)
+// Drop plays a dropped item landing on the ground.
+func (e *Effects) Drop(landing world.Landing) {
+	e.play(e.landings[landing])
+}
+
+// landingSound synthesizes the sound of a kind of landing.
+func landingSound(landing world.Landing) []float32 {
+	switch landing {
+	case world.WoodenThud:
+		return dropSound()
+	}
+	return nil
 }
 
 // LevelUp plays the level-up jingle, with its melody when the level unlocks a tree.

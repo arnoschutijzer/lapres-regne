@@ -83,7 +83,7 @@ func (w *World) Drop(slot int) bool {
 		return false
 	}
 	w.ground = append(w.ground, GroundItem{X: w.hero.x, Z: w.hero.z, Item: item, left: groundTime})
-	w.sounds.Drop()
+	w.sounds.Drop(item.Landing())
 	return true
 }
 

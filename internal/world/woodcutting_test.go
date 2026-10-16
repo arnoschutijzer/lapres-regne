@@ -127,15 +127,16 @@ func TestAChopHoldsTheFacingUntilTheTreeFalls(t *testing.T) {
 type recordedSounds struct {
 	chops int
 	falls int
-	drops int
+	// drops records the landing sound of each dropped item.
+	drops []world.Landing
 	// levelUps records each level-up jingle, true when the new level unlocked something.
 	levelUps []bool
 }
 
-func (s *recordedSounds) Chop()                 { s.chops++ }
-func (s *recordedSounds) Fall()                 { s.falls++ }
-func (s *recordedSounds) Drop()                 { s.drops++ }
-func (s *recordedSounds) LevelUp(unlocked bool) { s.levelUps = append(s.levelUps, unlocked) }
+func (s *recordedSounds) Chop()                      { s.chops++ }
+func (s *recordedSounds) Fall()                      { s.falls++ }
+func (s *recordedSounds) Drop(landing world.Landing) { s.drops = append(s.drops, landing) }
+func (s *recordedSounds) LevelUp(unlocked bool)      { s.levelUps = append(s.levelUps, unlocked) }
 
 func TestTheAxeLandsAsTheChopStartsAndEveryStrikeAfter(t *testing.T) {
 	w := besideTree()

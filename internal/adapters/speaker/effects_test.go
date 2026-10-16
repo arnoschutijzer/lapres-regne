@@ -2,9 +2,11 @@ package speaker
 
 import (
 	"math"
+	"reflect"
 	"testing"
 
 	"lapresregne/internal/soundtrack"
+	"lapresregne/internal/world"
 )
 
 // amplitude measures how strongly a frequency sounds in the first milliseconds of a mono signal.
@@ -124,6 +126,12 @@ func TestAFallingTreeCreaksThenLandsWithALowThud(t *testing.T) {
 		if math.Abs(float64(sample)) > 0.005 {
 			t.Fatalf("tail sample = %.4f, want the fall to fade to silence", sample)
 		}
+	}
+}
+
+func TestAWoodenThudPlaysTheClunk(t *testing.T) {
+	if !reflect.DeepEqual(landingSound(world.WoodenThud), dropSound()) {
+		t.Fatal("a wooden thud must play the dull clunk of a log landing")
 	}
 }
 
