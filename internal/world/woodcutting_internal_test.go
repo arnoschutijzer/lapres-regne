@@ -173,7 +173,7 @@ const inventoryFull = "Your inventory is too full to carry any more logs."
 // fillInventory packs the hero's inventory with normal logs until a number of slots is used.
 func fillInventory(w *World, used int) {
 	for w.hero.inventory.Len() < used {
-		w.hero.inventory.add(NormalTree)
+		w.hero.inventory.add(Logs)
 	}
 }
 

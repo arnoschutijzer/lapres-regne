@@ -18,13 +18,14 @@ type File struct {
 }
 
 // version marks the file layout so later layouts can still read older saves. Version 1
-// counted logs; version 2 lists the inventory slot by slot, naming each log's tree and
-// leaving "" for an empty slot.
+// counted logs; version 2 lists the inventory slot by slot, naming each item and leaving ""
+// for an empty slot.
 const version = 2
 
-// logNames spell each kind of log in the file, independent of how the domain names them.
-var logNames = map[world.TreeKind]string{
-	world.NormalTree: "normal", world.Oak: "oak", world.Willow: "willow", world.Yew: "yew",
+// itemNames spell each item in the file, independent of how the domain names them. Logs keep
+// the names of their trees from before items were generic.
+var itemNames = map[world.Item]string{
+	world.Logs: "normal", world.OakLogs: "oak", world.WillowLogs: "willow", world.YewLogs: "yew",
 }
 
 type progressJSON struct {
@@ -75,18 +76,18 @@ func (f File) Load() (world.Snapshot, bool, error) {
 	}
 	// Version 1 counted logs before they had kinds; they were all normal logs.
 	for range saved.Logs {
-		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Kind: world.NormalTree, Filled: true})
+		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Item: world.Logs, Filled: true})
 	}
 	for _, name := range saved.Inventory {
 		if name == "" {
 			snapshot.Inventory = append(snapshot.Inventory, world.Slot{})
 			continue
 		}
-		kind, known := kindNamed(name)
+		item, known := itemNamed(name)
 		if !known {
-			return world.Snapshot{}, false, fmt.Errorf("read %s: unknown log %q", f.Path, name)
+			return world.Snapshot{}, false, fmt.Errorf("read %s: unknown item %q", f.Path, name)
 		}
-		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Kind: kind, Filled: true})
+		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Item: item, Filled: true})
 	}
 	for _, stump := range saved.Stumps {
 		snapshot.Stumps = append(snapshot.Stumps, world.Stump{GX: stump.GX, GZ: stump.GZ, Regrow: time.Duration(stump.RegrowMillis) * time.Millisecond})
@@ -104,7 +105,7 @@ func (f File) Save(snapshot world.Snapshot) error {
 		Inventory:   []string{},
 		Stumps:      []stumpJSON{},
 	}
-	// Empty slots are saved as "" so logs keep their places; trailing empty slots are left off.
+	// Empty slots are saved as "" so items keep their places; trailing empty slots are left off.
 	last := -1
 	for index, slot := range snapshot.Inventory {
 		if slot.Filled {
@@ -114,7 +115,7 @@ func (f File) Save(snapshot world.Snapshot) error {
 	for _, slot := range snapshot.Inventory[:last+1] {
 		name := ""
 		if slot.Filled {
-			name = logNames[slot.Kind]
+			name = itemNames[slot.Item]
 		}
 		saved.Inventory = append(saved.Inventory, name)
 	}
@@ -148,10 +149,10 @@ func (f File) Save(snapshot world.Snapshot) error {
 	return os.Rename(temporary.Name(), f.Path)
 }
 
-func kindNamed(name string) (world.TreeKind, bool) {
-	for kind, spelled := range logNames {
+func itemNamed(name string) (world.Item, bool) {
+	for item, spelled := range itemNames {
 		if spelled == name {
-			return kind, true
+			return item, true
 		}
 	}
 	return 0, false

@@ -17,12 +17,13 @@ const (
 	emptyGlyph   = "··"
 )
 
-// logTint colors each kind of log; empty slots stay faint.
-var logTint = map[world.TreeKind]string{
-	world.NormalTree: "\x1b[38;2;196;170;120m",
-	world.Oak:        "\x1b[38;2;178;128;74m",
-	world.Willow:     "\x1b[38;2;150;158;112m",
-	world.Yew:        "\x1b[38;2;132;84;60m",
+// itemIcons draws each item in a slot: logs share a glyph, tinted by their tree; empty slots
+// stay faint.
+var itemIcons = map[world.Item]string{
+	world.Logs:       "\x1b[38;2;196;170;120m" + logGlyph,
+	world.OakLogs:    "\x1b[38;2;178;128;74m" + logGlyph,
+	world.WillowLogs: "\x1b[38;2;150;158;112m" + logGlyph,
+	world.YewLogs:    "\x1b[38;2;132;84;60m" + logGlyph,
 }
 
 const (
@@ -52,7 +53,7 @@ func inventoryPanel(inventory world.Inventory, cursor slotCursor) []string {
 			index := row*panelColumns + column
 			glyph := emptySlot
 			if slots[index].Filled {
-				glyph = logTint[slots[index].Kind] + logGlyph
+				glyph = itemIcons[slots[index].Item]
 			}
 			if cursor.active && cursor.slot == index {
 				line += "[" + glyph + panelText + "]"
@@ -84,8 +85,8 @@ func (s *slotCursor) move(step int) {
 	s.slot = (s.slot + step + world.InventorySize) % world.InventorySize
 }
 
-// drop drops the highlighted log, or the first log when no log is highlighted, then
-// highlights the next log so repeated presses empty the inventory in order.
+// drop drops the highlighted item, or the first item when no item is highlighted, then
+// highlights the next item so repeated presses empty the inventory in order.
 func (s *slotCursor) drop(w *world.World) {
 	slots := w.Hero().Inventory().Slots()
 	slot := s.slot

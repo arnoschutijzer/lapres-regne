@@ -234,7 +234,7 @@ func (w *World) roll(salt uint64) float64 {
 // trees fall with the first log after their depletion timer runs out.
 func (w *World) cutLog() {
 	kind := species[w.chop.kind]
-	w.hero.inventory.add(w.chop.kind)
+	w.hero.inventory.add(kind.logs)
 	level := w.hero.woodcutting.Level()
 	w.hero.woodcutting.gain(kind.xp)
 	if reached := w.hero.woodcutting.Level(); reached > level {

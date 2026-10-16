@@ -19,15 +19,15 @@ func TestACutLogTakesASlotOfItsOwnKind(t *testing.T) {
 	w.Chop()
 	chopUntilFelled(t, w)
 	slots := w.Hero().Inventory().Slots()
-	if len(slots) != world.InventorySize || slots[0] != (world.Slot{Kind: world.NormalTree, Filled: true}) || slots[1].Filled {
+	if len(slots) != world.InventorySize || slots[0] != (world.Slot{Item: world.Logs, Filled: true}) || slots[1].Filled {
 		t.Fatalf("slots = %v, want one normal log in the first of 28 slots", slots)
 	}
 }
 
-func TestLogsAreNamedAfterTheirTree(t *testing.T) {
+func TestEachTreeGivesLogsNamedAfterIt(t *testing.T) {
 	names := map[world.TreeKind]string{world.NormalTree: "logs", world.Oak: "oak logs", world.Willow: "willow logs", world.Yew: "yew logs"}
 	for kind, name := range names {
-		if got := kind.Logs(); got != name {
+		if got := kind.Logs().String(); got != name {
 			t.Errorf("%v logs = %q, want %q", kind, got, name)
 		}
 	}
@@ -44,16 +44,16 @@ func TestADroppedLogLiesUnderTheHeroForThreeMinutes(t *testing.T) {
 		t.Fatal("dropping the first slot must empty it")
 	}
 	x, z := w.Hero().Position()
-	ground := w.GroundLogs()
-	if len(ground) != 1 || ground[0].Kind != world.NormalTree || ground[0].X != x || ground[0].Z != z {
+	ground := w.GroundItems()
+	if len(ground) != 1 || ground[0].Item != world.Logs || ground[0].X != x || ground[0].Z != z {
 		t.Fatalf("ground = %+v, want one normal log under the hero at %v, %v", ground, x, z)
 	}
 	w.Advance(0, 0, 3*time.Minute-time.Millisecond, false)
-	if len(w.GroundLogs()) != 1 {
+	if len(w.GroundItems()) != 1 {
 		t.Fatal("a dropped log must lie on the ground for three minutes")
 	}
 	w.Advance(0, 0, time.Millisecond, false)
-	if len(w.GroundLogs()) != 0 {
+	if len(w.GroundItems()) != 0 {
 		t.Fatal("a dropped log must disappear after three minutes")
 	}
 }

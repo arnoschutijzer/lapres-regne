@@ -19,13 +19,14 @@ func (k TreeKind) String() string {
 	return [...]string{"tree", "oak", "willow", "yew"}[k]
 }
 
-// Logs names the logs this kind of tree gives.
-func (k TreeKind) Logs() string {
-	return [...]string{"logs", "oak logs", "willow logs", "yew logs"}[k]
+// Logs is the item this kind of tree gives when chopped.
+func (k TreeKind) Logs() Item {
+	return species[k].logs
 }
 
 // treeSpecies holds Old School RuneScape's woodcutting values for one kind of tree.
 type treeSpecies struct {
+	logs  Item
 	level int
 	xp    float64
 	// low and high are the bronze-axe success rolls out of 256 at levels 1 and 99.
@@ -39,10 +40,10 @@ type treeSpecies struct {
 }
 
 var species = [...]treeSpecies{
-	NormalTree: {level: 1, xp: 25, low: 64, high: 200, fallsWithFirstLog: true, respawn: 36 * time.Second, respawnSpread: 24 * time.Second},
-	Oak:        {level: 15, xp: 37.5, low: 32, high: 100, lifetime: 45 * gameTick, respawn: 14 * gameTick},
-	Willow:     {level: 30, xp: 67.5, low: 16, high: 50, lifetime: 50 * gameTick, respawn: 14 * gameTick},
-	Yew:        {level: 60, xp: 175, low: 4, high: 12, lifetime: 190 * gameTick, respawn: 99 * gameTick},
+	NormalTree: {logs: Logs, level: 1, xp: 25, low: 64, high: 200, fallsWithFirstLog: true, respawn: 36 * time.Second, respawnSpread: 24 * time.Second},
+	Oak:        {logs: OakLogs, level: 15, xp: 37.5, low: 32, high: 100, lifetime: 45 * gameTick, respawn: 14 * gameTick},
+	Willow:     {logs: WillowLogs, level: 30, xp: 67.5, low: 16, high: 50, lifetime: 50 * gameTick, respawn: 14 * gameTick},
+	Yew:        {logs: YewLogs, level: 60, xp: 175, low: 4, high: 12, lifetime: 190 * gameTick, respawn: 99 * gameTick},
 }
 
 // chance is the chance one tick cuts a log at a level, rolled as Old School RuneScape does.

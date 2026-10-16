@@ -64,7 +64,7 @@ func TestXWithoutAHighlightedLogDropsTheFirstOne(t *testing.T) {
 func TestTheHighlightedSlotIsBracketed(t *testing.T) {
 	w := withLogs(t, 1)
 	lines := inventoryPanel(w.Hero().Inventory(), slotCursor{active: true, slot: 0})
-	if !strings.Contains(lines[3], "["+logTint[world.NormalTree]+logGlyph+panelText+"]") {
+	if !strings.Contains(lines[3], "["+itemIcons[world.Logs]+panelText+"]") {
 		t.Fatalf("first slot row = %q, want the first slot bracketed", lines[3])
 	}
 	// Color escapes contain "[", so count the closing brackets.

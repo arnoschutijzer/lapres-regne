@@ -199,8 +199,8 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	if chopping {
 		drawChips(c, f, chopped, strike, sinceHit)
 	}
-	for _, log := range f.GroundLogs() {
-		drawGroundLog(c, log)
+	for _, item := range f.GroundItems() {
+		drawGroundItem(c, item)
 	}
 	r.drawCharacter(c, seconds)
 	r.drawGrass(c, left, right, back, front, seconds)

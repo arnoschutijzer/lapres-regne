@@ -2,20 +2,20 @@ package world
 
 import "testing"
 
-func TestSlotsStayPutAndNewLogsFillTheFirstGap(t *testing.T) {
+func TestSlotsStayPutAndNewItemsFillTheFirstGap(t *testing.T) {
 	var inventory Inventory
-	for _, kind := range []TreeKind{Oak, Willow, Yew} {
-		inventory.add(kind)
+	for _, item := range []Item{OakLogs, WillowLogs, YewLogs} {
+		inventory.add(item)
 	}
-	if kind, ok := inventory.drop(1); !ok || kind != Willow {
-		t.Fatalf("dropped %v, %v; want the willow log", kind, ok)
+	if item, ok := inventory.drop(1); !ok || item != WillowLogs {
+		t.Fatalf("dropped %v, %v; want the willow logs", item, ok)
 	}
 	slots := inventory.Slots()
-	if slots[0].Kind != Oak || slots[1].Filled || slots[2].Kind != Yew || inventory.Len() != 2 {
+	if slots[0].Item != OakLogs || slots[1].Filled || slots[2].Item != YewLogs || inventory.Len() != 2 {
 		t.Fatalf("slots = %v, want the oak and yew logs to stay in their slots around a gap", slots[:3])
 	}
-	inventory.add(NormalTree)
-	if slots := inventory.Slots(); slots[1] != (Slot{Kind: NormalTree, Filled: true}) {
+	inventory.add(Logs)
+	if slots := inventory.Slots(); slots[1] != (Slot{Item: Logs, Filled: true}) {
 		t.Fatalf("slot 1 = %v, want the new log in the first gap", slots[1])
 	}
 	if first, ok := inventory.FirstFilled(); !ok || first != 0 {

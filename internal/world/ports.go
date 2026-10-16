@@ -8,7 +8,7 @@ type Sounds interface {
 	Chop()
 	// Fall sounds a chopped tree coming down.
 	Fall()
-	// Drop sounds a log landing on the ground.
+	// Drop sounds an item landing on the ground.
 	Drop()
 	// LevelUp plays the jingle for a new level; unlocked picks the variant for a level that lets
 	// the hero chop a new kind of tree.

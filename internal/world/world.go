@@ -16,8 +16,8 @@ type World struct {
 	depletion map[cell]time.Duration
 	approach  approach
 	chop      chop
-	// ground holds the dropped logs until they disappear.
-	ground      []GroundLog
+	// ground holds the dropped items until they disappear.
+	ground      []GroundItem
 	message     string
 	celebration celebration
 	sounds      Sounds

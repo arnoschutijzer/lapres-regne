@@ -136,12 +136,12 @@ func TestKeepingReportsProgressThatCannotBeSaved(t *testing.T) {
 	}
 }
 
-func TestKeepingAndResumingCarryTheInventoryKindByKind(t *testing.T) {
+func TestKeepingAndResumingCarryTheInventoryItemByItem(t *testing.T) {
 	// Slots stay where they were, gaps included.
 	carried := make([]world.Slot, world.InventorySize)
-	carried[0] = world.Slot{Kind: world.Oak, Filled: true}
-	carried[2] = world.Slot{Kind: world.Willow, Filled: true}
-	carried[27] = world.Slot{Kind: world.Yew, Filled: true}
+	carried[0] = world.Slot{Item: world.OakLogs, Filled: true}
+	carried[2] = world.Slot{Item: world.WillowLogs, Filled: true}
+	carried[27] = world.Slot{Item: world.YewLogs, Filled: true}
 	progress := &memoryProgress{snapshot: world.Snapshot{Seed: 7, Inventory: carried, SavedAt: quitAt}, saved: true}
 	w, err := world.Resume(7, progress, quitAt)
 	if err != nil {
@@ -159,7 +159,7 @@ func TestKeepingAndResumingCarryTheInventoryKindByKind(t *testing.T) {
 func TestResumingNeverOverfillsTheInventory(t *testing.T) {
 	overfull := make([]world.Slot, world.InventorySize+5)
 	for i := range overfull {
-		overfull[i] = world.Slot{Kind: world.NormalTree, Filled: true}
+		overfull[i] = world.Slot{Item: world.Logs, Filled: true}
 	}
 	progress := &memoryProgress{snapshot: world.Snapshot{Seed: 7, Inventory: overfull}, saved: true}
 	w, _ := world.Resume(7, progress, quitAt)
