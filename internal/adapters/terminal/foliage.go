@@ -412,7 +412,7 @@ func (r *renderer) drawGrass(c *forestCanvas, left, right, back, front, seconds 
 			if sx < -3 || sx > float64(c.width)+3 || sy < 0 || sy > float64(c.height)+12 {
 				continue
 			}
-			distance, width := f.River(x, z)
+			distance, width := world.NearestRiver(r.rivers.at(z), x)
 			if distance < width {
 				continue
 			}
