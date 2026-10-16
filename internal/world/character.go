@@ -14,6 +14,10 @@ const (
 	FacingRight
 )
 
+func (f Facing) String() string {
+	return [...]string{"down", "up", "left", "right"}[f]
+}
+
 // stride is the distance covered by one counted step.
 const stride = 0.55
 

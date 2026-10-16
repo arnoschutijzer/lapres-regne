@@ -279,7 +279,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 	}
 	x, z := r.world.Hero().Position()
-	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  %s  |  seed %d", x, z, r.world.Hero().Steps(), r.world.Region(), r.world.Seed())
+	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  facing %s  |  %s  |  seed %d", x, z, r.world.Hero().Steps(), r.world.Hero().Facing(), r.world.Region(), r.world.Seed())
 	if full || status != r.lastStatus {
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height, status[:min(width-1, len(status))])
 		r.lastStatus = status

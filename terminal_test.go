@@ -203,11 +203,11 @@ func TestTerminal(t *testing.T) {
 		s.send("np\x1b[110;1u\x1b[112;1:3u")
 		s.readFor(50 * time.Millisecond)
 		s.send("d")
-		s.until("x 0.6  z 0.0  |  steps 1")
+		s.until("x 0.6  z 0.0  |  steps 1  |  facing right")
 		s.send("\x1b[A")
-		s.until("x 0.6  z -0.6  |  steps 2")
+		s.until("x 0.6  z -0.6  |  steps 2  |  facing up")
 		s.send("js")
-		s.until("x 0.0  z 0.0  |  steps 4")
+		s.until("x 0.0  z 0.0  |  steps 4  |  facing down")
 		var regions strings.Builder
 		for step := 5; step < 65; step++ {
 			s.send("d")
@@ -304,11 +304,11 @@ func TestTerminal(t *testing.T) {
 		s := openTestTerminal(t, binary, "--mute")
 		initial := s.until("steps 0")
 		terminalCheck(t, strings.Contains(initial, "\x1b[?1003h\x1b[?1006h"), "request mouse motion reporting")
-		// Motion to the far left and top, then a click and its release.
-		s.send("\x1b[<35;1;1M\x1b[<35;60;20M\x1b[<0;60;20M\x1b[<0;60;20m")
+		// Motion to the top, then left of the hero, then a click and its release elsewhere.
+		s.send("\x1b[<35;1;1M\x1b[<35;10;17M\x1b[<0;60;20M\x1b[<0;60;20m")
 		s.readFor(100 * time.Millisecond)
 		s.send("d")
-		s.until("x 0.6  z 0.0  |  steps 1")
+		s.until("x 0.6  z 0.0  |  steps 1  |  facing left")
 		s.send("q")
 		s.restored()
 	})
