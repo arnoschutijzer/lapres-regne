@@ -61,10 +61,16 @@ func TestXWithoutAHighlightedLogDropsTheFirstOne(t *testing.T) {
 	}
 }
 
+func TestAnItemIconIsItsShapeInItsColor(t *testing.T) {
+	if got, want := icon(world.OakLogs), "\x1b[38;2;178;128;74m"+logGlyph; got != want {
+		t.Fatalf("oak logs icon = %q, want %q", got, want)
+	}
+}
+
 func TestTheHighlightedSlotIsBracketed(t *testing.T) {
 	w := withLogs(t, 1)
 	lines := inventoryPanel(w.Hero().Inventory(), slotCursor{active: true, slot: 0})
-	if !strings.Contains(lines[3], "["+itemIcons[world.Logs]+panelText+"]") {
+	if !strings.Contains(lines[3], "["+icon(world.Logs)+panelText+"]") {
 		t.Fatalf("first slot row = %q, want the first slot bracketed", lines[3])
 	}
 	// Color escapes contain "[", so count the closing brackets.

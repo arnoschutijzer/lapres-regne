@@ -75,6 +75,19 @@ func TestADroppedLogSoundsAsItLands(t *testing.T) {
 	}
 }
 
+func TestLogsLookLikeLogsTintedByTheirTree(t *testing.T) {
+	tints := map[world.Color]world.Item{}
+	for _, item := range []world.Item{world.Logs, world.OakLogs, world.WillowLogs, world.YewLogs} {
+		if item.Shape() != world.LogShape {
+			t.Errorf("%v has shape %v, want a log", item, item.Shape())
+		}
+		if other, taken := tints[item.Color()]; taken {
+			t.Errorf("%v share their tint with %v, want each tree's logs tinted their own way", item, other)
+		}
+		tints[item.Color()] = item
+	}
+}
+
 func TestEveryLogLandsWithAWoodenThud(t *testing.T) {
 	for _, item := range []world.Item{world.Logs, world.OakLogs, world.WillowLogs, world.YewLogs} {
 		if item.Landing() != world.WoodenThud {

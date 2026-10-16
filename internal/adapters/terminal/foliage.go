@@ -131,12 +131,19 @@ func drawStump(c *forestCanvas, tree world.Tree) {
 	c.line(x-trunk, stumpHeight, z, x+trunk, stumpHeight, z, 0.9, 7)
 }
 
-// drawGroundItem lays a dropped item on the ground. Every item is a log so far, drawn with its
-// pale cut end facing the viewer's right.
-func drawGroundItem(c *forestCanvas, log world.GroundItem) {
-	c.line(log.X-0.35, 0.1, log.Z, log.X+0.25, 0.1, log.Z, 0.62, 4)
-	c.line(log.X-0.35, 0.2, log.Z, log.X+0.25, 0.2, log.Z, 0.5, 4)
-	c.line(log.X+0.3, 0.08, log.Z, log.X+0.3, 0.22, log.Z, 0.9, 7)
+// drawGroundItem lays a dropped item on the ground in its shape.
+func drawGroundItem(c *forestCanvas, item world.GroundItem) {
+	switch item.Item.Shape() {
+	case world.LogShape:
+		drawGroundLog(c, item.X, item.Z)
+	}
+}
+
+// drawGroundLog lays a log on the ground, its pale cut end facing the viewer's right.
+func drawGroundLog(c *forestCanvas, x, z float64) {
+	c.line(x-0.35, 0.1, z, x+0.25, 0.1, z, 0.62, 4)
+	c.line(x-0.35, 0.2, z, x+0.25, 0.2, z, 0.5, 4)
+	c.line(x+0.3, 0.08, z, x+0.3, 0.22, z, 0.9, 7)
 }
 
 func (r *renderer) drawGrass(c *forestCanvas, left, right, back, front, seconds float64) {

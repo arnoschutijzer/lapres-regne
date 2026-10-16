@@ -17,13 +17,15 @@ const (
 	emptyGlyph   = "··"
 )
 
-// itemIcons draws each item in a slot: logs share a glyph, tinted by their tree; empty slots
-// stay faint.
-var itemIcons = map[world.Item]string{
-	world.Logs:       "\x1b[38;2;196;170;120m" + logGlyph,
-	world.OakLogs:    "\x1b[38;2;178;128;74m" + logGlyph,
-	world.WillowLogs: "\x1b[38;2;150;158;112m" + logGlyph,
-	world.YewLogs:    "\x1b[38;2;132;84;60m" + logGlyph,
+// shapeGlyphs draws each item shape in a slot; empty slots stay faint.
+var shapeGlyphs = map[world.Shape]string{
+	world.LogShape: logGlyph,
+}
+
+// icon draws an item in a slot: its shape's glyph in its color.
+func icon(item world.Item) string {
+	color := item.Color()
+	return fmt.Sprintf("\x1b[38;2;%d;%d;%dm", color.R, color.G, color.B) + shapeGlyphs[item.Shape()]
 }
 
 const (
@@ -53,7 +55,7 @@ func inventoryPanel(inventory world.Inventory, cursor slotCursor) []string {
 			index := row*panelColumns + column
 			glyph := emptySlot
 			if slots[index].Filled {
-				glyph = itemIcons[slots[index].Item]
+				glyph = icon(slots[index].Item)
 			}
 			if cursor.active && cursor.slot == index {
 				line += "[" + glyph + panelText + "]"
