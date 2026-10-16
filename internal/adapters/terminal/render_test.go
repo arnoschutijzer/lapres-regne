@@ -305,3 +305,26 @@ func TestTheInventoryPanelOpensWithTintedLogsAndClosesCleanly(t *testing.T) {
 		t.Fatal("closing the panel must repaint the forest beneath it")
 	}
 }
+
+func TestADroppedLogLiesOnTheGround(t *testing.T) {
+	w := besideTree()
+	w.Chop()
+	chopUntilFelled(t, w)
+	x, z := w.Hero().Position()
+	r := newRenderer(w, "L’Après-Règne")
+	before := r.render(100, 27, 0)
+	px, py, _ := before.project(x, 0.1, z+3*0.55)
+	inkBefore := before.pixels[int(py)*before.width+int(px)].ink
+	// Drop the log three steps down, then walk back so the hero does not cover it.
+	for range 3 {
+		w.Walk(0, 1, false)
+	}
+	w.Drop(0)
+	for range 3 {
+		w.Walk(0, -1, false)
+	}
+	after := r.render(100, 27, 0)
+	if ink := after.pixels[int(py)*after.width+int(px)].ink; ink != 4 && ink != 7 || ink == inkBefore {
+		t.Fatalf("ink at the dropped log = %d (was %d), want bark or its pale cut end", ink, inkBefore)
+	}
+}

@@ -149,6 +149,13 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			}
 			return false
 		}
+		if event.action == dropLog {
+			// Holding X keeps dropping, one log per repeat.
+			if slot, filled := world.Hero().Inventory().FirstFilled(); filled {
+				world.Drop(slot)
+			}
+			return false
+		}
 		if event.action == toggleInventory {
 			if !event.repeat {
 				view.inventoryOpen = !view.inventoryOpen

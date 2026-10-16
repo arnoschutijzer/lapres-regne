@@ -67,3 +67,10 @@ func TestTabTogglesTheInventory(t *testing.T) {
 		t.Fatalf("event = %+v, want an encoded Tab to toggle the inventory", events[len(events)-1])
 	}
 }
+
+func TestXDropsALog(t *testing.T) {
+	var d keyDecoder
+	if event := d.feed('x'); event.action != dropLog {
+		t.Fatalf("event = %+v, want X to drop a log", event)
+	}
+}

@@ -16,8 +16,10 @@ type World struct {
 	depletion map[cell]time.Duration
 	approach  approach
 	chop      chop
-	message   string
-	sounds    Sounds
+	// ground holds the dropped logs until they disappear.
+	ground  []GroundLog
+	message string
+	sounds  Sounds
 }
 
 func New(seed uint64) *World {
@@ -78,6 +80,7 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
 	w.approachFor(dt)
 	w.regrow(dt)
+	w.despawn(dt)
 	w.recoverTimers(dt)
 	w.chopFor(dt)
 }

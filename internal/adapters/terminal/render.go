@@ -179,6 +179,9 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	if chopping {
 		drawChips(c, f, chopped, strike, sinceHit)
 	}
+	for _, log := range f.GroundLogs() {
+		drawGroundLog(c, log)
+	}
 	r.drawCharacter(c, seconds)
 	r.drawGrass(c, left, right, back, front, seconds)
 	return c
@@ -275,8 +278,8 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 		out.WriteString("\x1b[2J\x1b[1;1H  " + r.title)
 	}
-	hint := "  arrows/WASD/IJKL · shift run · E act · Tab bag · Q quit"
-	if width >= 72 {
+	hint := "  arrows/WASD/IJKL · shift run · E act · Tab bag · X drop · Q quit"
+	if width >= 81 {
 		hint += " · N/P tracks"
 	}
 	if message := r.world.Message(); message != "" {

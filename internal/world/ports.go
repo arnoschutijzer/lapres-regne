@@ -26,8 +26,8 @@ type Snapshot struct {
 	Seed          uint64
 	X, Z          float64
 	WoodcuttingXP float64
-	// Inventory lists the logs carried, by the tree they came from, slot by slot.
-	Inventory []TreeKind
+	// Inventory lists the inventory slot by slot, gaps included.
+	Inventory []Slot
 	Stumps    []Stump
 	SavedAt   time.Time
 }

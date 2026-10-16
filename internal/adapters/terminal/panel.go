@@ -41,8 +41,8 @@ func inventoryPanel(inventory world.Inventory) []string {
 	for row := range world.InventorySize / panelColumns {
 		line := "   "
 		for column := range panelColumns {
-			if slot := row*panelColumns + column; slot < len(slots) {
-				line += logTint[slots[slot]] + logGlyph + "  "
+			if slot := slots[row*panelColumns+column]; slot.Filled {
+				line += logTint[slot.Kind] + logGlyph + "  "
 			} else {
 				line += emptySlot + "  "
 			}

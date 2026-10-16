@@ -14,7 +14,7 @@ func TestSavedProgressLoadsBackUnchanged(t *testing.T) {
 	file := File{Path: filepath.Join(t.TempDir(), "nested", "progress.json")}
 	snapshot := world.Snapshot{
 		Seed: 7, X: 4.95, Z: -1.65, WoodcuttingXP: 112.5,
-		Inventory: []world.TreeKind{world.Oak, world.NormalTree, world.Willow, world.Yew},
+		Inventory: []world.Slot{{Kind: world.Oak, Filled: true}, {}, {Kind: world.Willow, Filled: true}, {Kind: world.Yew, Filled: true}},
 		Stumps:    []world.Stump{{GX: 1, GZ: 0, Regrow: 41*time.Second + 250*time.Millisecond}, {GX: -2, GZ: 3, Regrow: 8400 * time.Millisecond}},
 		SavedAt:   time.Date(2026, 10, 16, 21, 0, 0, 0, time.UTC),
 	}
@@ -77,7 +77,7 @@ func TestAVersionOneSaveCarriesItsLogCountAsNormalLogs(t *testing.T) {
 	if err != nil || !saved {
 		t.Fatalf("load = %v, %v; want the old save", saved, err)
 	}
-	want := []world.TreeKind{world.NormalTree, world.NormalTree}
+	want := []world.Slot{{Kind: world.NormalTree, Filled: true}, {Kind: world.NormalTree, Filled: true}}
 	if !reflect.DeepEqual(loaded.Inventory, want) || loaded.WoodcuttingXP != 50 || loaded.X != 2.75 || len(loaded.Stumps) != 1 {
 		t.Fatalf("loaded = %+v, want two normal logs and the rest of the old save", loaded)
 	}

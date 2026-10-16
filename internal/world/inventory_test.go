@@ -1,8 +1,8 @@
 package world_test
 
 import (
-	"reflect"
 	"testing"
+	"time"
 
 	"dither-cli/internal/world"
 )
@@ -18,8 +18,9 @@ func TestACutLogTakesASlotOfItsOwnKind(t *testing.T) {
 	w := besideTree()
 	w.Chop()
 	chopUntilFelled(t, w)
-	if slots := w.Hero().Inventory().Slots(); !reflect.DeepEqual(slots, []world.TreeKind{world.NormalTree}) {
-		t.Fatalf("slots = %v, want one normal log", slots)
+	slots := w.Hero().Inventory().Slots()
+	if len(slots) != world.InventorySize || slots[0] != (world.Slot{Kind: world.NormalTree, Filled: true}) || slots[1].Filled {
+		t.Fatalf("slots = %v, want one normal log in the first of 28 slots", slots)
 	}
 }
 
@@ -29,5 +30,30 @@ func TestLogsAreNamedAfterTheirTree(t *testing.T) {
 		if got := kind.Logs(); got != name {
 			t.Errorf("%v logs = %q, want %q", kind, got, name)
 		}
+	}
+}
+
+func TestADroppedLogLiesUnderTheHeroForThreeMinutes(t *testing.T) {
+	w := besideTree()
+	w.Chop()
+	chopUntilFelled(t, w)
+	if w.Drop(1) {
+		t.Fatal("an empty slot must not drop anything")
+	}
+	if !w.Drop(0) || w.Hero().Inventory().Len() != 0 {
+		t.Fatal("dropping the first slot must empty it")
+	}
+	x, z := w.Hero().Position()
+	ground := w.GroundLogs()
+	if len(ground) != 1 || ground[0].Kind != world.NormalTree || ground[0].X != x || ground[0].Z != z {
+		t.Fatalf("ground = %+v, want one normal log under the hero at %v, %v", ground, x, z)
+	}
+	w.Advance(0, 0, 3*time.Minute-time.Millisecond, false)
+	if len(w.GroundLogs()) != 1 {
+		t.Fatal("a dropped log must lie on the ground for three minutes")
+	}
+	w.Advance(0, 0, time.Millisecond, false)
+	if len(w.GroundLogs()) != 0 {
+		t.Fatal("a dropped log must disappear after three minutes")
 	}
 }

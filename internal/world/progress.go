@@ -37,8 +37,8 @@ func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 		return w, nil
 	}
 	w.hero.woodcutting.gain(snapshot.WoodcuttingXP)
-	for _, kind := range snapshot.Inventory {
-		w.hero.inventory.add(kind)
+	for index, slot := range snapshot.Inventory[:min(len(snapshot.Inventory), InventorySize)] {
+		w.hero.inventory.slots[index] = slot
 	}
 	if snapshot.Seed != seed {
 		return w, nil

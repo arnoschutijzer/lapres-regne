@@ -18,7 +18,8 @@ type File struct {
 }
 
 // version marks the file layout so later layouts can still read older saves. Version 1
-// counted logs; version 2 lists each log in the inventory by the tree it came from.
+// counted logs; version 2 lists the inventory slot by slot, naming each log's tree and
+// leaving "" for an empty slot.
 const version = 2
 
 // logNames spell each kind of log in the file, independent of how the domain names them.
@@ -74,14 +75,18 @@ func (f File) Load() (world.Snapshot, bool, error) {
 	}
 	// Version 1 counted logs before they had kinds; they were all normal logs.
 	for range saved.Logs {
-		snapshot.Inventory = append(snapshot.Inventory, world.NormalTree)
+		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Kind: world.NormalTree, Filled: true})
 	}
 	for _, name := range saved.Inventory {
+		if name == "" {
+			snapshot.Inventory = append(snapshot.Inventory, world.Slot{})
+			continue
+		}
 		kind, known := kindNamed(name)
 		if !known {
 			return world.Snapshot{}, false, fmt.Errorf("read %s: unknown log %q", f.Path, name)
 		}
-		snapshot.Inventory = append(snapshot.Inventory, kind)
+		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Kind: kind, Filled: true})
 	}
 	for _, stump := range saved.Stumps {
 		snapshot.Stumps = append(snapshot.Stumps, world.Stump{GX: stump.GX, GZ: stump.GZ, Regrow: time.Duration(stump.RegrowMillis) * time.Millisecond})
@@ -99,8 +104,19 @@ func (f File) Save(snapshot world.Snapshot) error {
 		Inventory:   []string{},
 		Stumps:      []stumpJSON{},
 	}
-	for _, kind := range snapshot.Inventory {
-		saved.Inventory = append(saved.Inventory, logNames[kind])
+	// Empty slots are saved as "" so logs keep their places; trailing empty slots are left off.
+	last := -1
+	for index, slot := range snapshot.Inventory {
+		if slot.Filled {
+			last = index
+		}
+	}
+	for _, slot := range snapshot.Inventory[:last+1] {
+		name := ""
+		if slot.Filled {
+			name = logNames[slot.Kind]
+		}
+		saved.Inventory = append(saved.Inventory, name)
 	}
 	for _, stump := range snapshot.Stumps {
 		saved.Stumps = append(saved.Stumps, stumpJSON{GX: stump.GX, GZ: stump.GZ, RegrowMillis: stump.Regrow.Milliseconds()})
