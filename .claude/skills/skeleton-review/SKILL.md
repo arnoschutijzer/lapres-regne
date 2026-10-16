@@ -8,7 +8,7 @@ description: Review the current branch to confirm new code is wired through the 
 Use `git diff` against the main branch. Use the paths in `CLAUDE.md` and answer with yes or no plus file references:
 
 1. Is every new domain type, port and adapter reachable from the composition root (`main.go`)?
-2. Does at least one acceptance test exercise the new behavior through the real entry point?
+2. Do unit tests cover the new domain logic and adapter behavior?
 3. Does the domain import anything from adapters, frameworks or infrastructure?
 4. Did the change add a new entry point, main function or wiring location?
 5. Is there new code that only unit tests call?
