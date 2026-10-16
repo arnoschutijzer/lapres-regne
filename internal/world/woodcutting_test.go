@@ -264,3 +264,20 @@ func TestAChopRollsEveryFourTicksUntilALogComes(t *testing.T) {
 		t.Fatalf("ticks = %d, then %d; want the same seed to roll the same chop", ticks, replayed)
 	}
 }
+
+func TestANormalTreeRegrowsBetween36And60SecondsAfterFalling(t *testing.T) {
+	w := besideTree()
+	w.Chop()
+	chopUntilFelled(t, w)
+	w.Advance(0, 0, 36*time.Second-time.Millisecond, false)
+	if tree, _ := w.TreeAt(1, 0); !tree.Stump {
+		t.Fatal("a normal tree must stay a stump for at least 36 seconds")
+	}
+	w.Advance(0, 0, 24*time.Second, false)
+	if tree, _ := w.TreeAt(1, 0); tree.Stump {
+		t.Fatal("a normal tree must regrow within 60 seconds")
+	}
+	if _, ok := w.TreeInReach(); !ok {
+		t.Fatal("a regrown tree must be chopped again")
+	}
+}

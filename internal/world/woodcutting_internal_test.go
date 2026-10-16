@@ -99,3 +99,47 @@ func TestAnOaksTimerRecoversWhileNobodyChopsIt(t *testing.T) {
 		t.Fatalf("the oak fell %v into a fresh chop, want its timer back to the full 27s", elapsed)
 	}
 }
+
+// nearestOf finds the tree of a kind closest to the spawn point.
+func nearestOf(w *World, kind TreeKind) Tree {
+	for radius := 0; ; radius++ {
+		for gz := -radius; gz <= radius; gz++ {
+			for gx := -radius; gx <= radius; gx++ {
+				if tree, ok := w.TreeAt(gx, gz); ok && tree.Kind == kind && max(abs(gx), abs(gz)) == radius {
+					return tree
+				}
+			}
+		}
+	}
+}
+
+func TestOaksWillowsAndYewsRegrowAfterTheirRespawnTime(t *testing.T) {
+	cases := []struct {
+		kind    TreeKind
+		respawn time.Duration
+	}{
+		{Oak, 14 * gameTick}, {Willow, 14 * gameTick}, {Yew, 99 * gameTick},
+	}
+	for _, c := range cases {
+		t.Run(c.kind.String(), func(t *testing.T) {
+			w := New(7)
+			tree := nearestOf(w, c.kind)
+			standBeside(w, tree, levelXP[99])
+			if !w.Chop() {
+				t.Fatalf("a level 99 hero must chop the %v: %s", c.kind, w.Message())
+			}
+			chopFor(w, time.Hour)
+			if felled, _ := w.TreeAt(tree.cell.gx, tree.cell.gz); !felled.Stump {
+				t.Fatalf("the %v must fall", c.kind)
+			}
+			w.Advance(0, 0, c.respawn-time.Millisecond, false)
+			if waiting, _ := w.TreeAt(tree.cell.gx, tree.cell.gz); !waiting.Stump {
+				t.Fatalf("the %v regrew before %v", c.kind, c.respawn)
+			}
+			w.Advance(0, 0, time.Millisecond, false)
+			if regrown, _ := w.TreeAt(tree.cell.gx, tree.cell.gz); regrown.Stump {
+				t.Fatalf("the %v must regrow after %v", c.kind, c.respawn)
+			}
+		})
+	}
+}

@@ -10,8 +10,8 @@ type World struct {
 	seed             uint64
 	hero             Character
 	cameraX, cameraZ float64
-	// felled holds the cells whose tree is a stump.
-	felled map[cell]bool
+	// felled holds the cells whose tree is a stump, with the time left until it regrows.
+	felled map[cell]time.Duration
 	// depletion is how long each tree that gives several logs has been worn down by chopping.
 	depletion map[cell]time.Duration
 	approach  approach
@@ -77,6 +77,7 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	}
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
 	w.approachFor(dt)
+	w.regrow(dt)
 	w.recoverTimers(dt)
 	w.chopFor(dt)
 }

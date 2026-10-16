@@ -191,6 +191,17 @@ func (w *World) chopFor(dt time.Duration) {
 	}
 }
 
+// regrow brings stumps back as trees once their respawn time has passed.
+func (w *World) regrow(dt time.Duration) {
+	for tree, left := range w.felled {
+		if left <= dt {
+			delete(w.felled, tree)
+		} else {
+			w.felled[tree] = left - dt
+		}
+	}
+}
+
 // recoverTimers lets every tree nobody is chopping regain its depletion timer as fast as it wore down.
 func (w *World) recoverTimers(dt time.Duration) {
 	for tree, worn := range w.depletion {
@@ -222,9 +233,9 @@ func (w *World) cutLog() {
 		return
 	}
 	if w.felled == nil {
-		w.felled = make(map[cell]bool)
+		w.felled = make(map[cell]time.Duration)
 	}
-	w.felled[w.chop.tree] = true
+	w.felled[w.chop.tree] = kind.respawn + time.Duration(w.roll(0x9e60)*float64(kind.respawnSpread))
 	delete(w.depletion, w.chop.tree)
 	w.chop = chop{}
 }

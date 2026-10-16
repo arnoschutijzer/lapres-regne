@@ -95,5 +95,5 @@ func (w *World) TreeAt(gx, gz int) (Tree, bool) {
 	case Yew:
 		height, radius = height*1.15, radius*0.85
 	}
-	return Tree{x, z, height, radius, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), kind, w.felled[cell{gx, gz}], cell{gx, gz}}, true
+	return Tree{x, z, height, radius, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), kind, w.felled[cell{gx, gz}] > 0, cell{gx, gz}}, true
 }

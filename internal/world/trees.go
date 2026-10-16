@@ -29,13 +29,15 @@ type treeSpecies struct {
 	// first log after lifetime of chopping.
 	fallsWithFirstLog bool
 	lifetime          time.Duration
+	// respawn is how long a stump takes to regrow, up to respawnSpread longer at random.
+	respawn, respawnSpread time.Duration
 }
 
 var species = [...]treeSpecies{
-	NormalTree: {level: 1, xp: 25, low: 64, high: 200, fallsWithFirstLog: true},
-	Oak:        {level: 15, xp: 37.5, low: 32, high: 100, lifetime: 45 * gameTick},
-	Willow:     {level: 30, xp: 67.5, low: 16, high: 50, lifetime: 50 * gameTick},
-	Yew:        {level: 60, xp: 175, low: 4, high: 12, lifetime: 190 * gameTick},
+	NormalTree: {level: 1, xp: 25, low: 64, high: 200, fallsWithFirstLog: true, respawn: 36 * time.Second, respawnSpread: 24 * time.Second},
+	Oak:        {level: 15, xp: 37.5, low: 32, high: 100, lifetime: 45 * gameTick, respawn: 14 * gameTick},
+	Willow:     {level: 30, xp: 67.5, low: 16, high: 50, lifetime: 50 * gameTick, respawn: 14 * gameTick},
+	Yew:        {level: 60, xp: 175, low: 4, high: 12, lifetime: 190 * gameTick, respawn: 99 * gameTick},
 }
 
 // chance is the chance one tick cuts a log at a level, rolled as Old School RuneScape does.
