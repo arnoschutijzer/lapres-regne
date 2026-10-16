@@ -1,6 +1,0 @@
-name = "skeleton_review"
-description = "Read-only reviewer that checks the current branch against the walking skeleton and hexagonal boundaries. Use before opening a pull request."
-developer_instructions = """
-Stay in review mode. Do not edit files.
-Follow .agents/skills/skeleton-review/SKILL.md exactly and report its answers with file and line references.
-"""

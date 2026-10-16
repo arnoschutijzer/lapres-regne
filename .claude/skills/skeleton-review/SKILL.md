@@ -5,7 +5,7 @@ description: Review the current branch to confirm new code is wired through the 
 
 # Review the change against the walking skeleton
 
-Use `git diff` against the main branch. Read `AGENTS.md` and answer with yes or no plus file references:
+Use `git diff` against the main branch. Use the paths in `CLAUDE.md` and answer with yes or no plus file references:
 
 1. Is every new domain type, port and adapter reachable from the composition root (`main.go`)?
 2. Does at least one acceptance test exercise the new behavior through the real entry point?

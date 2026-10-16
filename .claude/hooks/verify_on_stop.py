@@ -1,4 +1,4 @@
-"""Stop hook: keep Codex working until vet, the architecture check and all tests pass."""
+"""Stop hook: keep Claude working until vet, the architecture check and all tests pass."""
 
 import json
 import subprocess
