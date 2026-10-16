@@ -1,10 +1,14 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"time"
 
+	"dither-cli/internal/adapters/progressfile"
 	"dither-cli/internal/adapters/songfiles"
 	"dither-cli/internal/adapters/speaker"
 	"dither-cli/internal/adapters/terminal"
@@ -18,8 +22,9 @@ func main() {
 	seed := flag.Uint64("seed", 7, "procedural forest seed")
 	mute := flag.Bool("mute", false, "disable the soundtrack and sound effects")
 	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
+	savePath := flag.String("save", "", "file keeping progress between sessions (default in the user config folder)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on a tree within reach (1 chops it down)\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: dither-cli [--seed number] [--mute] [--save file]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  E                     act on a tree within reach (1 chops it down)\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -27,7 +32,15 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if err := run(*seed, *mute, *musicDir); err != nil {
+	if *savePath == "" {
+		config, err := os.UserConfigDir()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "dither-cli: find a place to save progress (use --save):", err)
+			os.Exit(1)
+		}
+		*savePath = filepath.Join(config, "dither-cli", "progress.json")
+	}
+	if err := run(*seed, *mute, *musicDir, *savePath); err != nil {
 		fmt.Fprintln(os.Stderr, "dither-cli:", err)
 		os.Exit(1)
 	}
@@ -46,13 +59,17 @@ func startMusic(device *speaker.Device, directory string) (*speaker.Playback, er
 }
 
 // run is the composition root: it builds every adapter and wires it to the domain.
-func run(seed uint64, mute bool, musicDir string) error {
+func run(seed uint64, mute bool, musicDir, savePath string) error {
+	progress := progressfile.File{Path: savePath}
+	forest, err := world.Resume(seed, progress, time.Now())
+	if err != nil {
+		return fmt.Errorf("%w (move or remove %s to start afresh)", err, savePath)
+	}
 	session, err := terminal.Open()
 	if err != nil {
 		return err
 	}
 	defer session.Close()
-	forest := world.New(seed)
 	var music soundtrack.Player
 	if !mute {
 		device, err := speaker.Open()
@@ -70,5 +87,7 @@ func run(seed uint64, mute bool, musicDir string) error {
 			music = playback
 		}
 	}
-	return session.Run(forest, music, appTitle)
+	// Progress is kept however the session ends, even when it ends with an error.
+	played := session.Run(forest, music, appTitle)
+	return errors.Join(played, forest.Keep(progress, time.Now()))
 }
