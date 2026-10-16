@@ -48,7 +48,7 @@ func (b heroBody) at(side, forward float64) (x, z float64) {
 func (b heroBody) part(side, y, forward, width, height, depth float64, ink int) {
 	x, z := b.at(side, forward)
 	rx, rz := b.radii(width, depth)
-	ellipsoid(b.c, x, y, z, rx, height, rz, func(px, py int, depth float64, _, normal vec) {
+	ellipsoid(b.c, x, y, z, rx, height, rz, 0, func(px, py int, depth float64, _, normal vec) {
 		// Shading flows smoothly across parts; only the outline behind the figure marks its edge.
 		light := 0.6 + 0.4*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))
 		b.c.plot(px, py, depth, light, ink)
@@ -61,7 +61,7 @@ func (b heroBody) outline(side, y, forward, width, height, depth float64) {
 	x, z := b.at(side, forward)
 	band := 1.5 / b.c.scale
 	rx, rz := b.radii(width+band, depth+band)
-	ellipsoid(b.c, x, y, z, rx, height+band, rz, func(px, py int, depth float64, _, _ vec) {
+	ellipsoid(b.c, x, y, z, rx, height+band, rz, 0, func(px, py int, depth float64, _, _ vec) {
 		b.c.plot(px, py, depth+0.4, 0, 0)
 	})
 }

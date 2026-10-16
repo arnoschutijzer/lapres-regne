@@ -410,3 +410,24 @@ func TestTheHeroShowsTheirFaceOnlyWhenFacingTheViewer(t *testing.T) {
 		t.Error("a hero facing away must show only the back of their head")
 	}
 }
+
+// ellipsoidWidth measures how many canvas columns a long, thin ellipsoid covers when turned by yaw.
+func ellipsoidWidth(yaw float64) int {
+	c := &forestCanvas{width: 120, height: 120, scale: 10}
+	c.pixels = make([]forestPixel, c.width*c.height)
+	for i := range c.pixels {
+		c.pixels[i].depth = math.Inf(1)
+	}
+	left, right := c.width, -1
+	ellipsoid(c, 0, 0, 0, 2, 0.5, 0.2, yaw, func(px, _ int, _ float64, _, _ vec) {
+		left, right = min(left, px), max(right, px)
+	})
+	return right - left
+}
+
+func TestAnEllipsoidTurnsAboutItsUprightAxis(t *testing.T) {
+	across, along := ellipsoidWidth(0), ellipsoidWidth(math.Pi/2)
+	if along*4 >= across {
+		t.Fatalf("a long ellipsoid covers %d columns across the view and %d turned toward it, want it much narrower turned", across, along)
+	}
+}
