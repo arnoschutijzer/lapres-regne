@@ -56,7 +56,7 @@ func TestOvershootingATreeStillReachesItAndChoppingTurnsTowardIt(t *testing.T) {
 	}
 }
 
-func TestChoppingANormalTreeTakesOneTickAndLeavesAStump(t *testing.T) {
+func TestChoppingANormalTreeLeavesAStumpWithItsFirstLog(t *testing.T) {
 	w := besideTree()
 	if !w.Chop() {
 		t.Fatal("chopping must start at a tree in reach")
@@ -65,7 +65,7 @@ func TestChoppingANormalTreeTakesOneTickAndLeavesAStump(t *testing.T) {
 	if !w.Chopping() || w.Hero().Logs() != 0 {
 		t.Fatalf("chopping = %v, logs = %d; want still chopping with no logs before the tick", w.Chopping(), w.Hero().Logs())
 	}
-	w.Advance(0, 0, time.Millisecond, false)
+	chopUntilFelled(t, w)
 	if w.Chopping() || w.Hero().Logs() != 1 {
 		t.Fatalf("chopping = %v, logs = %d; want one log and chopping stopped", w.Chopping(), w.Hero().Logs())
 	}
@@ -104,7 +104,7 @@ func TestTheChoppedTreeIsKnownWhileChopping(t *testing.T) {
 	if chopped, ok := w.ChoppedTree(); !ok || chopped != faced {
 		t.Fatalf("chopped tree = %+v, %v; want the tree in reach %+v", chopped, ok, faced)
 	}
-	w.Advance(0, 0, time.Second, false)
+	chopUntilFelled(t, w)
 	if _, ok := w.ChoppedTree(); ok {
 		t.Fatal("no tree is chopped once it falls")
 	}
@@ -117,7 +117,7 @@ func TestAChopHoldsTheFacingUntilTheTreeFalls(t *testing.T) {
 	if facing := w.Hero().Facing(); facing != world.FacingRight {
 		t.Fatalf("facing = %v, want right toward the tree while chopping", facing)
 	}
-	w.Advance(0, 0, time.Second, false)
+	chopUntilFelled(t, w)
 	w.AimAt(0, 0)
 	if facing := w.Hero().Facing(); facing != world.FacingLeft {
 		t.Fatalf("facing = %v, want aiming to work again once the tree falls", facing)
@@ -190,7 +190,7 @@ func TestApproachingATreeWalksUpToItAndStartsChopping(t *testing.T) {
 func TestAStumpCannotBeApproached(t *testing.T) {
 	w := besideTree()
 	w.Chop()
-	w.Advance(0, 0, time.Second, false)
+	chopUntilFelled(t, w)
 	if stump, _ := w.TreeAt(1, 0); w.Approach(stump) {
 		t.Fatal("a stump must not be approached")
 	}
@@ -226,5 +226,37 @@ func TestMovingCancelsAnApproachAndAChop(t *testing.T) {
 				t.Fatalf("chopping = %v, logs = %d; want the chop cancelled", w.Chopping(), w.Hero().Logs())
 			}
 		})
+	}
+}
+
+// chopUntilFelled advances tick by tick until the chopped tree falls, returning the ticks taken.
+func chopUntilFelled(t *testing.T, w *world.World) int {
+	t.Helper()
+	for ticks := 1; ticks <= 200; ticks++ {
+		w.Advance(0, 0, 600*time.Millisecond, false)
+		if !w.Chopping() {
+			return ticks
+		}
+	}
+	t.Fatal("the tree did not fall within 200 ticks")
+	return 0
+}
+
+func TestAChopRollsEveryTickUntilALogComes(t *testing.T) {
+	w := besideTree()
+	sounds := &recordedSounds{}
+	w.SetSounds(sounds)
+	w.Chop()
+	ticks := chopUntilFelled(t, w)
+	if sounds.chops != ticks+1 {
+		t.Fatalf("chops = %d over %d ticks, want a strike as chopping starts and on every tick", sounds.chops, ticks)
+	}
+	if w.Hero().Logs() != 1 || w.Hero().Woodcutting().XP() != 25 {
+		t.Fatalf("logs = %d, xp = %v; want one log worth 25 xp", w.Hero().Logs(), w.Hero().Woodcutting().XP())
+	}
+	again := besideTree()
+	again.Chop()
+	if replayed := chopUntilFelled(t, again); replayed != ticks {
+		t.Fatalf("ticks = %d, then %d; want the same seed to roll the same chop", ticks, replayed)
 	}
 }

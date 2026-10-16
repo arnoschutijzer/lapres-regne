@@ -9,8 +9,19 @@ import (
 const reach = 2.5
 
 // chopTick is one woodcutting attempt. The axe lands as chopping starts and again on every
-// tick; a normal tree falls on the first tick.
+// tick, and each tick rolls for a log; a normal tree falls with its first log.
 const chopTick = 600 * time.Millisecond
+
+// normalLogXP is the experience a normal tree's log gives.
+const normalLogXP = 25.0
+
+// logChance is the chance one tick cuts a normal log, as Old School RuneScape rolls it
+// for a bronze axe: 65 in 256 at level 1, rising to 201 in 256 at level 99.
+func logChance(level int) float64 {
+	const low, high = 64.0, 200.0
+	l := float64(level)
+	return (1 + math.Floor(low*(maxLevel-l)/(maxLevel-1)+high*(l-1)/(maxLevel-1)+0.5)) / 256
+}
 
 // arrival is how close to a trunk an approach ends, comfortably within reach.
 const arrival = 1.2
@@ -27,6 +38,7 @@ type chop struct {
 	active  bool
 	tree    cell
 	elapsed time.Duration
+	ticks   int
 }
 
 // TreeInReach finds the standing tree the hero acts on: the nearest one in front within reach,
@@ -144,20 +156,36 @@ func (w *World) ChoppedTree() (Tree, bool) {
 	return w.TreeAt(w.chop.tree.gx, w.chop.tree.gz)
 }
 
-// chopFor works on the chopped tree until it falls, leaving a stump and a log.
+// chopFor strikes the chopped tree on every tick and rolls for a log; the first log fells it.
 func (w *World) chopFor(dt time.Duration) {
 	if !w.chop.active {
 		return
 	}
 	w.chop.elapsed += dt
-	if w.chop.elapsed < chopTick {
-		return
+	for w.chop.active && w.chop.elapsed >= time.Duration(w.chop.ticks+1)*chopTick {
+		w.chop.ticks++
+		w.sounds.Chop()
+		if w.rollForLog() {
+			w.fell(w.chop.tree)
+		}
 	}
-	w.sounds.Chop()
+}
+
+// rollForLog draws this attempt's roll from the world seed and the tree being chopped.
+func (w *World) rollForLog() bool {
+	const salt = 0x10c5
+	roll := w.Random(w.chop.tree.gx, w.chop.tree.gz, salt+uint64(w.hero.attempts))
+	w.hero.attempts++
+	return roll < logChance(w.hero.woodcutting.Level())
+}
+
+// fell turns a tree into a stump and gives the hero its log.
+func (w *World) fell(tree cell) {
 	if w.felled == nil {
 		w.felled = make(map[cell]bool)
 	}
-	w.felled[w.chop.tree] = true
+	w.felled[tree] = true
 	w.hero.logs++
+	w.hero.woodcutting.gain(normalLogXP)
 	w.chop = chop{}
 }

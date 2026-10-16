@@ -164,6 +164,9 @@ func treePixels(output string) string {
 	}, frames[len(frames)-1])
 }
 
+// chopTimeout covers the many ticks a chop may roll before a tree gives its log.
+const chopTimeout = 20 * time.Second
+
 var positionPattern = regexp.MustCompile(`  x (-?[\d.]+)  z (-?[\d.]+)  \|`)
 
 func positions(output string) [][2]float64 {
@@ -325,10 +328,24 @@ func TestTerminal(t *testing.T) {
 		s.until("1 Chop down")
 		s.send("1")
 		chopping := s.until("chopping")
-		felled := s.until("logs 1")
+		felled := s.read(chopTimeout, "logs 1")
 		terminalCheck(t, !strings.Contains(chopping+felled, "logs 2"), "one normal tree must give one log")
 		s.send("e")
 		terminalCheck(t, !strings.Contains(s.readFor(time.Second), "Chop down"), "a stump must not offer chopping")
+		s.send("q")
+		s.restored()
+	})
+	t.Run("woodcutting experience", func(t *testing.T) {
+		s := openTestTerminal(t, binary, "--mute")
+		terminalCheck(t, strings.Contains(s.until("logs 0"), "woodcutting 1 · 0 xp"), "the woodcutting skill must start at level 1")
+		s.send(strings.Repeat("s", 3) + strings.Repeat("d", 9))
+		s.until("steps 12")
+		s.send("e")
+		s.until("1 Chop down")
+		s.send("1")
+		// Each tick rolls for a log, so the chop lasts until the seed's first success.
+		felled := s.read(chopTimeout, "logs 1")
+		terminalCheck(t, strings.Contains(felled, "woodcutting 1 · 25 xp"), "a normal log must give 25 woodcutting xp")
 		s.send("q")
 		s.restored()
 	})
@@ -339,7 +356,7 @@ func TestTerminal(t *testing.T) {
 		s.until("logs 0")
 		s.send(clickTree)
 		s.until("chopping")
-		walked := lastPosition(t, s.until("logs 1"))
+		walked := lastPosition(t, s.read(chopTimeout, "logs 1"))
 		terminalCheck(t, walked[0] > 4 && walked[0] < 5.5, "clicking a tree must walk the hero up to its trunk")
 		s.send("q")
 		s.restored()

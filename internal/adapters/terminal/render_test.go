@@ -51,6 +51,18 @@ func besideTree() *world.World {
 	return w
 }
 
+// chopUntilFelled advances tick by tick until the chopped tree falls.
+func chopUntilFelled(t *testing.T, w *world.World) {
+	t.Helper()
+	for range 200 {
+		w.Advance(0, 0, 600*time.Millisecond, false)
+		if !w.Chopping() {
+			return
+		}
+	}
+	t.Fatal("the tree did not fall within 200 ticks")
+}
+
 func countInk(c *forestCanvas, inks ...int) int {
 	count := 0
 	for _, p := range c.pixels {
@@ -68,7 +80,7 @@ func TestAFelledTreeDrawsAStumpWithoutACrown(t *testing.T) {
 	r := newRenderer(w, "L’Après-Règne")
 	leaves := countInk(r.render(100, 27, 0), 2, 3)
 	w.Chop()
-	w.Advance(0, 0, time.Second, false)
+	chopUntilFelled(t, w)
 	if felled := countInk(r.render(100, 27, 0), 2, 3); felled >= leaves {
 		t.Fatalf("leaf pixels = %d after felling, want fewer than %d", felled, leaves)
 	}
@@ -184,5 +196,18 @@ func TestTreeAtPicksTheTreeUnderAClick(t *testing.T) {
 	}
 	if _, ok := r.treeAt(61, 30); ok {
 		t.Fatal("the status line must not pick a tree")
+	}
+}
+
+func TestTheWoodcuttingSkillShowsOnTheTitleRow(t *testing.T) {
+	w := besideTree()
+	r := newRenderer(w, "L’Après-Règne")
+	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "\x1b[1;") || !strings.Contains(frame, "woodcutting 1 · 0 xp") {
+		t.Fatal("the title row must show the woodcutting level and xp")
+	}
+	w.Chop()
+	chopUntilFelled(t, w)
+	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "woodcutting 1 · 25 xp") {
+		t.Fatal("the title row must update with gained xp")
 	}
 }

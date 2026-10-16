@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ type renderer struct {
 	cells                     []forestCell
 	screenWidth, screenHeight int
 	lastStatus, lastHint      string
+	lastSkill                 string
 	// menu lists the actions offered for the tree in reach; nil when closed.
 	menu []string
 }
@@ -279,6 +281,17 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		controls := []rune(hint)
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height-1, string(controls[:min(width-1, len(controls))]))
 		r.lastHint = hint
+	}
+	woodcutting := r.world.Hero().Woodcutting()
+	skill := fmt.Sprintf("woodcutting %d · %s xp  ", woodcutting.Level(), strconv.FormatFloat(woodcutting.XP(), 'f', -1, 64))
+	if full || skill != r.lastSkill {
+		// Right-align the skill on the title row without ever covering the title.
+		skillRunes := []rune(skill)
+		start := max(len([]rune(r.title))+5, width-len(skillRunes))
+		if start < width {
+			fmt.Fprintf(&out, "\x1b[1;%dH\x1b[K\x1b[38;2;147;166;130m%s", start+1, string(skillRunes[:min(width-start, len(skillRunes))]))
+		}
+		r.lastSkill = skill
 	}
 	lastInk := -1
 	for row := range rows {
