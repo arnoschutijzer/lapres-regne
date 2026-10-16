@@ -36,6 +36,9 @@ func (f *forest) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 				continue
 			}
 			t := (-b + math.Sqrt(discriminant)) / (2 * a)
+			if depth-t > c.pixels[py*c.width+px].depth {
+				continue
+			}
 			localY, localZ := -v*0.69+t*0.72, v*0.72+t*0.69
 			normal := vec{u / (rx * rx), localY / (ry * ry), localZ / (rz * rz)}.unit()
 			light := 0.20 + 0.68*math.Max(0, normal.dot(vec{-0.52, 0.80, -0.29}))

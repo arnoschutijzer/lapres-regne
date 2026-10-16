@@ -30,6 +30,9 @@ class Terminal:
             self.slave, termios.TIOCSWINSZ, struct.pack("HHHH", height, width, 0, 0)
         )
 
+        if hasattr(self, "process"):
+            self.process.send_signal(signal.SIGWINCH)
+
     def read(self, until=None, timeout=3):
         data = b""
         deadline = time.monotonic() + timeout
@@ -61,7 +64,7 @@ class Terminal:
 
 def tree_pixels(output):
     """Compare visible tree glyphs, excluding the header and slider cursor."""
-    frame = output.split(b"\x1b[H")[-1].decode()
+    frame = output.split(b"\x1b[H")[-1].decode(errors="ignore")
     return "".join(c for c in frame if "\u2800" <= c <= "\u28ff")
 
 
@@ -145,6 +148,27 @@ def check_forest(binary):
         terminal.close()
 
 
+def check_responsive_rendering(binary):
+    terminal = Terminal(binary)
+    try:
+        terminal.read(until=b"seed 7")
+        terminal.resize(220, 90)
+        initial = terminal.read(until=b"seed 7")
+        idle = terminal.read(timeout=0.35)
+        frames = idle.count(b"\x1b[H")
+        assert frames >= 5, "animation must update more frequently than the old 12 FPS loop"
+        assert b"\x1b[2J" not in idle, "steady animation must not clear the screen"
+        assert len(idle) / frames < len(initial) / 2, "idle frames must send incremental updates"
+
+        terminal.send(b"d" * 40)
+        moved = terminal.read(until=b"steps 40  |")
+        assert moved.count(b"\x1b[H") <= 3, "queued input must not trigger one redraw per key"
+        terminal.send(b"q")
+        terminal.assert_restored()
+    finally:
+        terminal.close()
+
+
 with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     binary = str(Path(directory) / "dither-cli")
     subprocess.run(["go", "build", "-o", binary, "."], cwd=ROOT, check=True)
@@ -154,6 +178,7 @@ with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     assert non_terminal.returncode == 1 and b"interactive terminal" in non_terminal.stderr
     check_interaction(binary)
     check_forest(binary)
+    check_responsive_rendering(binary)
     check_exit(binary, b"\x03")
     check_exit(binary, signal.SIGTERM)
-    print("Passed: forest exploration, river crossing, tree orbit, controls, resize, quit, Ctrl-C, SIGTERM, restoration")
+    print("Passed: exploration, river crossing, input batching, incremental redraws, animation cadence, tree orbit, controls, resize, cleanup")

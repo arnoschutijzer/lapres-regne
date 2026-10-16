@@ -69,6 +69,9 @@ func run(treeMode bool, seed uint64) error {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer signal.Stop(signals)
+	resize := make(chan os.Signal, 1)
+	signal.Notify(resize, syscall.SIGWINCH)
+	defer signal.Stop(resize)
 	if _, err := stty("raw", "-echo"); err != nil {
 		return err
 	}
@@ -95,30 +98,51 @@ func run(treeMode bool, seed uint64) error {
 
 	frames := time.NewTicker(time.Second / 30)
 	defer frames.Stop()
-	resize := time.NewTicker(500 * time.Millisecond)
-	defer resize.Stop()
 	position, angle := 0.5, 0.0
 	var original *tree
 	if treeMode {
 		original = newTree()
 	}
 	forest := newForest(seed)
-	lastFrame := time.Now()
 	dirty := true
 	var decoder keyDecoder
-	for {
-		if dirty {
-			var output string
-			if treeMode {
-				output = original.frame(width, height, position, angle)
-			} else {
-				output = forest.frame(width, height, time.Since(forest.started).Seconds())
-			}
-			if _, err := io.WriteString(os.Stdout, output); err != nil {
-				return err
-			}
-			dirty = false
+	handleKey := func(key byte) bool {
+		action := decoder.feed(key)
+		if action == quit {
+			return true
 		}
+		if !treeMode && action != none {
+			forest.walk(action)
+		} else if action == left || action == right {
+			// Snap to a terminal column before moving to avoid half-cell rounding drift.
+			span := max(1, width-1)
+			column := int(position*float64(span) + 0.5)
+			delta := 1
+			if action == left {
+				delta = -1
+			}
+			next := float64(max(0, min(span, column+delta))) / float64(span)
+			if next != position {
+				position, dirty = next, true
+			}
+		}
+		return false
+	}
+	draw := func() error {
+		var output string
+		if treeMode {
+			output = original.frame(width, height, position, angle)
+		} else {
+			output = forest.frame(width, height, time.Since(forest.started).Seconds())
+		}
+		_, err := io.WriteString(os.Stdout, output)
+		dirty = false
+		return err
+	}
+	if err := draw(); err != nil {
+		return err
+	}
+	for {
 		select {
 		case <-signals:
 			return nil
@@ -126,43 +150,34 @@ func run(treeMode bool, seed uint64) error {
 			if !ok {
 				return nil
 			}
-			action := decoder.feed(key)
-			if action == quit {
+			if handleKey(key) {
 				return nil
 			}
-			if !treeMode && action != none {
-				forest.walk(action)
-				dirty = true
-			} else if action == left || action == right {
-				// Snap to a terminal column before moving to avoid half-cell rounding drift.
-				span := max(1, width-1)
-				column := int(position*float64(span) + 0.5)
-				delta := 1
-				if action == left {
-					delta = -1
-				}
-				next := float64(max(0, min(span, column+delta))) / float64(span)
-				if next != position {
-					position, dirty = next, true
+			// Consume pending repeats before rendering, so input cannot queue behind redraws.
+			for len(keys) > 0 {
+				if handleKey(<-keys) {
+					return nil
 				}
 			}
-		case <-resize.C:
+		case <-resize:
 			if w, h, err := terminalSize(); err == nil && (w != width || h != height) {
 				width, height, dirty = w, h, true
 			}
 		case <-frames.C:
 			if !treeMode {
 				forest.follow()
-				if time.Since(lastFrame) >= time.Second/12 {
-					dirty = true
-					lastFrame = time.Now()
-				}
-				continue
-			}
-			target := (position - 0.5) * 2 * math.Pi
-			if target-angle > 0.0005 || angle-target > 0.0005 {
-				angle += (target - angle) * 0.24
 				dirty = true
+			} else {
+				target := (position - 0.5) * 2 * math.Pi
+				if math.Abs(target-angle) > 0.0005 {
+					angle += (target - angle) * 0.24
+					dirty = true
+				}
+			}
+			if dirty {
+				if err := draw(); err != nil {
+					return err
+				}
 			}
 		}
 	}

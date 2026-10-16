@@ -16,14 +16,35 @@ func (f *forest) cover(x, z float64) float64 {
 }
 
 func (f *forest) river(x, z float64) (distance, width float64) {
-	distance = math.Inf(1)
 	band := int(math.Floor((x + 30) / 110))
-	for i := band - 1; i <= band+1; i++ {
-		phase := f.random(i, 0, 72) * 6.28
-		center := float64(i)*110 + 28 + math.Sin(z*0.038+phase)*12 + math.Sin(z*0.11+phase)*3
-		if d := math.Abs(x - center); d < distance {
+	channels := [3]riverChannel{f.riverChannel(band-1, z), f.riverChannel(band, z), f.riverChannel(band+1, z)}
+	return nearestRiver(channels[:], x)
+}
+
+type riverChannel struct{ center, width float64 }
+
+func (f *forest) riverChannel(band int, z float64) riverChannel {
+	phase := f.random(band, 0, 72) * 6.28
+	return riverChannel{
+		float64(band)*110 + 28 + math.Sin(z*0.038+phase)*12 + math.Sin(z*0.11+phase)*3,
+		1.7 + 0.65*math.Sin(z*0.047+phase),
+	}
+}
+
+func (f *forest) riverChannels(channels []riverChannel, z, left, right float64) []riverChannel {
+	first, last := int(math.Floor((left+30)/110))-1, int(math.Floor((right+30)/110))+1
+	for band := first; band <= last; band++ {
+		channels = append(channels, f.riverChannel(band, z))
+	}
+	return channels
+}
+
+func nearestRiver(channels []riverChannel, x float64) (distance, width float64) {
+	distance = math.Inf(1)
+	for _, channel := range channels {
+		if d := math.Abs(x - channel.center); d < distance {
 			distance = d
-			width = 1.7 + 0.65*math.Sin(z*0.047+phase)
+			width = channel.width
 		}
 	}
 	return distance, width

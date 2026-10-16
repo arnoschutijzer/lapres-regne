@@ -13,9 +13,9 @@ Walk with the **arrow keys**, **WASD**, or **IJKL** (I up, J left, K down,
 L right). Hold a key to keep walking. Press **Q** or **Ctrl-C** to quit.
 The camera follows the traveler and the view adapts when the terminal resizes.
 
-Trees cast shadows and you can walk freely through their trunks. Tall grass sways in front
-of the traveler, while a small canopy cutaway keeps the character readable
-under the trees. Rivers ripple and can be crossed by wading at half speed.
+Trees cast shadows and you can walk freely through their trunks. Tall grass
+sways in front of the traveler, while a small canopy cutaway keeps the character
+readable under the trees. Rivers ripple and can be crossed by wading at half speed.
 
 Terrain is generated from world coordinates with bounded memory, so revisiting
 a place recreates the same forest. Choose another forest with a seed:
@@ -42,4 +42,10 @@ Run the application-level terminal checks with Python 3:
 
 ```sh
 python3 tests/terminal.py
+```
+
+Benchmark animated rendering at three terminal sizes:
+
+```sh
+go test -run '^$' -bench BenchmarkForestFrame -benchmem
 ```

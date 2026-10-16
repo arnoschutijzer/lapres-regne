@@ -3,17 +3,23 @@ package main
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 )
 
 // World coordinates are sampled directly: exploration never allocates a growing map.
 type forest struct {
-	seed                   uint64
-	x, z, cameraX, cameraZ float64
-	steps                  int
-	facing                 action
-	started, lastWalk      time.Time
+	seed                      uint64
+	x, z, cameraX, cameraZ    float64
+	steps                     int
+	facing                    action
+	started, lastWalk         time.Time
+	canvas                    forestCanvas
+	trees                     []woodlandTree
+	cells                     []forestCell
+	screenWidth, screenHeight int
+	lastStatus                string
 }
 
 func newForest(seed uint64) *forest {
@@ -63,14 +69,20 @@ func (f *forest) walk(direction action) {
 }
 
 func (f *forest) follow() {
-	f.cameraX += (f.x - f.cameraX) * 0.28
-	f.cameraZ += (f.z - f.cameraZ) * 0.28
+	f.cameraX += (f.x - f.cameraX) * 0.65
+	f.cameraZ += (f.z - f.cameraZ) * 0.65
 }
 
 type forestPixel struct {
 	depth, light float64
 	ink          int
 }
+
+type forestCell struct {
+	bits, ink uint8
+}
+
+const maxForestColumns = 220
 
 type forestCanvas struct {
 	width, height int
@@ -117,13 +129,16 @@ func (c *forestCanvas) line(x1, y1, z1, x2, y2, z2, light float64, ink int) {
 }
 
 func (f *forest) render(cols, rows int, seconds float64) *forestCanvas {
-	c := &forestCanvas{width: cols * 2, height: rows * 4, x: f.cameraX, z: f.cameraZ, scale: 3.6}
-	c.pixels = make([]forestPixel, c.width*c.height)
+	c := &f.canvas
+	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, f.cameraX, f.cameraZ, 3.6
+	if len(c.pixels) != c.width*c.height {
+		c.pixels = make([]forestPixel, c.width*c.height)
+	}
 	left := c.x - float64(c.width)/c.scale/2 - 5
 	right := c.x + float64(c.width)/c.scale/2 + 5
 	back := c.z - float64(c.height)/c.scale - 5
 	front := c.z + float64(c.height)/c.scale + 12
-	var trees []woodlandTree
+	trees := f.trees[:0]
 	for gz := int(math.Floor(back / treeSpacing)); gz <= int(math.Ceil(front/treeSpacing)); gz++ {
 		for gx := int(math.Floor(left / treeSpacing)); gx <= int(math.Ceil(right/treeSpacing)); gx++ {
 			if tree, exists := f.treeAt(gx, gz); exists {
@@ -131,10 +146,17 @@ func (f *forest) render(cols, rows int, seconds float64) *forestCanvas {
 			}
 		}
 	}
+	f.trees = trees
+	// Front-to-back drawing lets hidden crown pixels skip lighting calculations.
+	sort.Slice(trees, func(i, j int) bool {
+		return trees[i].z*0.69+trees[i].height*0.72 > trees[j].z*0.69+trees[j].height*0.72
+	})
+	channels := make([]riverChannel, 0, 6)
 	for y := range c.height {
+		wz := (float64(y)-float64(c.height)*0.57)/(c.scale*0.72) + c.z
+		channels = f.riverChannels(channels[:0], wz, left, right)
 		for x := range c.width {
 			wx := (float64(x)-float64(c.width)/2)/c.scale + c.x
-			wz := (float64(y)-float64(c.height)*0.57)/(c.scale*0.72) + c.z
 			n := f.noise(wx*0.65, wz*0.65, 19)
 			cover := f.cover(wx, wz)
 			ink, light := 0, 0.13+n*0.23
@@ -148,7 +170,7 @@ func (f *forest) render(cols, rows int, seconds float64) *forestCanvas {
 			if sun > 0.24 {
 				ink = 7
 			}
-			distance, width := f.river(wx, wz)
+			distance, width := nearestRiver(channels, wx)
 			if distance < width {
 				ink, light = 5, 0.28+n*0.3
 				if math.Sin(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
@@ -195,21 +217,27 @@ func (f *forest) frame(width, height int, seconds float64) string {
 	var out strings.Builder
 	out.WriteString("\x1b[H\x1b[0m\x1b[48;2;9;15;14m\x1b[38;2;147;166;130m")
 	if width < 40 || height < 14 {
+		f.screenWidth = 0
 		message := "Resize to 40 x 14. Q quits."
 		out.WriteString("\x1b[2J" + message[:min(width, len(message))])
 		return out.String()
 	}
-	cols, rows := min(width, 220), min(height-3, 90)
+	cols, rows := min(width, maxForestColumns), min(height-3, 90)
 	c := f.render(cols, rows, seconds)
 	margin := (width - cols) / 2
-	out.WriteString("\x1b[1;1H\x1b[2K  D I T H E R  /  W I L D S")
-	for row := range height - 2 {
-		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K", row+2)
-		if row >= rows {
-			continue
+	full := width != f.screenWidth || height != f.screenHeight
+	if full {
+		f.screenWidth, f.screenHeight = width, height
+		if len(f.cells) != cols*rows {
+			f.cells = make([]forestCell, cols*rows)
 		}
-		fmt.Fprintf(&out, "\x1b[%dG", margin+1)
-		lastInk := -1
+		out.WriteString("\x1b[2J\x1b[1;1H  D I T H E R  /  W I L D S")
+		controls := []rune("  arrows / WASD / IJKL walk · Q quit")
+		fmt.Fprintf(&out, "\x1b[%d;1H%s", height-1, string(controls[:min(width-1, len(controls))]))
+	}
+	lastInk := -1
+	for row := range rows {
+		var current [maxForestColumns]forestCell
 		for col := range cols {
 			bits, ink := 0, 0
 			var votes [9]int
@@ -229,21 +257,45 @@ func (f *forest) frame(width, height int, seconds float64) string {
 					ink = i
 				}
 			}
-			if bits == 0 {
-				out.WriteByte(' ')
+			current[col] = forestCell{uint8(bits), uint8(ink)}
+		}
+		previous := f.cells[row*cols : (row+1)*cols]
+		for col := 0; col < cols; {
+			if !full && current[col] == previous[col] {
+				col++
 				continue
 			}
-			if ink != lastInk {
-				rgb := forestPalette[ink]
-				fmt.Fprintf(&out, "\x1b[38;2;%d;%d;%dm", rgb[0], rgb[1], rgb[2])
-				lastInk = ink
+			end := col + 1
+			// Bridge tiny gaps when that costs less than another cursor escape.
+			for scan := end; scan < cols; scan++ {
+				if full || current[scan] != previous[scan] {
+					if scan-end > 3 {
+						break
+					}
+					end = scan + 1
+				}
 			}
-			out.WriteRune(rune(0x2800 + bits))
+			fmt.Fprintf(&out, "\x1b[%d;%dH", row+2, margin+col+1)
+			for ; col < end; col++ {
+				cell := current[col]
+				previous[col] = cell
+				if cell.bits == 0 {
+					out.WriteByte(' ')
+					continue
+				}
+				if int(cell.ink) != lastInk {
+					rgb := forestPalette[cell.ink]
+					fmt.Fprintf(&out, "\x1b[38;2;%d;%d;%dm", rgb[0], rgb[1], rgb[2])
+					lastInk = int(cell.ink)
+				}
+				out.WriteRune(rune(0x2800 + int(cell.bits)))
+			}
 		}
 	}
 	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  %s  |  seed %d", f.x, f.z, f.steps, f.region(), f.seed)
-	controls := "  arrows / WASD / IJKL walk · Q quit"
-	fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height-1, string([]rune(controls)[:min(width-1, len([]rune(controls)))]))
-	fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K%s", height, status[:min(width-1, len(status))])
+	if full || status != f.lastStatus {
+		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height, status[:min(width-1, len(status))])
+		f.lastStatus = status
+	}
 	return out.String()
 }
