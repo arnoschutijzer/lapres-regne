@@ -1,4 +1,4 @@
-package main
+package terminal
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"dither-cli/internal/forest"
 )
 
 // Bayer thresholds turn smooth lighting into a stable, ordered dot pattern.
@@ -13,107 +15,19 @@ var bayer = [4][4]float64{
 	{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5},
 }
 
-// World coordinates are sampled directly: exploration never allocates a growing map.
-type forest struct {
-	seed                      uint64
-	x, z, cameraX, cameraZ    float64
-	steps                     int
-	stepDistance              float64
-	facing                    action
-	started, lastWalk         time.Time
+// renderer draws the forest as braille cells and sends only changed cells.
+type renderer struct {
+	world                     *forest.Forest
+	title                     string
 	canvas                    forestCanvas
-	trees                     []woodlandTree
+	trees                     []forest.Tree
 	cells                     []forestCell
 	screenWidth, screenHeight int
 	lastStatus                string
 }
 
-func newForest(seed uint64) *forest {
-	return &forest{seed: seed, facing: down, started: time.Now()}
-}
-
-func (f *forest) random(x, z int, salt uint64) float64 {
-	n := uint64(int64(x))*0x9e3779b185ebca87 ^ uint64(int64(z))*0xc2b2ae3d27d4eb4f ^ f.seed ^ salt
-	n ^= n >> 30
-	n *= 0xbf58476d1ce4e5b9
-	n ^= n >> 27
-	n *= 0x94d049bb133111eb
-	n ^= n >> 31
-	return float64(n>>11) / (1 << 53)
-}
-
-func (f *forest) noise(x, z float64, salt uint64) float64 {
-	ix, iz := int(math.Floor(x)), int(math.Floor(z))
-	u, v := x-float64(ix), z-float64(iz)
-	u, v = u*u*(3-2*u), v*v*(3-2*v)
-	a := f.random(ix, iz, salt)*(1-u) + f.random(ix+1, iz, salt)*u
-	b := f.random(ix, iz+1, salt)*(1-u) + f.random(ix+1, iz+1, salt)*u
-	return a*(1-v) + b*v
-}
-
-func (f *forest) walk(direction action, sprinting bool) {
-	dx, dz := 0.0, 0.0
-	switch direction {
-	case left:
-		dx = -1
-	case right:
-		dx = 1
-	case up:
-		dz = -1
-	case down:
-		dz = 1
-	default:
-		return
-	}
-	distance := 0.55
-	if sprinting {
-		distance *= 2
-	}
-	f.move(dx, dz, distance)
-	f.steps++
-}
-
-// Advance by elapsed time, independently of terminal key-repeat timing.
-func (f *forest) advance(dx, dz float64, dt time.Duration, sprinting bool) {
-	speed := 9.0
-	if sprinting {
-		speed *= 2
-	}
-	f.stepDistance += f.move(dx, dz, speed*dt.Seconds())
-	for f.stepDistance >= 0.55 {
-		f.steps++
-		f.stepDistance -= 0.55
-	}
-}
-
-func (f *forest) move(dx, dz, distance float64) float64 {
-	length := math.Hypot(dx, dz)
-	if length == 0 {
-		return 0
-	}
-	dx, dz = dx/length, dz/length
-	f.facing = down
-	if math.Abs(dx) > math.Abs(dz) {
-		f.facing = right
-		if dx < 0 {
-			f.facing = left
-		}
-	} else if dz < 0 {
-		f.facing = up
-	}
-	f.lastWalk = time.Now()
-	riverDistance, width := f.river(f.x, f.z)
-	if riverDistance < width {
-		distance *= 0.5
-	}
-	f.x, f.z = f.x+dx*distance, f.z+dz*distance
-	return distance
-}
-
-func (f *forest) follow(dt time.Duration) {
-	blend := 1 - math.Exp(-32*dt.Seconds())
-	f.cameraX += (f.x - f.cameraX) * blend
-	f.cameraZ += (f.z - f.cameraZ) * blend
+func newRenderer(world *forest.Forest, title string) *renderer {
+	return &renderer{world: world, title: title}
 }
 
 type forestPixel struct {
@@ -171,9 +85,11 @@ func (c *forestCanvas) line(x1, y1, z1, x2, y2, z2, light float64, ink int) {
 	}
 }
 
-func (f *forest) render(cols, rows int, seconds float64) *forestCanvas {
-	c := &f.canvas
-	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, f.cameraX, f.cameraZ, 3.6
+func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
+	f := r.world
+	c := &r.canvas
+	cameraX, cameraZ := f.Camera()
+	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, 3.6
 	if len(c.pixels) != c.width*c.height {
 		c.pixels = make([]forestPixel, c.width*c.height)
 	}
@@ -181,39 +97,39 @@ func (f *forest) render(cols, rows int, seconds float64) *forestCanvas {
 	right := c.x + float64(c.width)/c.scale/2 + 5
 	back := c.z - float64(c.height)/c.scale - 5
 	front := c.z + float64(c.height)/c.scale + 12
-	trees := f.trees[:0]
-	for gz := int(math.Floor(back / treeSpacing)); gz <= int(math.Ceil(front/treeSpacing)); gz++ {
-		for gx := int(math.Floor(left / treeSpacing)); gx <= int(math.Ceil(right/treeSpacing)); gx++ {
-			if tree, exists := f.treeAt(gx, gz); exists {
+	trees := r.trees[:0]
+	for gz := int(math.Floor(back / forest.TreeSpacing)); gz <= int(math.Ceil(front/forest.TreeSpacing)); gz++ {
+		for gx := int(math.Floor(left / forest.TreeSpacing)); gx <= int(math.Ceil(right/forest.TreeSpacing)); gx++ {
+			if tree, exists := f.TreeAt(gx, gz); exists {
 				trees = append(trees, tree)
 			}
 		}
 	}
-	f.trees = trees
+	r.trees = trees
 	// Front-to-back drawing lets hidden crown pixels skip lighting calculations.
 	sort.Slice(trees, func(i, j int) bool {
-		return trees[i].z*0.69+trees[i].height*0.72 > trees[j].z*0.69+trees[j].height*0.72
+		return trees[i].Z*0.69+trees[i].Height*0.72 > trees[j].Z*0.69+trees[j].Height*0.72
 	})
-	channels := make([]riverChannel, 0, 6)
+	channels := make([]forest.RiverChannel, 0, 6)
 	for y := range c.height {
 		wz := (float64(y)-float64(c.height)*0.57)/(c.scale*0.72) + c.z
-		channels = f.riverChannels(channels[:0], wz, left, right)
+		channels = f.RiverChannels(channels[:0], wz, left, right)
 		for x := range c.width {
 			wx := (float64(x)-float64(c.width)/2)/c.scale + c.x
-			n := f.noise(wx*0.65, wz*0.65, 19)
-			cover := f.cover(wx, wz)
+			n := f.Noise(wx*0.65, wz*0.65, 19)
+			cover := f.Cover(wx, wz)
 			ink, light := 0, 0.13+n*0.23
 			if cover < 0.38 {
 				ink, light = 1, 0.21+n*0.24
 			}
 			// Diagonal pools of sunlight survive only where the canopy opens.
-			beam := math.Max(0, math.Sin(wx*0.28-wz*0.19+f.noise(wx/9, wz/9, 81)*2)-0.45)
+			beam := math.Max(0, math.Sin(wx*0.28-wz*0.19+f.Noise(wx/9, wz/9, 81)*2)-0.45)
 			sun := beam * math.Max(0, 1-cover*1.3)
 			light += sun * 0.8
 			if sun > 0.24 {
 				ink = 7
 			}
-			distance, width := nearestRiver(channels, wx)
+			distance, width := forest.NearestRiver(channels, wx)
 			if distance < width {
 				ink, light = 5, 0.28+n*0.3
 				if math.Sin(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
@@ -229,52 +145,53 @@ func (f *forest) render(cols, rows int, seconds float64) *forestCanvas {
 		c.shadow(tree)
 	}
 	for _, tree := range trees {
-		f.drawTree(c, tree)
+		r.drawTree(c, tree)
 	}
-	f.drawCharacter(c, seconds)
-	f.drawGrass(c, left, right, back, front, seconds)
+	r.drawCharacter(c, seconds)
+	r.drawGrass(c, left, right, back, front, seconds)
 	return c
 }
 
-func (f *forest) drawCharacter(c *forestCanvas, seconds float64) {
+func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
+	x, z := r.world.Position()
 	stride := 0.0
-	if time.Since(f.lastWalk) < 200*time.Millisecond {
+	if time.Since(r.world.LastWalk()) < 200*time.Millisecond {
 		stride = math.Sin(seconds*18) * 0.24
 	}
 	strideX, strideZ := 0.0, stride
-	if f.facing == left || f.facing == right {
+	if facing := r.world.Facing(); facing == forest.FacingLeft || facing == forest.FacingRight {
 		strideX, strideZ = stride, 0
 	}
 	// A small warm-colored traveler: boots, coat, arms, and a round hat.
-	c.line(f.x-0.16+strideX, 0.05, f.z+strideZ, f.x-0.12, 0.7, f.z, 1, 8)
-	c.line(f.x+0.16-strideX, 0.05, f.z-strideZ, f.x+0.12, 0.7, f.z, 1, 8)
-	c.line(f.x, 0.55, f.z, f.x, 1.15, f.z, 1, 8)
-	c.line(f.x-0.34, 0.65, f.z-stride, f.x+0.34, 1.0, f.z+stride, 0.95, 8)
+	c.line(x-0.16+strideX, 0.05, z+strideZ, x-0.12, 0.7, z, 1, 8)
+	c.line(x+0.16-strideX, 0.05, z-strideZ, x+0.12, 0.7, z, 1, 8)
+	c.line(x, 0.55, z, x, 1.15, z, 1, 8)
+	c.line(x-0.34, 0.65, z-stride, x+0.34, 1.0, z+stride, 0.95, 8)
 	for i := range 8 {
 		a := float64(i) * math.Pi / 4
-		c.line(f.x, 1.48, f.z, f.x+math.Cos(a)*0.28, 1.48, f.z+math.Sin(a)*0.28, 1, 8)
+		c.line(x, 1.48, z, x+math.Cos(a)*0.28, 1.48, z+math.Sin(a)*0.28, 1, 8)
 	}
 }
 
-func (f *forest) frame(width, height int, seconds float64) string {
+func (r *renderer) frame(width, height int, seconds float64) string {
 	var out strings.Builder
 	out.WriteString("\x1b[H\x1b[0m\x1b[48;2;9;15;14m\x1b[38;2;147;166;130m")
 	if width < 40 || height < 14 {
-		f.screenWidth = 0
+		r.screenWidth = 0
 		message := "Resize to 40 x 14. Q quits."
 		out.WriteString("\x1b[2J" + message[:min(width, len(message))])
 		return out.String()
 	}
 	cols, rows := min(width, maxForestColumns), min(height-3, 90)
-	c := f.render(cols, rows, seconds)
+	c := r.render(cols, rows, seconds)
 	margin := (width - cols) / 2
-	full := width != f.screenWidth || height != f.screenHeight
+	full := width != r.screenWidth || height != r.screenHeight
 	if full {
-		f.screenWidth, f.screenHeight = width, height
-		if len(f.cells) != cols*rows {
-			f.cells = make([]forestCell, cols*rows)
+		r.screenWidth, r.screenHeight = width, height
+		if len(r.cells) != cols*rows {
+			r.cells = make([]forestCell, cols*rows)
 		}
-		out.WriteString("\x1b[2J\x1b[1;1H  " + appTitle)
+		out.WriteString("\x1b[2J\x1b[1;1H  " + r.title)
 		hint := "  arrows/WASD/IJKL · shift run · Q quit"
 		if width >= 54 {
 			hint += " · N/P tracks"
@@ -306,7 +223,7 @@ func (f *forest) frame(width, height int, seconds float64) string {
 			}
 			current[col] = forestCell{uint8(bits), uint8(ink)}
 		}
-		previous := f.cells[row*cols : (row+1)*cols]
+		previous := r.cells[row*cols : (row+1)*cols]
 		for col := 0; col < cols; {
 			if !full && current[col] == previous[col] {
 				col++
@@ -339,10 +256,11 @@ func (f *forest) frame(width, height int, seconds float64) string {
 			}
 		}
 	}
-	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  %s  |  seed %d", f.x, f.z, f.steps, f.region(), f.seed)
-	if full || status != f.lastStatus {
+	x, z := r.world.Position()
+	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  %s  |  seed %d", x, z, r.world.Steps(), r.world.Region(), r.world.Seed())
+	if full || status != r.lastStatus {
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height, status[:min(width-1, len(status))])
-		f.lastStatus = status
+		r.lastStatus = status
 	}
 	return out.String()
 }

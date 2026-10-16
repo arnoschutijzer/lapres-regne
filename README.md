@@ -72,5 +72,5 @@ go test ./...
 Benchmark animated rendering at three terminal sizes:
 
 ```sh
-go test -run '^$' -bench BenchmarkForestFrame -benchmem
+go test -run '^$' -bench BenchmarkForestFrame -benchmem ./internal/adapters/terminal
 ```

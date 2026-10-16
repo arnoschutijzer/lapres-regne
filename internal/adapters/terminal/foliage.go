@@ -1,6 +1,10 @@
-package main
+package terminal
 
-import "math"
+import (
+	"math"
+
+	"dither-cli/internal/forest"
+)
 
 type vec struct{ x, y, z float64 }
 
@@ -8,9 +12,9 @@ func (a vec) mul(s float64) vec { return vec{a.x * s, a.y * s, a.z * s} }
 func (a vec) dot(b vec) float64 { return a.x*b.x + a.y*b.y + a.z*b.z }
 func (a vec) unit() vec         { return a.mul(1 / math.Sqrt(a.dot(a))) }
 
-func (c *forestCanvas) shadow(tree woodlandTree) {
-	x, y, _ := c.project(tree.x+tree.height*0.55, 0, tree.z+tree.height*0.3)
-	rx, ry := tree.radius*c.scale*1.3, tree.radius*c.scale*0.72
+func (c *forestCanvas) shadow(tree forest.Tree) {
+	x, y, _ := c.project(tree.X+tree.Height*0.55, 0, tree.Z+tree.Height*0.3)
+	rx, ry := tree.Radius*c.scale*1.3, tree.Radius*c.scale*0.72
 	for py := max(0, int(y-ry)); py <= min(c.height-1, int(y+ry)); py++ {
 		for px := max(0, int(x-rx)); px <= min(c.width-1, int(x+rx)); px++ {
 			u, v := (float64(px)-x)/rx, (float64(py)-y)/ry
@@ -26,11 +30,13 @@ func (c *forestCanvas) shadow(tree woodlandTree) {
 }
 
 // Ray/ellipsoid intersections provide rounded crowns with real depth and lighting.
-func (f *forest) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
+func (r *renderer) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
+	f := r.world
+	heroWorldX, heroWorldZ := f.Position()
 	sx, sy, depth := c.project(x, y, z)
 	boundX := rx * c.scale
 	boundY := math.Sqrt(ry*ry*0.69*0.69+rz*rz*0.72*0.72) * c.scale
-	heroX, heroY, _ := c.project(f.x, 0.9, f.z)
+	heroX, heroY, _ := c.project(heroWorldX, 0.9, heroWorldZ)
 	a := 0.72*0.72/(ry*ry) + 0.69*0.69/(rz*rz)
 	for py := max(0, int(sy-boundY)-1); py <= min(c.height-1, int(sy+boundY)+1); py++ {
 		for px := max(0, int(sx-boundX)-1); px <= min(c.width-1, int(sx+boundX)+1); px++ {
@@ -56,7 +62,7 @@ func (f *forest) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 			// A small cutaway keeps the traveler readable under overlapping crowns.
 			hx, hy := (float64(px)-heroX)/7, (float64(py)-heroY)/9
 			if distance := hx*hx + hy*hy; distance < 1 {
-				if distance < 0.13 || f.random(int(math.Floor(x+u*3)), int(math.Floor(z+localZ*3)), 83) > 0.18 {
+				if distance < 0.13 || f.Random(int(math.Floor(x+u*3)), int(math.Floor(z+localZ*3)), 83) > 0.18 {
 					continue
 				}
 			}
@@ -65,37 +71,38 @@ func (f *forest) crown(c *forestCanvas, x, y, z, rx, ry, rz float64) {
 	}
 }
 
-func (f *forest) drawTree(c *forestCanvas, tree woodlandTree) {
-	x, z, h, r := tree.x, tree.z, tree.height, tree.radius
-	for _, offset := range []float64{-tree.trunk, 0, tree.trunk} {
+func (r *renderer) drawTree(c *forestCanvas, tree forest.Tree) {
+	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
+	for _, offset := range []float64{-tree.Trunk, 0, tree.Trunk} {
 		c.line(x+offset, 0, z, x+offset*0.6, h, z, 0.62, 4)
 	}
-	a := tree.variation * 6.28
+	a := tree.Variation * 6.28
 	for i := range 3 {
 		angle := a + float64(i)*2.094
-		dx, dz := math.Cos(angle)*r*0.62, math.Sin(angle)*r*0.62
+		dx, dz := math.Cos(angle)*radius*0.62, math.Sin(angle)*radius*0.62
 		c.line(x, h*0.45, z, x+dx, h*0.92, z+dz, 0.7, 4)
-		f.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, r*0.72, r*0.57, r*0.72)
+		r.crown(c, x+dx, h*(0.84+float64(i)*0.05), z+dz, radius*0.72, radius*0.57, radius*0.72)
 	}
-	f.crown(c, x, h+0.3, z, r*0.83, r*0.70, r*0.83)
+	r.crown(c, x, h+0.3, z, radius*0.83, radius*0.70, radius*0.83)
 }
 
-func (f *forest) drawGrass(c *forestCanvas, left, right, back, front, seconds float64) {
+func (r *renderer) drawGrass(c *forestCanvas, left, right, back, front, seconds float64) {
+	f := r.world
 	for gz := int(math.Floor(back)); gz <= int(math.Ceil(front)); gz++ {
 		for gx := int(math.Floor(left)); gx <= int(math.Ceil(right)); gx++ {
-			chance := f.random(gx, gz, 31)
-			x := float64(gx) + f.random(gx, gz, 32)
-			z := float64(gz) + f.random(gx, gz, 33)
+			chance := f.Random(gx, gz, 31)
+			x := float64(gx) + f.Random(gx, gz, 32)
+			z := float64(gz) + f.Random(gx, gz, 33)
 			// Skip offscreen roots before evaluating the more expensive biome fields.
 			sx, sy, _ := c.project(x, 0, z)
 			if sx < -3 || sx > float64(c.width)+3 || sy < 0 || sy > float64(c.height)+12 {
 				continue
 			}
-			distance, width := f.river(x, z)
+			distance, width := f.River(x, z)
 			if distance < width {
 				continue
 			}
-			cover := f.cover(x, z)
+			cover := f.Cover(x, z)
 			tall := cover < 0.38 || distance < width+1.5
 			if !tall && chance > 0.10 || tall && chance > 0.78 {
 				continue
@@ -105,7 +112,7 @@ func (f *forest) drawGrass(c *forestCanvas, left, right, back, front, seconds fl
 				height = 1.2 + chance*1.5
 			}
 			sway := math.Sin(seconds*1.5+x*0.4+z*0.3) * 0.16
-			light := 0.46 + f.random(gx, gz, 34)*0.4
+			light := 0.46 + f.Random(gx, gz, 34)*0.4
 			c.line(x, 0, z, x+sway*0.5, height*0.6, z, light*0.8, 1)
 			c.line(x+sway*0.5, height*0.6, z, x+sway+0.16, height, z+0.08, light, 1)
 			c.line(x+sway*0.5, height*0.55, z, x-0.22+sway, height*0.85, z-0.04, light*0.8, 1)

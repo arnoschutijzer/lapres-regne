@@ -1,4 +1,4 @@
-package main
+package terminal
 
 import (
 	"strconv"
@@ -202,4 +202,19 @@ func (keys heldKeys) direction() (dx, dz float64) {
 		dz++
 	}
 	return dx, dz
+}
+
+// vector turns a single movement action into a walking direction.
+func (a action) vector() (dx, dz float64) {
+	switch a {
+	case left:
+		return -1, 0
+	case right:
+		return 1, 0
+	case up:
+		return 0, -1
+	case down:
+		return 0, 1
+	}
+	return 0, 0
 }
