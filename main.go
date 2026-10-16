@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,15 +14,18 @@ import (
 )
 
 func main() {
+	treeMode := flag.Bool("tree", false, "show the original orbiting tree")
+	seed := flag.Uint64("seed", 7, "procedural forest seed")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "Usage: dither-cli\n\nAn interactive, dithered 3D tree. Requires a macOS or Linux terminal.\n\n  ← / J   rotate left\n  → / L   rotate right\n  Q / Ctrl-C   quit")
+		fmt.Fprintln(flag.CommandLine.Output(), "Usage: dither-cli [--seed number] [--tree]\n\nWalk through an endless dithered forest.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Q / Ctrl-C            quit\n\nWith --tree, left/right or J/L orbit the original tree.")
+		flag.PrintDefaults()
 	}
 	flag.Parse()
 	if flag.NArg() != 0 {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if err := run(); err != nil {
+	if err := run(*treeMode, *seed); err != nil {
 		fmt.Fprintln(os.Stderr, "dither-cli:", err)
 		os.Exit(1)
 	}
@@ -54,10 +56,10 @@ func terminalSize() (int, int, error) {
 	return cols, rows, nil
 }
 
-func run() error {
+func run(treeMode bool, seed uint64) error {
 	state, err := stty("-g")
 	if err != nil {
-		return fmt.Errorf("open an interactive terminal to run the tree (%w)", err)
+		return fmt.Errorf("open an interactive terminal to explore the forest (%w)", err)
 	}
 	width, height, err := terminalSize()
 	if err != nil {
@@ -95,12 +97,23 @@ func run() error {
 	resize := time.NewTicker(500 * time.Millisecond)
 	defer resize.Stop()
 	position, angle := 0.5, 0.0
-	tree := newTree()
+	var original *tree
+	if treeMode {
+		original = newTree()
+	}
+	forest := newForest(seed)
+	lastFrame := time.Now()
 	dirty := true
 	var decoder keyDecoder
 	for {
 		if dirty {
-			if _, err := io.WriteString(os.Stdout, tree.frame(width, height, position, angle)); err != nil {
+			var output string
+			if treeMode {
+				output = original.frame(width, height, position, angle)
+			} else {
+				output = forest.frame(width, height, time.Since(forest.started).Seconds())
+			}
+			if _, err := io.WriteString(os.Stdout, output); err != nil {
 				return err
 			}
 			dirty = false
@@ -116,11 +129,18 @@ func run() error {
 			if action == quit {
 				return nil
 			}
-			if action != 0 {
+			if !treeMode && action != none {
+				forest.walk(action)
+				dirty = true
+			} else if action == left || action == right {
 				// Snap to a terminal column before moving to avoid half-cell rounding drift.
 				span := max(1, width-1)
-				column := int(math.Round(position * float64(span)))
-				next := float64(max(0, min(span, column+action))) / float64(span)
+				column := int(position*float64(span) + 0.5)
+				delta := 1
+				if action == left {
+					delta = -1
+				}
+				next := float64(max(0, min(span, column+delta))) / float64(span)
 				if next != position {
 					position, dirty = next, true
 				}
@@ -130,8 +150,16 @@ func run() error {
 				width, height, dirty = w, h, true
 			}
 		case <-frames.C:
-			target := (position - 0.5) * 2 * math.Pi
-			if math.Abs(target-angle) > 0.0005 {
+			if !treeMode {
+				forest.follow()
+				if time.Since(lastFrame) >= time.Second/12 {
+					dirty = true
+					lastFrame = time.Now()
+				}
+				continue
+			}
+			target := (position - 0.5) * 6.283185307179586
+			if target-angle > 0.0005 || angle-target > 0.0005 {
 				angle += (target - angle) * 0.24
 				dirty = true
 			}
@@ -139,11 +167,20 @@ func run() error {
 	}
 }
 
-const quit = 2
+type action byte
+
+const (
+	none action = iota
+	left
+	right
+	up
+	down
+	quit
+)
 
 type keyDecoder struct{ escape byte }
 
-func (d *keyDecoder) feed(key byte) int {
+func (d *keyDecoder) feed(key byte) action {
 	if key == 3 || key == 4 || key == 'q' || key == 'Q' {
 		return quit
 	}
@@ -163,19 +200,29 @@ func (d *keyDecoder) feed(key byte) int {
 		if key >= 0x40 && key <= 0x7e {
 			d.escape = 0
 			if key == 'D' {
-				return -1
+				return left
 			}
 			if key == 'C' {
-				return 1
+				return right
+			}
+			if key == 'A' {
+				return up
+			}
+			if key == 'B' {
+				return down
 			}
 		}
 		return 0
 	}
 	switch key {
-	case 'j', 'J':
-		return -1
-	case 'l', 'L':
-		return 1
+	case 'j', 'J', 'a', 'A':
+		return left
+	case 'l', 'L', 'd', 'D':
+		return right
+	case 'i', 'I', 'w', 'W':
+		return up
+	case 'k', 'K', 's', 'S':
+		return down
 	}
 	return 0
 }

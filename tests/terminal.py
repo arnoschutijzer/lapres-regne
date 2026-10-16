@@ -17,12 +17,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Terminal:
-    def __init__(self, binary):
+    def __init__(self, binary, *args):
         self.master, self.slave = pty.openpty()
         self.resize(100, 30)
         self.original = termios.tcgetattr(self.slave)
         self.process = subprocess.Popen(
-            [binary], stdin=self.slave, stdout=self.slave, stderr=self.slave
+            [binary, *args], stdin=self.slave, stdout=self.slave, stderr=self.slave
         )
 
     def resize(self, width, height):
@@ -66,7 +66,7 @@ def tree_pixels(output):
 
 
 def check_interaction(binary):
-    terminal = Terminal(binary)
+    terminal = Terminal(binary, "--tree")
     try:
         initial = terminal.read(until=b"\x1b[51G\x1b[38;2;225;239;208m_")
         assert len(tree_pixels(initial)) > 100, "tree must be visible"
@@ -115,6 +115,24 @@ def check_exit(binary, action):
         terminal.close()
 
 
+def check_forest(binary):
+    terminal = Terminal(binary)
+    try:
+        initial = terminal.read(until=b"steps 0")
+        assert b"W I L D S" in initial
+        assert b"236;185;105m" in initial, "traveler must be visible"
+        terminal.send(b"d")
+        terminal.read(until=b"x 0.6  z 0.0  |  steps 1")
+        terminal.send(b"\x1b[A")
+        terminal.read(until=b"x 0.6  z -0.6  |  steps 2")
+        terminal.send(b"js")
+        terminal.read(until=b"x 0.0  z 0.0  |  steps 4")
+        terminal.send(b"q")
+        terminal.assert_restored()
+    finally:
+        terminal.close()
+
+
 with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     binary = str(Path(directory) / "dither-cli")
     subprocess.run(["go", "build", "-o", binary, "."], cwd=ROOT, check=True)
@@ -123,6 +141,7 @@ with tempfile.TemporaryDirectory(prefix="dither-test-") as directory:
     non_terminal = subprocess.run([binary], stdin=subprocess.DEVNULL, capture_output=True)
     assert non_terminal.returncode == 1 and b"interactive terminal" in non_terminal.stderr
     check_interaction(binary)
+    check_forest(binary)
     check_exit(binary, b"\x03")
     check_exit(binary, signal.SIGTERM)
     print("Passed: rendering, rotation, arrows, J/L, bounds, resize, quit, Ctrl-C, SIGTERM, restoration")
