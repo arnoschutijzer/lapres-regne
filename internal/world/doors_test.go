@@ -1,6 +1,7 @@
 package world_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -113,5 +114,28 @@ func TestWalkingElsewhereGivesUpOnTheDoor(t *testing.T) {
 	walkFor(w, 3*time.Second)
 	if w.EdgesAt(3.5*world.TileSize, 4.5*world.TileSize).NorthShut {
 		t.Fatal("the door closed after the hero walked elsewhere")
+	}
+}
+
+func TestADoorSoundsAsItClosesAndOpens(t *testing.T) {
+	w := atTheDoor()
+	sounds := &recordedSounds{}
+	w.SetSounds(sounds)
+	w.ToggleDoor()
+	w.ToggleDoor()
+	if want := []string{"close", "open"}; !slices.Equal(sounds.doors, want) {
+		t.Fatalf("door sounds = %v, want %v", sounds.doors, want)
+	}
+}
+
+func TestADoorThatCannotCloseOnTheHeroMakesNoSound(t *testing.T) {
+	w := world.NewOnMap(7, lodge(world.Wall))
+	w.WalkTo(3.5*world.TileSize, 4*world.TileSize)
+	walkFor(w, 3*time.Second)
+	sounds := &recordedSounds{}
+	w.SetSounds(sounds)
+	w.ToggleDoor()
+	if len(sounds.doors) != 0 {
+		t.Fatalf("door sounds = %v, want none", sounds.doors)
 	}
 }

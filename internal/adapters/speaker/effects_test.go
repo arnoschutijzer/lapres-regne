@@ -210,3 +210,50 @@ func TestTheFireworksHissUpThenPopInThrees(t *testing.T) {
 		}
 	}
 }
+
+func TestAClosingDoorSwingsLowThenKnocksAgainstItsFrame(t *testing.T) {
+	samples := doorSound(false)
+	if seconds := float64(len(samples)/soundtrack.Channels) / soundtrack.SampleRate; seconds < 0.18 || seconds > 0.25 {
+		t.Fatalf("closing lasts %.2f s, want about the original's 0.2 s", seconds)
+	}
+	if hinge, swing := loudness(samples, 0, 0.05), loudness(samples, 0.07, 0.08); swing < 4*hinge {
+		t.Fatalf("hinge = %.3f, swing = %.3f; want a faint start before the door swings", hinge, swing)
+	}
+	if swingLow, swingHigh := amplitudeAt(samples, 200, 0.07, 0.08), amplitudeAt(samples, 2000, 0.07, 0.08); swingLow < 4*swingHigh {
+		t.Fatalf("200 Hz = %.4f, 2000 Hz = %.4f while swinging; want a low, dull swing", swingLow, swingHigh)
+	}
+	if knock, swing := amplitudeAt(samples, 700, 0.163, 0.02), amplitudeAt(samples, 700, 0.1, 0.02); knock < 1.5*swing {
+		t.Fatalf("700 Hz at the knock = %.4f, while swinging = %.4f; want a brighter knock", knock, swing)
+	}
+	peak := 0.0
+	for i := 0; i < len(samples); i += soundtrack.Channels {
+		if samples[i] != samples[i+1] {
+			t.Fatalf("frame %d differs between channels; want a centred sound", i/2)
+		}
+		peak = math.Max(peak, math.Abs(float64(samples[i])))
+	}
+	if peak < 0.2 || peak > 0.95 {
+		t.Fatalf("peak = %.2f, want a clear knock that never clips", peak)
+	}
+}
+
+func TestAnOpeningDoorCreaksOnAfterItsKnock(t *testing.T) {
+	closing, opening := doorSound(false), doorSound(true)
+	if seconds := float64(len(opening)/soundtrack.Channels) / soundtrack.SampleRate; seconds < 0.42 || seconds > 0.55 {
+		t.Fatalf("opening lasts %.2f s, want about the original's 0.5 s", seconds)
+	}
+	for i := range closing[:int(0.18*soundtrack.SampleRate)*soundtrack.Channels] {
+		if closing[i] != opening[i] {
+			t.Fatalf("sample %d differs; want opening and closing to share their swing and knock", i)
+		}
+	}
+	if creak, swing := loudness(opening, 0.25, 0.13), loudness(opening, 0.07, 0.08); creak < 0.1*swing {
+		t.Fatalf("creak = %.3f, swing = %.3f; want the door creaking on after its knock", creak, swing)
+	}
+	if hum, high := amplitudeAt(opening, 186, 0.28, 0.08), amplitudeAt(opening, 3000, 0.28, 0.08); hum < 4*high {
+		t.Fatalf("186 Hz = %.4f, 3000 Hz = %.4f; want a low, hollow creak", hum, high)
+	}
+	if end := loudness(opening, 0.47, 0.01); end > 0.01 {
+		t.Fatalf("end = %.3f, want the creak to fade out", end)
+	}
+}

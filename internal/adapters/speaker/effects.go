@@ -22,6 +22,8 @@ type Effects struct {
 	levelUp, unlockingLevelUp []byte
 	// fireworks crackle over the jingle of every level-up.
 	fireworks []byte
+	// openDoor and closeDoor are a door swinging open and shut.
+	openDoor, closeDoor []byte
 	// playing keeps players referenced until their sound has finished.
 	playing []*oto.Player
 }
@@ -35,6 +37,8 @@ func newEffects(context *oto.Context) *Effects {
 		levelUp:          encode(levelUpSound(false)),
 		unlockingLevelUp: encode(levelUpSound(true)),
 		fireworks:        encode(fireworksSound()),
+		openDoor:         encode(doorSound(true)),
+		closeDoor:        encode(doorSound(false)),
 	}
 }
 
@@ -71,6 +75,16 @@ func (e *Effects) LevelUp(unlocked bool) {
 		e.play(e.levelUp)
 	}
 	e.play(e.fireworks)
+}
+
+// OpenDoor plays a door swinging open: it knocks back against its stop and creaks on.
+func (e *Effects) OpenDoor() {
+	e.play(e.openDoor)
+}
+
+// CloseDoor plays a door swinging shut and knocking against its frame.
+func (e *Effects) CloseDoor() {
+	e.play(e.closeDoor)
 }
 
 func (e *Effects) play(sound []byte) {

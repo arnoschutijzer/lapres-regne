@@ -131,12 +131,16 @@ type recordedSounds struct {
 	drops []world.Landing
 	// levelUps records each level-up jingle, true when the new level unlocked something.
 	levelUps []bool
+	// doors records each door moving: "open" or "close".
+	doors []string
 }
 
 func (s *recordedSounds) Chop()                      { s.chops++ }
 func (s *recordedSounds) Fall()                      { s.falls++ }
 func (s *recordedSounds) Drop(landing world.Landing) { s.drops = append(s.drops, landing) }
 func (s *recordedSounds) LevelUp(unlocked bool)      { s.levelUps = append(s.levelUps, unlocked) }
+func (s *recordedSounds) OpenDoor()                  { s.doors = append(s.doors, "open") }
+func (s *recordedSounds) CloseDoor()                 { s.doors = append(s.doors, "close") }
 
 func TestTheAxeLandsAsTheChopStartsAndEveryStrikeAfter(t *testing.T) {
 	w := besideTree()

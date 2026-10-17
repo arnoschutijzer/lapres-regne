@@ -13,6 +13,9 @@ type Sounds interface {
 	// LevelUp plays the jingle for a new level; unlocked picks the variant for a level that lets
 	// the hero chop a new kind of tree.
 	LevelUp(unlocked bool)
+	// OpenDoor sounds a door or gate swinging open, and CloseDoor one swinging shut.
+	OpenDoor()
+	CloseDoor()
 }
 
 // silence is the default when no sound effects are wired.
@@ -22,6 +25,8 @@ func (silence) Chop()        {}
 func (silence) Fall()        {}
 func (silence) Drop(Landing) {}
 func (silence) LevelUp(bool) {}
+func (silence) OpenDoor()    {}
+func (silence) CloseDoor()   {}
 
 // Progress keeps the hero's progress between sessions.
 type Progress interface {
