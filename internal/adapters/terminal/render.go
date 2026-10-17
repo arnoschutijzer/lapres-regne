@@ -53,6 +53,10 @@ type renderer struct {
 	modelInks map[*world.Model][]int
 	// bands are the canvases the structures and models are drawn on at once, a band of rows each.
 	bands []forestCanvas
+	// revealed is how far the clearing around the hero is open, from 0 shut to 1 open, and
+	// revealing marks that a frame has set it, so the first frame shows it settled.
+	revealed  float64
+	revealing bool
 }
 
 // newRenderer opens the view at the camera's zoom and yaw, so a resumed session starts where it was left.
@@ -406,12 +410,6 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		c.pixels = make([]forestPixel, c.width*c.height)
 		c.under = make([]groundPoint, c.width*c.height)
 	}
-	if f.Mapped() {
-		// The hero shows through the buildings, roofs and floors in front of them.
-		c.floor = r.floorOf(storey)
-		c.clearing = c.around(f.Hero().Position())
-		c.floor = nil
-	}
 	// The world area to draw holds the view, with room for trees and grass that reach into it,
 	// reaching farther off where the ground falls away below the camera and nearer where it rises.
 	halfAcross := float64(c.width)/c.scale/2 + 5
@@ -453,6 +451,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		for i := range r.upstairs {
 			r.upstairs[i].cover(r.upstairs[i+1:])
 		}
+		r.reveal(c, seconds)
 	} else {
 		r.rivers.sample(f, back, front, left, right, 1/c.scale)
 	}
@@ -877,6 +876,85 @@ func (r *renderer) shownStoreys() int {
 	return f.Storeys() - 1
 }
 
+// reveal opens the clearing around the hero while the walls, roofs and floors in front of them hide
+// most of them, so they show through, and shuts it once they don't. It eases open and shut.
+func (r *renderer) reveal(c *forestCanvas, seconds float64) {
+	target := 0.0
+	if r.heroHidden(c) {
+		target = 1
+	}
+	dt := min(0.1, max(0, seconds-r.lastSeconds))
+	r.revealed += (target - r.revealed) * (1 - math.Exp(-6*dt))
+	if !r.revealing || math.Abs(target-r.revealed) < 0.005 {
+		r.revealed, r.revealing = target, true
+	}
+	if r.revealed == 0 {
+		return
+	}
+	c.floor = r.floorOf(r.world.Storey())
+	c.clearing = c.around(r.world.Hero().Position())
+	c.floor = nil
+	c.clearing.across *= r.revealed
+	c.clearing.up *= r.revealed
+}
+
+// heroHidden tells whether the walls, doors, fences, roofs and floors above hide most of the hero
+// from the viewer, judged by rays cast toward the viewer from points across the hero's body.
+// Furniture and models never count: the hero is not shown through them.
+func (r *renderer) heroHidden(c *forestCanvas) bool {
+	f := r.world
+	x, z := f.Hero().Position()
+	base := f.ElevationOn(f.Storey(), x, z)
+	// Nothing stands higher than the walls of the highest floor shown, or the highest roof's ridge.
+	top := c.highest + wallHeight + copingHeight + merlonHeight
+	for _, roof := range r.built.roofs {
+		top = max(top, f.Highest()+roof.ridge())
+	}
+	hidden := 0
+	for _, height := range [3]float64{0.3, 0.9, 1.5} {
+		for _, across := range [3]float64{-0.25, 0, 0.25} {
+			if r.blocked(c, x+c.yawCos*across, base+height, z+c.yawSin*across, top) {
+				hidden++
+			}
+		}
+	}
+	return hidden >= 5
+}
+
+// blocked tells whether a wall, door, fence, roof or floor above stands between the viewer and the
+// point x, y, z of the world, looking no higher than top.
+func (r *renderer) blocked(c *forestCanvas, x, y, z, top float64) bool {
+	f := r.world
+	const step = 0.15
+	toViewer := c.viewer()
+	for travelled := step; ; travelled += step {
+		px, py, pz := x+toViewer.x*travelled, y+toViewer.y*travelled, z+toViewer.z*travelled
+		if py > top {
+			return false
+		}
+		for floor := f.Storey(); floor <= len(r.upstairs); floor++ {
+			area := &r.built
+			if floor > 0 {
+				area = &r.upstairs[floor-1]
+			}
+			height := py - f.ElevationOn(floor, px, pz)
+			if height >= 0 && area.occupied(px, height, pz) {
+				return true
+			}
+			// A floor above blocks where the ray rises through it.
+			if _, floored := f.GroundOn(floor, px, pz); floored && floor > f.Storey() && height >= 0 && height < toViewer.y*step {
+				return true
+			}
+		}
+		ground := c.heightAt(px, pz)
+		for _, roof := range r.built.roofs {
+			if roof.covers(px, py-ground, pz) {
+				return true
+			}
+		}
+	}
+}
+
 // shownFloor is the highest floor above the ground drawn floored at a world position, or false
 // where the ground shows. A floor above the hero's is left out round the hero where it stands in
 // front of them, so they show through it.
@@ -895,7 +973,6 @@ func (r *renderer) shownFloor(x, z float64) (int, bool) {
 	return 0, false
 }
 
-// floorOf is how high a floor lies, for whatever is drawn on it; nil for the ground.
 // shareOut works through count pieces of work at once across the cores, each core taking the next
 // piece as soon as it is done with its last, so faster cores take on more and none waits long on a
 // slower one.
@@ -947,6 +1024,7 @@ func (r *renderer) drawBuilt(c *forestCanvas) {
 	c.doorways = append(c.doorways, r.bands[0].doorways...)
 }
 
+// floorOf is how high a floor lies, for whatever is drawn on it; nil for the ground.
 func (r *renderer) floorOf(storey int) func(x, z float64) float64 {
 	if storey == 0 {
 		return nil

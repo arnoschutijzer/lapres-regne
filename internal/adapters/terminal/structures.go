@@ -585,7 +585,11 @@ func (r *renderer) drawStructures(c *forestCanvas, a *builtArea) {
 		a.drawEdges(c, col, row, x, z, r.world.Random(col, row, 45))
 		if tile.furnished && !tile.shaped {
 			c.standOn(x+world.TileSize/2, z+world.TileSize/2)
+			// The hero is never shown through furniture.
+			open := c.clearing
+			c.clearing.active = false
 			drawFixture(c, x, z, *tile, r.world.Random(col, row, 44))
+			c.clearing = open
 		}
 	}
 }

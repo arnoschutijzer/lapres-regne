@@ -6,7 +6,12 @@ import "lapresregne/internal/world"
 // floor drawn above it, triangle by triangle in their own colours, each lit as it faces the sun,
 // on the floor at the middle of the tiles it stands over.
 func (r *renderer) drawModels(c *forestCanvas, a *builtArea, models []world.PlacedModel) {
+	// The hero is shown through what hangs on a wall, as through the wall, but never through
+	// furniture standing on the floor.
+	open := c.clearing
+	defer func() { c.clearing = open }()
 	for _, placed := range models {
+		c.clearing.active = open.active && placed.Hangs
 		if placed.Col+placed.Cols < a.col || placed.Col > a.col+a.cols || placed.Row+placed.Rows < a.row || placed.Row > a.row+a.rows {
 			continue
 		}

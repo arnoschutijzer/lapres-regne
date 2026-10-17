@@ -466,9 +466,10 @@ func TestRoofsHideWhileTheHeroIsIndoors(t *testing.T) {
 	}
 }
 
-func TestTheHeroShowsThroughABuildingInFrontOfThem(t *testing.T) {
+// behindCottage walks the hero to the tile just north of the cottage, behind its back wall and roof
+// as seen from the south.
+func behindCottage(t *testing.T) *world.World {
 	w := cottage()
-	// The tile just north of the cottage, behind its back wall and roof as seen from the south.
 	w.WalkTo(81, 43)
 	for range 400 {
 		w.Advance(0, 0, 50*time.Millisecond, false)
@@ -476,20 +477,88 @@ func TestTheHeroShowsThroughABuildingInFrontOfThem(t *testing.T) {
 	if x, z := w.Hero().Position(); math.Hypot(x-81, z-43) > 0.1 {
 		t.Fatalf("hero stands at %.1f, %.1f, want behind the cottage", x, z)
 	}
-	r := newRenderer(w, "L’Après-Règne")
-	r.zoom = zoom{current: 3}
-	c := r.render(160, 60, 0)
+	return w
+}
+
+// heroPixels counts the lit pixels of the hero.
+func heroPixels(c *forestCanvas) int {
 	hero := 0
 	for _, p := range c.pixels {
 		if foremost(p.ink) && p.light > 0 {
 			hero++
 		}
 	}
-	if hero == 0 {
+	return hero
+}
+
+func TestTheHeroShowsThroughABuildingInFrontOfThem(t *testing.T) {
+	r := newRenderer(behindCottage(t), "L’Après-Règne")
+	r.zoom = zoom{current: 3}
+	c := r.render(160, 60, 0)
+	if heroPixels(c) == 0 {
 		t.Fatal("the hero behind the cottage must show through its wall and roof")
 	}
 	if countInk(c, roofInks...) == 0 {
 		t.Fatal("the cottage must stay roofed while the hero stands outside it")
+	}
+}
+
+func TestTheBuildingInFrontOfTheHeroEasesOpenAroundThem(t *testing.T) {
+	w := behindCottage(t)
+	building := append([]int{stoneInk, shadedStoneInk}, roofInks...)
+	settled := newRenderer(w, "L’Après-Règne")
+	settled.zoom = zoom{current: 3}
+	open := countInk(settled.render(160, 60, 2.1), building...)
+	// A renderer that last showed the hero in the open has the clearing shut as they step behind.
+	easing := newRenderer(w, "L’Après-Règne")
+	easing.zoom = zoom{current: 3}
+	easing.revealing = true
+	easing.lastSeconds = 1
+	if opening := countInk(easing.render(160, 60, 1.05), building...); opening <= open {
+		t.Fatalf("%d pixels of the cottage a moment after the hero steps behind it, want more than the %d once it has opened", opening, open)
+	}
+	for frame := range 60 {
+		easing.render(160, 60, 1.05+float64(frame+1)/60)
+	}
+	if opened := countInk(easing.render(160, 60, 2.1), building...); opened != open {
+		t.Fatalf("%d pixels of the cottage a second after the hero steps behind it, want the %d once it has opened", opened, open)
+	}
+}
+
+// besideTableAndWall stands the hero in the open, with a table on the tile in front of them and a
+// wall running north and south just past their right side, neither hiding them.
+func besideTableAndWall() *world.World {
+	const cols, rows = 40, 30
+	ground := make([][]world.Ground, rows)
+	edges := world.Edges{
+		West: make([][]world.Ground, rows), North: make([][]world.Ground, rows),
+		Rising: make([][]world.Ground, rows), Falling: make([][]world.Ground, rows),
+	}
+	for row := range rows {
+		ground[row] = make([]world.Ground, cols)
+		edges.West[row], edges.North[row] = make([]world.Ground, cols), make([]world.Ground, cols)
+		edges.Rising[row], edges.Falling[row] = make([]world.Ground, cols), make([]world.Ground, cols)
+	}
+	edges.West[17][21], edges.West[18][21] = world.Wall, world.Wall
+	return world.NewOnMap(7, world.Map{
+		Name: "Yard", Ground: ground, Edges: edges, StartCol: 20, StartRow: 16,
+		Fixtures: []world.PlacedFixture{{Col: 20, Row: 17, Kind: world.Table}},
+	})
+}
+
+func TestTheHeroInTheOpenLeavesTheFurnitureInFrontOfThemDrawn(t *testing.T) {
+	_, c := closeView(besideTableAndWall())
+	// The hero stands at 41, 33; the table's top lies a tile in front of them, at z 35.
+	if found := inkNear(c, 41, tableHeight, 35, plankInk, shadedOf(plankInk)); found < 10 {
+		t.Fatalf("%d of 25 pixels of planks on the table in front of the hero, want it drawn", found)
+	}
+}
+
+func TestTheHeroInTheOpenLeavesTheWallBesideThemStanding(t *testing.T) {
+	_, c := closeView(besideTableAndWall())
+	// The wall runs along x 42, in front of the hero and just past their right side.
+	if found := inkNear(c, 42, 1.5, 35, stoneInks...); found < 10 {
+		t.Fatalf("%d of 25 pixels of stone on the wall beside the hero, want it standing", found)
 	}
 }
 
