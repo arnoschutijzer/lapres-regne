@@ -2,6 +2,7 @@ package window
 
 import (
 	"image"
+	"image/color"
 	"math"
 	"testing"
 	"time"
@@ -132,7 +133,8 @@ func TestClickingATreeWalksThereToChopIt(t *testing.T) {
 	g := newGame(world.New(7), nil)
 	g.step(controls{}, tick)
 	for _, p := range g.scene {
-		if p.tree == nil || p.tree.Stump {
+		// A hero at level 1 can chop only normal and dead trees.
+		if p.tree == nil || p.tree.Stump || p.tree.Kind != world.NormalTree {
 			continue
 		}
 		bounds := p.art.Bounds()
@@ -157,11 +159,53 @@ func TestTheGroundShowsTheRiver(t *testing.T) {
 	// Walk south along x 0 until the ground is a river.
 	for z := 0.0; z < 400; z += 0.5 {
 		if distance, width := w.River(0, z); distance < width/2 {
-			if water, grass := groundColor(w, 0, z, 0, 0), ramp(grassMaterial, 0.5); water == grass {
-				t.Fatal("the river shows as grass")
+			c, _, _ := groundPixel(w, 0, int(z*unit*depthSquash))
+			for _, blue := range waterTones {
+				if c == blue {
+					return
+				}
 			}
-			return
+			t.Fatalf("the river shows as %v; want one of the water's tones", c)
 		}
 	}
 	t.Skip("no river within 400 units south")
+}
+
+func TestTheGroundIsPaintedInCleanShapesWithoutStatic(t *testing.T) {
+	chunk := paintChunk(world.New(7), 0, 0)
+	lone := 0
+	for y := range chunkSize {
+		for x := 1; x < chunkSize-1; x++ {
+			c := chunk.RGBAAt(x, y)
+			if c != chunk.RGBAAt(x-1, y) && c != chunk.RGBAAt(x+1, y) {
+				lone++
+			}
+		}
+	}
+	if share := float64(lone) / (chunkSize * chunkSize); share > 0.04 {
+		t.Errorf("%.0f%% of the ground's pixels stand alone in their row; want clean shapes", share*100)
+	}
+}
+
+func TestClearingsGrowWildflowers(t *testing.T) {
+	w := world.New(7)
+	flowers := map[color.RGBA]bool{crimsonTones[1]: true, goldTones[1]: true, paleTones[1]: true}
+	for cy := -3; cy <= 3; cy++ {
+		for cx := -3; cx <= 3; cx++ {
+			chunk := paintChunk(w, cx, cy)
+			for i := 0; i < len(chunk.Pix); i += 4 {
+				if flowers[color.RGBA{chunk.Pix[i], chunk.Pix[i+1], chunk.Pix[i+2], 255}] {
+					return
+				}
+			}
+		}
+	}
+	t.Fatal("no wildflower grows anywhere near the start")
+}
+
+func TestTheSameGroundIsPaintedEveryTime(t *testing.T) {
+	w := world.New(7)
+	if string(paintChunk(w, 2, -1).Pix) != string(paintChunk(w, 2, -1).Pix) {
+		t.Fatal("painting one chunk twice gives two pictures")
+	}
 }

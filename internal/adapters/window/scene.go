@@ -2,15 +2,15 @@ package window
 
 import (
 	"image"
-	"image/color"
 	"math"
 	"sort"
 
 	"lapresregne/internal/world"
 )
 
-// screenWidth and screenHeight are the window's size in art pixels, before it is scaled up to fit.
-const screenWidth, screenHeight = 640, 360
+// screenWidth and screenHeight are the window's size in art pixels, before it is scaled up to fit:
+// Hyper Light Drifter's own.
+const screenWidth, screenHeight = 480, 270
 
 // unit is how many art pixels one world unit spans across the screen.
 const unit = 16.0
@@ -39,61 +39,14 @@ func (c *camera) follow(x, z, dt float64) {
 	c.z += (z - c.z) * ease
 }
 
+// origin is the world's art pixel at the screen's top left corner, once the camera is snapped.
+func (c camera) origin() (px, py int) {
+	return int(math.Round(c.x*unit)) - screenWidth/2, int(math.Round(c.z*unit*depthSquash)) - screenHeight/2
+}
+
 // snapped is the camera moved onto whole art pixels, so sprites and ground keep crisp edges.
 func (c camera) snapped() camera {
 	return camera{math.Round(c.x*unit) / unit, math.Round(c.z*unit*depthSquash) / (unit * depthSquash)}
-}
-
-// background is the color of whatever lies beyond the world.
-var background = color.RGBA{8, 6, 14, 255}
-
-// groundColor is the color of the ground at a world point. px and py are the world's own art pixel
-// there, so the texture stays put on the ground while the camera moves.
-func groundColor(w *world.World, x, z float64, px, py int) color.RGBA {
-	// Tufts a few pixels across give the ground a calm texture rather than static.
-	texture := (hash(px/6, py/4, 5) - 0.5) * 0.16
-	if w.Mapped() {
-		ground, ok := w.GroundAt(x, z)
-		if !ok {
-			return background
-		}
-		switch ground {
-		case world.Water:
-			return ramp(waterMaterial, 0.5+texture)
-		case world.Path:
-			return ramp(pathMaterial, 0.55+texture)
-		case world.Floor, world.Door:
-			return ramp(stoneMaterial, 0.5+texture)
-		case world.Boards:
-			return ramp(boardsMaterial, 0.5+texture)
-		}
-		return ramp(grassMaterial, 0.6-w.Cover(x, z)*0.4+texture)
-	}
-	if distance, width := w.River(x, z); distance < width {
-		// Ripples run across the river in thin bands.
-		ripple := 0.1 * math.Sin(float64(py)*0.9+float64(px)*0.15)
-		return ramp(waterMaterial, 0.45+ripple+texture*0.5)
-	}
-	// Grass darkens under the canopy and in broad, soft patches.
-	return ramp(grassMaterial, 0.5-w.Cover(x, z)*0.45+(w.Noise(x/6, z/6, 3)-0.5)*0.3+texture)
-}
-
-// paintGround fills an image of the screen with the ground the camera shows. Each 2 x 2 block of
-// art pixels shows one sample of the ground.
-func paintGround(ground *image.RGBA, w *world.World, view camera) {
-	originX := int(math.Round(view.x*unit)) - screenWidth/2
-	originY := int(math.Round(view.z*unit*depthSquash)) - screenHeight/2
-	for sy := 0; sy < screenHeight; sy += 2 {
-		for sx := 0; sx < screenWidth; sx += 2 {
-			x, z := view.toWorld(float64(sx)+1, float64(sy)+1)
-			c := groundColor(w, x, z, originX+sx, originY+sy)
-			for dy := range 2 {
-				for dx := range 2 {
-					ground.SetRGBA(sx+dx, sy+dy, c)
-				}
-			}
-		}
-	}
 }
 
 // placed is a sprite at its place on the screen: its art's top left at x, y. tree is the standing

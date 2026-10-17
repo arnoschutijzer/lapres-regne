@@ -71,15 +71,15 @@ func readControls() controls {
 
 // game is the world shown in the window.
 type game struct {
-	world  *world.World
-	music  soundtrack.Player
-	view   camera
-	art    *sprites
-	scene  []placed
-	ground *image.RGBA
-	// drawn holds each sprite's art once it has been sent to the graphics card.
-	drawn       map[*image.RGBA]*ebiten.Image
-	groundImage *ebiten.Image
+	world *world.World
+	music soundtrack.Player
+	view  camera
+	art   *sprites
+	scene []placed
+	// drawn holds each sprite's art once it has been sent to the graphics card, and chunks the
+	// painted ground near the camera.
+	drawn  map[*image.RGBA]*ebiten.Image
+	chunks map[image.Point]*ebiten.Image
 }
 
 func newGame(w *world.World, music soundtrack.Player) *game {
@@ -89,8 +89,8 @@ func newGame(w *world.World, music soundtrack.Player) *game {
 		music:  music,
 		view:   camera{x, z},
 		art:    newSprites(),
-		ground: image.NewRGBA(image.Rect(0, 0, screenWidth, screenHeight)),
 		drawn:  map[*image.RGBA]*ebiten.Image{},
+		chunks: map[image.Point]*ebiten.Image{},
 	}
 }
 
@@ -131,12 +131,8 @@ func (g *game) Update() error {
 }
 
 func (g *game) Draw(screen *ebiten.Image) {
-	paintGround(g.ground, g.world, g.view.snapped())
-	if g.groundImage == nil {
-		g.groundImage = ebiten.NewImage(screenWidth, screenHeight)
-	}
-	g.groundImage.WritePixels(g.ground.Pix)
-	screen.DrawImage(g.groundImage, nil)
+	screen.Fill(voidColor)
+	g.drawGround(screen)
 	for _, p := range g.scene {
 		sprite, ok := g.drawn[p.art]
 		if !ok {
@@ -149,13 +145,40 @@ func (g *game) Draw(screen *ebiten.Image) {
 	}
 }
 
+// drawGround draws the chunks of ground the camera shows, painting any not painted yet, and lets go
+// of those it has left behind.
+func (g *game) drawGround(screen *ebiten.Image) {
+	originX, originY := g.view.snapped().origin()
+	first := image.Pt(floorDiv(originX, chunkSize), floorDiv(originY, chunkSize))
+	last := image.Pt(floorDiv(originX+screenWidth, chunkSize), floorDiv(originY+screenHeight, chunkSize))
+	for at, chunk := range g.chunks {
+		if at.X < first.X-1 || at.X > last.X+1 || at.Y < first.Y-1 || at.Y > last.Y+1 {
+			chunk.Deallocate()
+			delete(g.chunks, at)
+		}
+	}
+	for cy := first.Y; cy <= last.Y; cy++ {
+		for cx := first.X; cx <= last.X; cx++ {
+			at := image.Pt(cx, cy)
+			chunk, ok := g.chunks[at]
+			if !ok {
+				chunk = ebiten.NewImageFromImage(paintChunk(g.world, cx, cy))
+				g.chunks[at] = chunk
+			}
+			options := &ebiten.DrawImageOptions{}
+			options.GeoM.Translate(float64(cx*chunkSize-originX), float64(cy*chunkSize-originY))
+			screen.DrawImage(chunk, options)
+		}
+	}
+}
+
 func (g *game) Layout(int, int) (int, int) { return screenWidth, screenHeight }
 
 // Run opens a window on the world and lets the traveler explore it until they quit or close the
 // window. Music is nil when muted.
 func Run(w *world.World, music soundtrack.Player, title string) error {
 	ebiten.SetWindowTitle(title)
-	ebiten.SetWindowSize(screenWidth*2, screenHeight*2)
+	ebiten.SetWindowSize(screenWidth*3, screenHeight*3)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetTPS(ticksPerSecond)
 	err := ebiten.RunGame(newGame(w, music))
