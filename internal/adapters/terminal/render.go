@@ -766,7 +766,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 					if prominent(material) || material == 2 || material == 3 || material == 4 || material >= 11 && material <= 16 {
 						strength = 0.35
 					}
-					current[col].paper = mix(background, r.palette[material], strength*counted.light/float64(counted.coverage))
+					current[col].paper = mix(background, r.palette[material], min(1, strength*c.underlay()*counted.light/float64(counted.coverage)))
 					break
 				}
 			}
@@ -1222,6 +1222,13 @@ func (s *riverSamples) at(z float64) []world.RiverChannel {
 	depths := len(s.channels) / s.bands
 	i := min(depths-1, max(0, int(math.Round((z-s.back)/s.step))))
 	return s.channels[i*s.bands : (i+1)*s.bands]
+}
+
+// underlay is how much the material color under the dots is strengthened: twice as much when
+// zoomed all the way out, where dots alone scatter into noise, easing to none from the zoom where
+// trees show their detail.
+func (c *forestCanvas) underlay() float64 {
+	return 2 - min(1, max(0, (c.scale-forestScale)/(detailScale-forestScale)))
 }
 
 // quiet is how strongly the ground shows, from half when zoomed all the way out up to full from

@@ -642,3 +642,11 @@ func TestEveryColourShowsBrighterWithItsHueKept(t *testing.T) {
 		t.Fatalf("paper = %q, want %q: a bright color lifts only as far as full strength", got, want)
 	}
 }
+
+func TestTheColorUnderTheDotsStrengthensAsTheViewZoomsOut(t *testing.T) {
+	far := forestCanvas{scale: forestScale}
+	near := forestCanvas{scale: detailScale}
+	if far.underlay() != 2 || near.underlay() != 1 {
+		t.Fatalf("underlay zoomed out %v, at tree detail %v; want 2 and 1", far.underlay(), near.underlay())
+	}
+}
