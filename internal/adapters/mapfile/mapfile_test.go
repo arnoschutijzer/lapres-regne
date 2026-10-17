@@ -167,6 +167,26 @@ func TestTheHeroWalksOverTheLumbridgeBridge(t *testing.T) {
 	}
 }
 
+func TestTheHeroClimbsLumbridgeCastlesStaircaseToTheBank(t *testing.T) {
+	lumbridge, err := Load(filepath.Join("..", "..", "..", "maps", "lumbridge.map"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := world.NewOnMap(7, lumbridge)
+	// The staircase in the castle's south-west tower, from the courtyard through the keep.
+	w.ApproachFlight(world.Flight{Col: 54, Row: 84, Kind: world.Staircase})
+	for range 600 {
+		w.Advance(0, 0, 50*time.Millisecond, false)
+	}
+	if w.Storey() != 1 {
+		x, z := w.Hero().Position()
+		t.Fatalf("storey = %d with the hero at %.1f, %.1f; want them up the staircase on the first floor", w.Storey(), x, z)
+	}
+	if !w.Climb(true) || w.Storey() != 2 {
+		t.Fatalf("storey = %d, want the hero up on the second floor, where the bank is", w.Storey())
+	}
+}
+
 func TestAMapFilePlacesItsFixtures(t *testing.T) {
 	loaded, err := Load(write(t, "hall.map", "terrain\n.@...\n_____\n\nobjects\n.....\n.t..t\n"))
 	if err != nil {

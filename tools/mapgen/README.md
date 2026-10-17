@@ -44,6 +44,13 @@ writes somewhere else, and `--cache` keeps the download elsewhere.
   body of water, room and bridge deck lying level.
 - **Objects.** Furniture and landmarks fill their footprints, turned with their
   rotation.
+- **Floors.** The game's levels 1 to 3 become the map's floors above the
+  ground (`terrain 1`, `walls 1`, `objects 1` and so on), floored in stone and
+  boards where the game floors them and open to the air elsewhere; a bridge's
+  deck stays on the ground. Their walls and furniture stand as on the ground.
+  The game leaves the floor out under a staircase or ladder above the ground,
+  so those tiles take the floor beside them. A staircase or ladder leads up
+  where the game stands its top on the same tiles a level higher.
 - **Models.** Every piece of furniture and every landmark is drawn as the game
   models it, written to `maps/lumbridge.models`; one the game stands
   diagonally is turned a further eighth of a turn. `models.py` ports RuneLite's object and model

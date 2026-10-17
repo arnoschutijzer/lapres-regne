@@ -48,8 +48,10 @@ class Terrain:
 
     def __init__(self):
         self.height = {}
-        # overlay is (id, shape, rotation) and underlay an id, at level 0.
-        self.overlay, self.underlay = {}, {}
+        # overlays holds each level's floors, (id, shape, rotation), and overlay those at level 0;
+        # underlay is an id, at level 0.
+        self.overlays = {z: {} for z in range(4)}
+        self.overlay, self.underlay = self.overlays[0], {}
         # settings holds each tile's flags at levels 0 and 1, by (level, x, y).
         self.settings = {}
 
@@ -83,8 +85,7 @@ class Terrain:
                             break
                         if op <= 49:
                             overlay = u16()
-                            if z == 0:
-                                self.overlay[(x, y)] = (overlay, (op - 2) // 4, (op - 2) & 3)
+                            self.overlays[z][(x, y)] = (overlay, (op - 2) // 4, (op - 2) & 3)
                         elif op <= 81:
                             if z <= 1:
                                 self.settings[(z, x, y)] = op - 49

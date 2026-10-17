@@ -28,6 +28,8 @@ X0, Y0, W, H = 3150, 3291, 134, 108
 SQUARES = [(sx, sy) for sx in range(49, 52) for sy in range(49, 52)]
 # Where every adventurer starts, in the castle courtyard.
 START = (3222, 3218)
+# The game's levels above the ground floor, each a floor of the map where the game floors it.
+UPPER_LEVELS = (1, 2, 3)
 
 # Floor overlays and underlays, by id, as their colours and textures show.
 WATER = {6, 7}  # the river's water, and the swamp's pools
@@ -91,7 +93,7 @@ def inside(c, r):
 
 
 def read_game(cache):
-    """The terrain, the objects placed at level 0, and the definitions of those objects."""
+    """The terrain, the objects placed at every level, and the definitions of those objects."""
     maps = cache.table(decode.MAPS)
     keys = cache.keys()
     terrain, placed = decode.Terrain(), []
@@ -123,13 +125,16 @@ def read_areas(path):
 
 
 class Lumbridge:
-    def __init__(self, terrain, placed, names, sizes, definitions):
+    """One floor of Lumbridge: the ground at level 0, or a floor above it at a higher level."""
+
+    def __init__(self, terrain, placed, names, sizes, definitions, level=0):
         self.terrain_data, self.names, self.sizes, self.definitions = terrain, names, sizes, definitions
+        self.level = level
         self.cache, self.model_points = None, {}
         # shaped lists the furniture drawn as the game models it: object, type, orientation and
         # its footprint's north-west tile and size; hung, the wall decorations and their tiles.
         self.shaped, self.hung = [], []
-        self.placed = [p for p in placed if p["z"] == 0]
+        self.placed = [p for p in placed if p["z"] == level]
         self.roof_pieces = [p for p in placed if 12 <= p["type"] <= 21]
         self.ground = [["."] * W for _ in range(H)]
         self.west = [[" "] * (W + 1) for _ in range(H + 1)]
@@ -146,6 +151,9 @@ class Lumbridge:
 
     def lay_ground(self):
         t = self.terrain_data
+        if self.level > 0:
+            self.lay_floor()
+            return
         for r in range(H):
             for c in range(W):
                 at = self.key(c, r)
@@ -169,6 +177,42 @@ class Lumbridge:
                 self.ground[r][c] = TREES[name]
             elif name == "Gravestone" and self.ground[r][c] in ".:_":
                 self.ground[r][c] = "+"
+
+    def lay_floor(self):
+        """A floor above the ground: stone and boards where the game floors this level, open air
+        elsewhere and over a bridge, whose deck the game lowers from the level above."""
+        t = self.terrain_data
+        for r in range(H):
+            for c in range(W):
+                at = self.key(c, r)
+                overlay = t.overlays[self.level].get(at, (0, 0, 0))[0]
+                if t.settings.get((1, *at), 0) & 2:
+                    continue
+                if overlay in STONE:
+                    self.ground[r][c] = "_"
+                elif overlay in BOARDS:
+                    self.ground[r][c] = "b"
+
+    def floor_flights(self):
+        """The game leaves the floor out under a staircase or ladder above the ground: its tiles
+        take the floor beside them, so it stands on the floor it leads from."""
+        for p in self.placed:
+            if p["type"] != 10 or LETTER.get(self.names.get(p["id"])) not in ("S", "L"):
+                continue
+            across, up = self.sizes.get(p["id"], (1, 1))
+            if p["rot"] in (1, 3):
+                across, up = up, across
+            c, r = col_row(p["x"], p["y"])
+            tiles = [(c + i, r - j) for i in range(across) for j in range(up) if inside(c + i, r - j)]
+            beside = [self.ground[y + dy][x + dx] for x, y in tiles for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                      if inside(x + dx, y + dy) and self.ground[y + dy][x + dx] in "_b"]
+            for x, y in tiles:
+                if self.ground[y][x] == ".":
+                    self.ground[y][x] = max(set(beside), key=beside.count) if beside else "_"
+
+    def floored(self):
+        """Whether the game floors any tile of this level."""
+        return any(g != "." for row in self.ground for g in row)
 
     def indoor(self, c, r):
         return inside(c, r) and self.ground[r][c] in "_b"
@@ -253,7 +297,7 @@ class Lumbridge:
         t = self.terrain_data
         for r in range(H):
             for c in range(W):
-                shape = t.overlay.get(self.key(c, r), (0, 0, 0))[1]
+                shape = t.overlays[self.level].get(self.key(c, r), (0, 0, 0))[1]
                 if self.ground[r][c] in "_b" and shape != 0 and not self.crossed(c, r):
                     if any(self.crossed(c + dc, r + dr) for dc in (-1, 0, 1) for dr in (-1, 0, 1)):
                         self.ground[r][c] = ":" if t.underlay.get(self.key(c, r)) in EARTHY_UNDERLAYS else "."
@@ -442,9 +486,12 @@ class Lumbridge:
                 continue
             if any(self.ground[y][x] in "~H+TOWYX" or self.objects[y][x] != "." for x, y in tiles):
                 continue
+            # Above the ground, nothing stands wholly in the open air.
+            if self.level > 0 and all(self.ground[y][x] == "." for x, y in tiles):
+                continue
             for x, y in tiles:
                 self.objects[y][x] = LETTER[name]
-            if LETTER[name] in MODELLED:
+            if LETTER[name] in MODELLED and self.level == 0:
                 self.shaped.append((p["id"], p["type"], p["rot"], c, r - up + 1, across, up))
 
     def hang_decorations(self):
@@ -532,9 +579,21 @@ class Lumbridge:
         return lines
 
 
+def upper_floor(cache, game, level):
+    """The floor of Lumbridge at a level above the ground, with its walls and furniture."""
+    floor = Lumbridge(*game, level=level)
+    floor.cache = cache
+    floor.lay_floor()
+    floor.stand_walls()
+    floor.floor_flights()
+    floor.furnish()
+    return floor
+
+
 def generate(cache_folder, areas_path, out_path):
     cache = Cache(cache_folder)
-    lumbridge = Lumbridge(*read_game(cache))
+    game = read_game(cache)
+    lumbridge = Lumbridge(*game)
     lumbridge.cache = cache
     lumbridge.lay_ground()
     lumbridge.stand_walls()
@@ -565,6 +624,15 @@ def generate(cache_folder, areas_path, out_path):
         "roofs"] + ["".join(row) for row in lumbridge.roofs] + [
         "", "// Furniture and landmarks where the game stands them, each filling its footprint.",
         "objects"] + ["".join(row) for row in lumbridge.objects]
+    for level in UPPER_LEVELS:
+        floor = upper_floor(cache, game, level)
+        if not floor.floored():
+            continue
+        text += [
+            "", f"// The floor at the game's level {level}: stone and boards where the game floors it, open",
+            "// air elsewhere.", f"terrain {level}"] + ["".join(row) for row in floor.ground] + [
+            "", f"walls {level}"] + floor.walls_grid() + [
+            "", f"objects {level}"] + ["".join(row) for row in floor.objects]
     with open(out_path, "w") as f:
         f.write("\n".join(text) + "\n")
     with open(os.path.splitext(out_path)[0] + ".models", "w") as f:
