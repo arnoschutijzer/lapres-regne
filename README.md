@@ -107,8 +107,10 @@ blocks the way, or as close as the hero can get. Progress keeps the map's name,
 so your position and stumps return only to the map they were saved on.
 
 Requires Go 1.25+, macOS or Linux with `stty`, and a UTF-8 terminal with
-true color and a font that supports Unicode braille. Use at least 40 columns
-and 14 rows; a larger window gives the dithering more detail.
+true color and a font that supports Unicode braille and quadrant blocks. Use at
+least 40 columns and 14 rows; a larger window gives the dithering more detail.
+The scenery layers heavy dithering over subtle solid colors. The traveler and
+axe use solid colors at their natural world scale to keep their details readable.
 
 To build a standalone executable:
 

@@ -501,10 +501,6 @@ func TestUpCloseTheHeroIsDrawnInDetail(t *testing.T) {
 			t.Errorf("the close-up draws no %s", part)
 		}
 	}
-	far := newRenderer(world.New(7), "L’Après-Règne").render(100, 27, 0)
-	if countInk(far, defaultLook.skin, defaultLook.undershirt) != 0 {
-		t.Error("the forest view must keep the small traveler")
-	}
 }
 
 func TestTheHeroShowsTheirFaceOnlyWhenFacingTheViewer(t *testing.T) {
