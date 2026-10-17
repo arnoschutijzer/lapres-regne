@@ -31,8 +31,6 @@ type Character struct {
 	lastWalk     time.Time
 	inventory    Inventory
 	woodcutting  Skill
-	// attempts counts every roll for a log, so a restarted chop rolls afresh.
-	attempts int
 	// passable tells where the character may stand; nil lets them stand anywhere.
 	passable func(x, z float64) bool
 }

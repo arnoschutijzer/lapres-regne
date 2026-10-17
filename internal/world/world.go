@@ -15,11 +15,8 @@ type World struct {
 	// yaw is how far the camera has turned about the upright axis, in radians.
 	yaw float64
 	// zoom is how many steps the camera has moved in from the forest view toward a close-up.
-	zoom int
-	// felled holds the cells whose tree is a stump, with the time left until it regrows.
-	felled map[cell]time.Duration
-	// depletion is how long each tree that gives several logs has been worn down by chopping.
-	depletion map[cell]time.Duration
+	zoom        int
+	woodcutting woodcutting
 	// order is the player order the hero carries out; nil while they stand idle.
 	order order
 	// offeredClimb marks a staircase or ladder reached that leads both ways, until the offer is
@@ -39,11 +36,20 @@ type World struct {
 }
 
 func New(seed uint64) *World {
-	return &World{seed: seed, sounds: silence{}}
+	w := &World{seed: seed, sounds: silence{}}
+	w.woodcutting = woodcutting{woods: w}
+	return w
 }
 
 // SetSounds plays the world's sound effects through sounds.
 func (w *World) SetSounds(sounds Sounds) { w.sounds = sounds }
+
+func (w *World) effects() Sounds { return w.sounds }
+
+// Message is the game's reply to the hero's latest action, or empty when there is none.
+func (w *World) Message() string { return w.message }
+
+func (w *World) say(message string) { w.message = message }
 
 func (w *World) Seed() uint64           { return w.seed }
 func (w *World) Hero() *Character       { return &w.hero }
@@ -100,9 +106,9 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	}
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
 	w.ageCelebration(dt)
-	w.regrow(dt)
+	chopping, _ := w.chopping()
+	w.woodcutting.advance(dt, chopping)
 	w.despawn(dt)
-	w.recoverTimers(dt)
 	w.carryOutOrder(dt, speed)
 }
 

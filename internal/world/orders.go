@@ -91,3 +91,75 @@ func (o *closeIn) carryOut(dt time.Duration, speed float64) order {
 	}
 	return o.arrive()
 }
+
+// TreeInReach finds the standing tree the hero acts on: the nearest one in front within reach,
+// else the nearest one within reach in any direction, so overshooting a tree still reaches it.
+func (w *World) TreeInReach() (Tree, bool) { return w.woodcutting.treeInReach() }
+
+// Chop orders the hero to chop the tree in reach, reporting whether chopping started. A tree above
+// the hero's level leaves a message instead.
+func (w *World) Chop() bool {
+	tree, ok := w.woodcutting.treeInReach()
+	if !ok {
+		return false
+	}
+	w.order = w.woodcutting.start(tree)
+	return w.order != nil
+}
+
+// Approach walks the hero to a standing tree, round whatever blocks the way, and chops it on arrival,
+// reporting whether the tree still stands.
+func (w *World) Approach(tree Tree) bool {
+	standing, exists := w.TreeAt(tree.cell.gx, tree.cell.gz)
+	if !exists || standing.Stump {
+		return false
+	}
+	w.Stop()
+	route := w.route(standing.X, standing.Z)
+	w.order = &closeIn{
+		world:     w,
+		target:    point{standing.X, standing.Z},
+		within:    arrival,
+		waypoints: route[:len(route)-1],
+		arrive:    func() order { return w.woodcutting.start(standing) },
+	}
+	return true
+}
+
+// chopping is the chop in progress, if any.
+func (w *World) chopping() (*chop, bool) {
+	chop, ok := w.order.(*chop)
+	return chop, ok
+}
+
+func (w *World) Chopping() bool {
+	_, chopping := w.chopping()
+	return chopping
+}
+
+// AimAt faces the hero toward a world position, except while a chop holds them toward the tree.
+func (w *World) AimAt(x, z float64) {
+	if w.Chopping() {
+		return
+	}
+	w.hero.AimAt(x, z)
+}
+
+// LastStrike tells which strike of the chop landed last, counting from zero, and how long ago.
+func (w *World) LastStrike() (index int, since time.Duration, ok bool) {
+	chop, chopping := w.chopping()
+	if !chopping {
+		return 0, 0, false
+	}
+	index, since = chop.lastStrike()
+	return index, since, true
+}
+
+// ChoppedTree is the tree being chopped, if any.
+func (w *World) ChoppedTree() (Tree, bool) {
+	chop, chopping := w.chopping()
+	if !chopping {
+		return Tree{}, false
+	}
+	return w.TreeAt(chop.tree.gx, chop.tree.gz)
+}

@@ -17,10 +17,8 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 		Zoom:          w.zoom,
 		Yaw:           w.yaw,
 		Inventory:     w.hero.inventory.Slots(),
+		Stumps:        w.woodcutting.stumps(),
 		SavedAt:       now,
-	}
-	for tree, regrow := range w.felled {
-		snapshot.Stumps = append(snapshot.Stumps, Stump{GX: tree.gx, GZ: tree.gz, Regrow: regrow})
 	}
 	if err := progress.Save(snapshot); err != nil {
 		return fmt.Errorf("save progress: %w", err)
@@ -67,10 +65,7 @@ func resume(w *World, progress Progress, now time.Time) (*World, error) {
 	away := max(0, now.Sub(snapshot.SavedAt))
 	for _, stump := range snapshot.Stumps {
 		if stump.Regrow > away {
-			if w.felled == nil {
-				w.felled = make(map[cell]time.Duration)
-			}
-			w.felled[cell{stump.GX, stump.GZ}] = stump.Regrow - away
+			w.woodcutting.fell(cell{stump.GX, stump.GZ}, stump.Regrow-away)
 		}
 	}
 	return w, nil

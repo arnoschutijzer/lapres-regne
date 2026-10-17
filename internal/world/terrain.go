@@ -122,5 +122,5 @@ func (w *World) grow(gx, gz int, x, z float64, kind TreeKind) Tree {
 	case DeadTree:
 		height, radius = height*0.75, radius*0.7
 	}
-	return Tree{x, z, height, radius, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), kind, w.felled[cell{gx, gz}] > 0, cell{gx, gz}}
+	return Tree{x, z, height, radius, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), kind, w.woodcutting.stump(cell{gx, gz}), cell{gx, gz}}
 }
