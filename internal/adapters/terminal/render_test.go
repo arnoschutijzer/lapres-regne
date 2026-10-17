@@ -650,3 +650,11 @@ func TestTheColorUnderTheDotsStrengthensAsTheViewZoomsOut(t *testing.T) {
 		t.Fatalf("underlay zoomed out %v, at tree detail %v; want 2 and 1", far.underlay(), near.underlay())
 	}
 }
+
+func TestDotsStandOutFromPaperTintedInTheirColor(t *testing.T) {
+	dot, paper := [3]int{100, 130, 70}, [3]int{40, 50, 35}
+	pushed := standOut(dot, paper)
+	if colorDistance(pushed, paper) <= colorDistance(dot, paper) {
+		t.Fatalf("dot %v on paper %v, want it pushed further from the paper than %v", pushed, paper, dot)
+	}
+}

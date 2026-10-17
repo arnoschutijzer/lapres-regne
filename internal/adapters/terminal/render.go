@@ -171,6 +171,19 @@ func paperOf(color [3]int) string {
 // brailleDot numbers the braille dots by their row and column in a cell.
 var brailleDot = [4][2]int{{0, 3}, {1, 4}, {2, 5}, {6, 7}}
 
+// dotContrast is how far a dot's color is pushed away from the tinted paper under it.
+const dotContrast = 0.3
+
+// standOut pushes a dot's color away from the paper under it, so dots keep their texture on paper
+// tinted in their own material's color.
+func standOut(color, paper [3]int) [3]int {
+	var pushed [3]int
+	for i := range pushed {
+		pushed[i] = min(255, max(0, color[i]+int(math.Round(float64(color[i]-paper[i])*dotContrast))))
+	}
+	return pushed
+}
+
 // mix blends from one color toward another by amount, from 0 to 1.
 func mix(from, to [3]int, amount float64) [3]int {
 	var blended [3]int
@@ -807,6 +820,9 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 				previous[col] = cell
 				color, glyph := r.palette[cell.ink], rune(0x2800+int(cell.bits))
 				paper := cell.paper
+				if paper != background {
+					color = standOut(color, paper)
+				}
 				if cell.solid {
 					color, glyph = cell.color, quadrants[cell.bits]
 				}
