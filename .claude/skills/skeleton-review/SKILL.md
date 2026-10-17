@@ -16,5 +16,7 @@ Use `git diff` against the main branch. Use the paths in `CLAUDE.md` and answer 
 7. Does shared code (`Snapshot`, level-ups, ports) gain a field, method or branch named after one skill or activity?
 8. Does the change add a separate "active" flag for an activity instead of using the current-activity value?
 9. Does the domain gain camera or other view state?
+10. Does a shared port gain a method for one feature instead of taking a generic effect value?
+11. Does domain code read the wall clock instead of using the `dt` passed to `Advance`?
 
 List each problem with the file, the line and the required fix.

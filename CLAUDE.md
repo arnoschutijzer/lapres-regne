@@ -15,6 +15,8 @@
 - Shared mechanics stay generic. Skills, XP, levels, level-ups and the save `Snapshot` take the skill name as data. Never add a field, method or branch named after one skill to shared code.
 - The hero does one activity at a time. Keep it in one current-activity value, not in separate "active" flags.
 - The domain holds game state only. Camera and other view state belong to the terminal adapter.
+- Ports stay stable as features grow. A feature plays sounds through a generic effect value or its own port, not through a new method on a shared port.
+- Domain code takes time only from the `dt` passed to `Advance`. It never reads the wall clock.
 
 ## Feature workflow (test-driven development)
 1. Name the domain type that owns the feature's state and rules. If the answer is `World` or `Character`, create a new type instead.
