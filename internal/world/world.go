@@ -20,16 +20,11 @@ type World struct {
 	felled map[cell]time.Duration
 	// depletion is how long each tree that gives several logs has been worn down by chopping.
 	depletion map[cell]time.Duration
-	approach  approach
-	chop      chop
-	// destination is the point on the ground the hero walks to after a click.
-	destination destination
-	// doorApproach is the doorway whose door the hero opens or closes on reaching the destination.
-	doorApproach doorApproach
-	// flightApproach is the staircase or ladder the hero climbs on reaching the destination, and
-	// offeredClimb marks one reached that leads both ways, until the offer is taken.
-	flightApproach flightApproach
-	offeredClimb   bool
+	// order is the player order the hero carries out; nil while they stand idle.
+	order order
+	// offeredClimb marks a staircase or ladder reached that leads both ways, until the offer is
+	// taken.
+	offeredClimb bool
 	// ground holds the dropped items until they disappear.
 	ground      []GroundItem
 	message     string
@@ -105,42 +100,24 @@ func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	}
 	w.hero.advance(dx, dz, w.wading(speed*dt.Seconds()))
 	w.ageCelebration(dt)
-	w.walkToFor(dt, speed)
-	w.approachFor(dt, speed)
 	w.regrow(dt)
 	w.despawn(dt)
 	w.recoverTimers(dt)
-	w.chopFor(dt)
-}
-
-type destination struct {
-	active bool
-	// waypoints lead round whatever blocks the way, ending on the destination.
-	waypoints []point
+	w.carryOutOrder(dt, speed)
 }
 
 // WalkTo walks the hero to a point on the ground, running while sprinting, giving up whatever they
 // were doing. On a map they go round whatever blocks the way, and stop as near as they can get to
 // a point they cannot reach.
 func (w *World) WalkTo(x, z float64) {
-	w.Stop()
-	w.panX, w.panZ = 0, 0
-	w.destination = destination{active: true, waypoints: w.route(x, z)}
+	w.walkTo(x, z, nil)
 }
 
-// walkToFor walks toward the destination at speed and stops on it.
-func (w *World) walkToFor(dt time.Duration, speed float64) {
-	if !w.destination.active {
-		return
-	}
-	waypoints, moving := w.follow(w.destination.waypoints, w.wading(speed*dt.Seconds()))
-	w.destination.waypoints = waypoints
-	// A hero who cannot get any closer gives up on the destination.
-	if len(waypoints) == 0 || !moving {
-		w.destination = destination{}
-		w.arriveAtDoor()
-		w.arriveAtFlight()
-	}
+// walkTo walks the hero to a point on the ground and acts on arrival.
+func (w *World) walkTo(x, z float64, arrive func() order) {
+	w.Stop()
+	w.panX, w.panZ = 0, 0
+	w.order = &walk{world: w, waypoints: w.route(x, z), arrive: arrive}
 }
 
 // wading halves the distance while the hero stands in a river.

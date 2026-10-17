@@ -56,6 +56,19 @@ func TestOvershootingATreeStillReachesItAndChoppingTurnsTowardIt(t *testing.T) {
 	}
 }
 
+func TestChoppingGivesUpTheWalkUnderWay(t *testing.T) {
+	w := besideTree()
+	x, z := w.Hero().Position()
+	w.WalkTo(x-20, z)
+	if !w.Chop() {
+		t.Fatal("chopping must start at a tree in reach")
+	}
+	w.Advance(0, 0, time.Second, false)
+	if movedX, movedZ := w.Hero().Position(); movedX != x || movedZ != z || !w.Chopping() {
+		t.Fatalf("hero at %.2f, %.2f, chopping = %v; want them chopping where they stood at %.2f, %.2f", movedX, movedZ, w.Chopping(), x, z)
+	}
+}
+
 func TestChoppingANormalTreeLeavesAStumpWithItsFirstLog(t *testing.T) {
 	w := besideTree()
 	if !w.Chop() {

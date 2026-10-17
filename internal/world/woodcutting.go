@@ -28,15 +28,9 @@ const arrival = 1.2
 // cell identifies a tree by its place on the tree grid.
 type cell struct{ gx, gz int }
 
-type approach struct {
-	active bool
-	tree   cell
-	// waypoints lead round whatever blocks the way to the tree.
-	waypoints []point
-}
-
+// chop is the order to chop a tree until it falls or the inventory fills.
 type chop struct {
-	active  bool
+	world   *World
 	tree    cell
 	kind    TreeKind
 	elapsed time.Duration
@@ -87,26 +81,26 @@ func (w *World) Chop() bool {
 	if !ok {
 		return false
 	}
-	return w.startChop(tree)
+	w.order = w.startChop(tree)
+	return w.order != nil
 }
 
-func (w *World) startChop(tree Tree) bool {
+// startChop turns the hero toward a tree and returns the order to chop it, or nil with a message
+// where the tree is above the hero's level or the inventory is full.
+func (w *World) startChop(tree Tree) order {
 	x, z := w.hero.Position()
 	w.hero.Face(FacingToward(tree.X-x, tree.Z-z))
-	w.approach = approach{}
-	w.chop = chop{}
 	if required := species[tree.Kind].level; w.hero.woodcutting.Level() < required {
 		w.message = fmt.Sprintf("You need woodcutting level %d to chop this %s.", required, tree.Kind)
-		return false
+		return nil
 	}
 	if w.hero.inventory.Full() {
 		w.message = inventoryFullMessage
-		return false
+		return nil
 	}
 	w.message = ""
-	w.chop = chop{active: true, tree: tree.cell, kind: tree.Kind}
 	w.sounds.Chop()
-	return true
+	return &chop{world: w, tree: tree.cell, kind: tree.Kind}
 }
 
 // Message is the game's reply to the hero's latest action, or empty when there is none.
@@ -119,60 +113,32 @@ func (w *World) Approach(tree Tree) bool {
 	if !exists || standing.Stump {
 		return false
 	}
-	w.chop = chop{}
-	w.destination = destination{}
-	w.doorApproach = doorApproach{}
-	w.message = ""
+	w.Stop()
 	route := w.route(standing.X, standing.Z)
-	w.approach = approach{active: true, tree: tree.cell, waypoints: route[:len(route)-1]}
+	w.order = &closeIn{
+		world:     w,
+		target:    point{standing.X, standing.Z},
+		within:    arrival,
+		waypoints: route[:len(route)-1],
+		arrive:    func() order { return w.startChop(standing) },
+	}
 	return true
 }
 
-// Stop cancels walking to a point or a tree and chopping one, and clears the last message.
-func (w *World) Stop() {
-	w.destination = destination{}
-	w.doorApproach = doorApproach{}
-	w.flightApproach = flightApproach{}
-	w.approach = approach{}
-	w.chop = chop{}
-	w.message = ""
+// chopping is the chop in progress, if any.
+func (w *World) chopping() (*chop, bool) {
+	chop, ok := w.order.(*chop)
+	return chop, ok
 }
 
-// approachFor walks toward the approached tree at speed and starts chopping once beside it.
-func (w *World) approachFor(dt time.Duration, speed float64) {
-	if !w.approach.active {
-		return
-	}
-	if len(w.approach.waypoints) > 0 {
-		waypoints, moving := w.follow(w.approach.waypoints, w.wading(speed*dt.Seconds()))
-		w.approach.waypoints = waypoints
-		if !moving {
-			w.approach = approach{}
-		}
-		return
-	}
-	tree, _ := w.TreeAt(w.approach.tree.gx, w.approach.tree.gz)
-	x, z := w.hero.Position()
-	dx, dz := tree.X-x, tree.Z-z
-	remaining := math.Hypot(dx, dz) - arrival
-	if remaining > 0 {
-		// A hero who cannot get any closer gives up on the tree.
-		if w.hero.advance(dx, dz, math.Min(remaining, w.wading(speed*dt.Seconds()))) == 0 {
-			w.approach = approach{}
-			return
-		}
-		remaining = math.Hypot(tree.X-w.hero.x, tree.Z-w.hero.z) - arrival
-	}
-	if remaining <= 1e-9 {
-		w.startChop(tree)
-	}
+func (w *World) Chopping() bool {
+	_, chopping := w.chopping()
+	return chopping
 }
-
-func (w *World) Chopping() bool { return w.chop.active }
 
 // AimAt faces the hero toward a world position, except while a chop holds them toward the tree.
 func (w *World) AimAt(x, z float64) {
-	if w.chop.active {
+	if w.Chopping() {
 		return
 	}
 	w.hero.AimAt(x, z)
@@ -180,43 +146,44 @@ func (w *World) AimAt(x, z float64) {
 
 // LastStrike tells which strike of the chop landed last, counting from zero, and how long ago.
 func (w *World) LastStrike() (index int, since time.Duration, ok bool) {
-	if !w.chop.active {
+	chop, chopping := w.chopping()
+	if !chopping {
 		return 0, 0, false
 	}
-	return int(w.chop.elapsed / StrikeInterval), w.chop.elapsed % StrikeInterval, true
+	return int(chop.elapsed / StrikeInterval), chop.elapsed % StrikeInterval, true
 }
 
 // ChoppedTree is the tree being chopped, if any.
 func (w *World) ChoppedTree() (Tree, bool) {
-	if !w.chop.active {
+	chop, chopping := w.chopping()
+	if !chopping {
 		return Tree{}, false
 	}
-	return w.TreeAt(w.chop.tree.gx, w.chop.tree.gz)
+	return w.TreeAt(chop.tree.gx, chop.tree.gz)
 }
 
-// chopFor swings the axe at its own pace and rolls for a log every four ticks. Trees that give
+// carryOut swings the axe at its own pace and rolls for a log every four ticks. Trees that give
 // several logs wear down their depletion timer while chopped.
-func (w *World) chopFor(dt time.Duration) {
-	if !w.chop.active {
-		return
-	}
-	w.chop.elapsed += dt
-	if !species[w.chop.kind].fallsWithFirstLog {
+func (c *chop) carryOut(dt time.Duration, _ float64) order {
+	w := c.world
+	c.elapsed += dt
+	if !species[c.kind].fallsWithFirstLog {
 		if w.depletion == nil {
 			w.depletion = make(map[cell]time.Duration)
 		}
-		w.depletion[w.chop.tree] += dt
+		w.depletion[c.tree] += dt
 	}
-	for w.chop.elapsed >= time.Duration(w.chop.strikes+1)*StrikeInterval {
-		w.chop.strikes++
+	for c.elapsed >= time.Duration(c.strikes+1)*StrikeInterval {
+		c.strikes++
 		w.sounds.Chop()
 	}
-	for w.chop.active && w.chop.elapsed >= time.Duration(w.chop.rolls+1)*rollInterval {
-		w.chop.rolls++
-		if w.roll(0x10c5) < species[w.chop.kind].chance(w.hero.woodcutting.Level()) {
-			w.cutLog()
+	for c.elapsed >= time.Duration(c.rolls+1)*rollInterval {
+		c.rolls++
+		if w.roll(c.tree, 0x10c5) < species[c.kind].chance(w.hero.woodcutting.Level()) && !w.cutLog(c) {
+			return nil
 		}
 	}
+	return c
 }
 
 // regrow brings stumps back as trees once their respawn time has passed.
@@ -232,8 +199,9 @@ func (w *World) regrow(dt time.Duration) {
 
 // recoverTimers lets every tree nobody is chopping regain its depletion timer as fast as it wore down.
 func (w *World) recoverTimers(dt time.Duration) {
+	chop, chopping := w.chopping()
 	for tree, worn := range w.depletion {
-		if w.chop.active && tree == w.chop.tree {
+		if chopping && tree == chop.tree {
 			continue
 		}
 		if worn <= dt {
@@ -245,34 +213,35 @@ func (w *World) recoverTimers(dt time.Duration) {
 }
 
 // roll draws this attempt's random number from the world seed, the tree being chopped and a salt.
-func (w *World) roll(salt uint64) float64 {
-	roll := w.Random(w.chop.tree.gx, w.chop.tree.gz, salt+uint64(w.hero.attempts))
+func (w *World) roll(tree cell, salt uint64) float64 {
+	roll := w.Random(tree.gx, tree.gz, salt+uint64(w.hero.attempts))
 	w.hero.attempts++
 	return roll
 }
 
-// cutLog gives the hero a log and its experience. A normal tree falls with its first log; other
-// trees fall with the first log after their depletion timer runs out.
-func (w *World) cutLog() {
-	kind := species[w.chop.kind]
+// cutLog gives the hero a log and its experience, and reports whether chopping goes on. A normal
+// tree falls with its first log; other trees fall with the first log after their depletion timer
+// runs out.
+func (w *World) cutLog(chop *chop) bool {
+	kind := species[chop.kind]
 	w.hero.inventory.add(kind.logs)
 	level := w.hero.woodcutting.Level()
 	w.hero.woodcutting.gain(kind.xp)
 	if reached := w.hero.woodcutting.Level(); reached > level {
 		w.celebrate(level, reached)
 	}
-	if !kind.fallsWithFirstLog && w.depletion[w.chop.tree] < kind.lifetime {
+	if !kind.fallsWithFirstLog && w.depletion[chop.tree] < kind.lifetime {
 		if w.hero.inventory.Full() {
-			w.chop = chop{}
 			w.message = inventoryFullMessage
+			return false
 		}
-		return
+		return true
 	}
 	if w.felled == nil {
 		w.felled = make(map[cell]time.Duration)
 	}
-	w.felled[w.chop.tree] = kind.respawn + time.Duration(w.roll(0x9e60)*float64(kind.respawnSpread))
-	delete(w.depletion, w.chop.tree)
-	w.chop = chop{}
+	w.felled[chop.tree] = kind.respawn + time.Duration(w.roll(chop.tree, 0x9e60)*float64(kind.respawnSpread))
+	delete(w.depletion, chop.tree)
 	w.sounds.Fall()
+	return false
 }

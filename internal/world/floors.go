@@ -221,12 +221,6 @@ func (w *World) land() {
 	w.hero.x, w.hero.z = nearest.x, nearest.z
 }
 
-// flightApproach is a staircase or ladder the hero walks to, to climb it on arrival.
-type flightApproach struct {
-	active bool
-	tile   cell
-}
-
 // ApproachFlight walks the hero round whatever blocks the way to the nearest tile they may climb a
 // staircase or ladder from, beside any of its tiles, and climbs it on arrival where it leads one
 // way only. Where it leads both up and down, arriving offers the choice, as OfferedClimb reports.
@@ -248,8 +242,7 @@ func (w *World) ApproachFlight(flight Flight) {
 		}
 	}
 	middle := goal.middle()
-	w.WalkTo(middle.x, middle.z)
-	w.flightApproach = flightApproach{active: true, tile: tile}
+	w.walkTo(middle.x, middle.z, func() order { return w.arriveAtFlight(tile) })
 }
 
 // routeLength is how many tiles a route of tiles side by side covers, diagonal steps counting as
@@ -263,14 +256,9 @@ func routeLength(route []cell) float64 {
 }
 
 // arriveAtFlight climbs the staircase or ladder the hero walked to, once they stop beside it.
-func (w *World) arriveAtFlight() {
-	if !w.flightApproach.active {
-		return
-	}
-	tile := w.flightApproach.tile
-	w.flightApproach = flightApproach{}
+func (w *World) arriveAtFlight(tile cell) order {
 	if !slices.Contains(w.here().standings(w.here().block(tile)), tileOf(w.hero.x, w.hero.z)) {
-		return
+		return nil
 	}
 	flight, ok := w.flightAt(tile)
 	switch {
@@ -280,6 +268,7 @@ func (w *World) arriveAtFlight() {
 	case flight.Up || flight.Down:
 		w.Climb(flight.Up)
 	}
+	return nil
 }
 
 // OfferedClimb reports, once, that the hero arrived beside a staircase or ladder leading both up

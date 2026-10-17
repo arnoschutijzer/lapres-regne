@@ -84,27 +84,16 @@ func (w *World) ApproachDoor(doorway Doorway) {
 		return
 	}
 	near := doorway.side(w.hero.x, w.hero.z).middle()
-	w.WalkTo(near.x, near.z)
-	w.doorApproach = doorApproach{active: true, doorway: doorway}
-}
-
-// doorApproach is a doorway the hero walks to, to open or close its door on arrival.
-type doorApproach struct {
-	active  bool
-	doorway Doorway
+	w.walkTo(near.x, near.z, func() order { return w.arriveAtDoor(doorway) })
 }
 
 // arriveAtDoor opens or closes the door the hero walked to, once they stop within reach of it.
-func (w *World) arriveAtDoor() {
-	if !w.doorApproach.active {
-		return
-	}
-	doorway := w.doorApproach.doorway
-	w.doorApproach = doorApproach{}
+func (w *World) arriveAtDoor(doorway Doorway) order {
 	middle := doorway.middle()
 	if math.Hypot(middle.x-w.hero.x, middle.z-w.hero.z) <= doorReach {
 		w.toggle(doorway)
 	}
+	return nil
 }
 
 // side is the tile beside the doorway on the same side of it as a point.
