@@ -182,8 +182,9 @@ models file beside the map. Each model lists its points, in world units about
 the middle of the ground it stands on with y upward, then its triangles between
 three points by index, each in a colour as six hex digits; a `place` line
 stands a model over a block of tiles, by its north-west tile and how many tiles
-it spans across and down. A modelled fixture is drawn as its model, lit face by
-face, in its own colours.
+it spans across and down, and a `hang` line hangs one, such as a banner, on
+the walls of a tile, about its middle, leaving the tile's fixtures as they are.
+A modelled fixture is drawn as its model, lit face by face, in its own colours.
 
 ```text
 model table

@@ -286,6 +286,7 @@ point 0 0.8 0.5
 face 0 1 2 785032
 
 place table 1 0 2 1
+hang table 2 0
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +302,7 @@ place table 1 0 2 1
 		Points: []world.Point{{X: -1, Y: 0, Z: -0.5}, {X: 1, Y: 0, Z: -0.5}, {X: 0, Y: 0.8, Z: 0.5}},
 		Faces:  []world.ModelFace{{A: 0, B: 1, C: 2, Color: world.Color{R: 0x78, G: 0x50, B: 0x32}}},
 	}
-	want := []world.PlacedModel{{Col: 1, Row: 0, Cols: 2, Rows: 1, Model: table}}
+	want := []world.PlacedModel{{Col: 1, Row: 0, Cols: 2, Rows: 1, Model: table}, {Col: 2, Row: 0, Cols: 1, Rows: 1, Model: table, Hangs: true}}
 	if !reflect.DeepEqual(loaded.Models, want) {
 		t.Fatalf("models = %+v, want %+v", loaded.Models, want)
 	}

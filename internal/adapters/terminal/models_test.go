@@ -57,3 +57,16 @@ func TestAModelledFixtureIsDrawnAsItsModelInItsOwnColours(t *testing.T) {
 		t.Fatal("the model's top must show in its own colour")
 	}
 }
+
+func TestAModelHungOnAWallLeavesTheFixturesOnItsTileAsTheyAre(t *testing.T) {
+	ground := make2D(30, 40)
+	w := world.NewOnMap(7, world.Map{
+		Name: "Hall", Ground: ground, StartCol: 20, StartRow: 15,
+		Fixtures: []world.PlacedFixture{{Col: 20, Row: 13, Kind: world.Table}},
+		Models:   []world.PlacedModel{{Col: 20, Row: 13, Cols: 1, Rows: 1, Model: tableModel(), Hangs: true}},
+	})
+	_, c := closeView(w)
+	if countInk(c, plankInk) == 0 {
+		t.Fatal("the table must still stand under the model hung on the wall")
+	}
+}

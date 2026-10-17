@@ -19,11 +19,13 @@ import (
 //	face 0 1 2 785032
 //
 //	place table 1 0 2 1
+//	hang banner 3 0
 //
 // Each model lists its points, in world units about the middle of the ground it stands on with y
 // upward, then its triangles between three points by their index, each in a colour as six hex
 // digits. A place line stands a model over a block of tiles: its north-west tile's column and
-// row, then how many tiles it spans across and down.
+// row, then how many tiles it spans across and down. A hang line hangs a model on the walls of a
+// tile, about its middle, shaping none of the fixtures standing there.
 func readModels(path string) ([]world.PlacedModel, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -71,8 +73,15 @@ func readModels(path string) ([]world.PlacedModel, error) {
 				return nil, mistake("place <model> <col> <row> <cols> <rows>, after the model")
 			}
 			placed = append(placed, world.PlacedModel{Col: ints[0], Row: ints[1], Cols: ints[2], Rows: ints[3], Model: model})
+		case "hang":
+			ints, ok := integers(fields[2:])
+			model, known := models[safe(fields, 1)]
+			if !ok || len(ints) != 2 || !known {
+				return nil, mistake("hang <model> <col> <row>, after the model")
+			}
+			placed = append(placed, world.PlacedModel{Col: ints[0], Row: ints[1], Cols: 1, Rows: 1, Model: model, Hangs: true})
 		default:
-			return nil, mistake("model, point, face or place")
+			return nil, mistake("model, point, face, place or hang")
 		}
 	}
 	return placed, lines.Err()

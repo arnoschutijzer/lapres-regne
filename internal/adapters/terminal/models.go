@@ -32,6 +32,9 @@ func (r *renderer) drawModels(c *forestCanvas) {
 // modelled marks the tiles of the surveyed area a model stands over, whose fixtures it shapes.
 func (a *builtArea) modelled(models []world.PlacedModel) {
 	for _, placed := range models {
+		if placed.Hangs {
+			continue
+		}
 		for row := placed.Row; row < placed.Row+placed.Rows; row++ {
 			for col := placed.Col; col < placed.Col+placed.Cols; col++ {
 				if col-a.col >= 0 && row-a.row >= 0 && col-a.col < a.cols && row-a.row < a.rows {

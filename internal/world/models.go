@@ -20,6 +20,9 @@ type ModelFace struct {
 type PlacedModel struct {
 	Col, Row, Cols, Rows int
 	Model                *Model
+	// Hangs marks a model hung on a wall, such as a banner, which shapes none of the fixtures on
+	// its tile.
+	Hangs bool
 }
 
 // Models lists the models standing on the map; none in the endless forest.
