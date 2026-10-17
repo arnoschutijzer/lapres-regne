@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"lapresregne/internal/world"
 )
@@ -80,13 +81,13 @@ func TestAMissingMapFileIsReported(t *testing.T) {
 }
 
 func TestAMapFileLoadsBuiltGroundAndStructures(t *testing.T) {
-	loaded, err := Load(write(t, "yard.map", "terrain\n#_:@b\n=G+DB\n"))
+	loaded, err := Load(write(t, "yard.map", "terrain\n#_:@bH\n=G+DB.\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := [][]world.Ground{
-		{world.Wall, world.Floor, world.Path, world.Grass, world.Boards},
-		{world.Fence, world.Gate, world.Grave, world.Door, world.Battlement},
+		{world.Wall, world.Floor, world.Path, world.Grass, world.Boards, world.Bridge},
+		{world.Fence, world.Gate, world.Grave, world.Door, world.Battlement, world.Grass},
 	}
 	if !reflect.DeepEqual(loaded.Ground, want) {
 		t.Fatalf("ground = %v, want %v", loaded.Ground, want)
@@ -132,5 +133,19 @@ func TestTheLumbridgeMapLoadsWithTheHeroInTheCastleCourtyard(t *testing.T) {
 	}
 	if area := lumbridge.Areas[lumbridge.StartRow][lumbridge.StartCol]; area != "Castle courtyard" {
 		t.Fatalf("start area = %q, want the castle courtyard", area)
+	}
+}
+
+func TestTheHeroWalksOverTheLumbridgeBridge(t *testing.T) {
+	lumbridge, err := Load(filepath.Join("..", "..", "..", "maps", "lumbridge.map"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The bridge runs east over the River Lum from the path at tile 89, 65 to the far bank.
+	lumbridge.StartCol, lumbridge.StartRow = 89, 65
+	w := world.NewOnMap(7, lumbridge)
+	w.Advance(1, 0, 10*time.Second, false)
+	if x, _ := w.Hero().Position(); x < 102*world.TileSize {
+		t.Fatalf("x = %v; want the hero over the bridge on the east bank", x)
 	}
 }

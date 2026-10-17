@@ -22,6 +22,8 @@ const (
 	Boards
 	// Door is an open doorway through a wall, on a flagstone floor.
 	Door
+	// Bridge is a wooden deck carrying the way over water.
+	Bridge
 	Wall
 	// Battlement is a castle wall, crowned with merlons.
 	Battlement

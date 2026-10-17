@@ -436,6 +436,8 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 			drawBars(c, x, z, tile.joined, 1.8)
 		case world.Grave:
 			drawGrave(c, x, z, r.world.Random(col, row, 41))
+		case world.Bridge:
+			drawBridgeRails(c, x, z, tile.beside)
 		}
 	}
 }
@@ -607,6 +609,32 @@ func drawRailing(c *forestCanvas, x, z float64, joined [4]bool, height float64, 
 		z0, z1 := min(middleZ, endZ)-rail, max(middleZ, endZ)+rail
 		for _, y := range rails {
 			c.box(x0, z0, x1, z1, y-rail, y+rail, [4]bool{}, ink, plain)
+		}
+	}
+}
+
+// drawBridgeRails rails a bridge's deck along each side of the tile that drops to the water, with
+// a post at either end of the side and one in its middle.
+func drawBridgeRails(c *forestCanvas, x, z float64, beside [4]world.Ground) {
+	const height = 1.0
+	rails := []float64{0.5, 0.95}
+	post, rail := c.thin(0.09), c.thin(0.05)
+	inset := 0.1
+	for side, step := range neighbours {
+		if beside[side] != world.Water {
+			continue
+		}
+		// The side runs along the tile's edge facing the water, set a little in from it.
+		edgeX, edgeZ := x+world.TileSize/2+float64(step[0])*(world.TileSize/2-inset), z+world.TileSize/2+float64(step[1])*(world.TileSize/2-inset)
+		alongX, alongZ := float64(step[1]*step[1]), float64(step[0]*step[0])
+		for _, along := range []float64{-world.TileSize / 2, 0, world.TileSize / 2} {
+			postX, postZ := edgeX+alongX*along, edgeZ+alongZ*along
+			c.box(postX-post, postZ-post, postX+post, postZ+post, 0, height, [4]bool{}, plankInk, plain)
+		}
+		x0, x1 := edgeX-alongX*world.TileSize/2-rail, edgeX+alongX*world.TileSize/2+rail
+		z0, z1 := edgeZ-alongZ*world.TileSize/2-rail, edgeZ+alongZ*world.TileSize/2+rail
+		for _, y := range rails {
+			c.box(x0, z0, x1, z1, y-rail, y+rail, [4]bool{}, plankInk, plain)
 		}
 	}
 }

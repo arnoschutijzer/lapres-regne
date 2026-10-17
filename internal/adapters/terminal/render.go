@@ -644,6 +644,9 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 				ink, light = floorInk, flagstones(wx, wz, n)
 			case ground == world.Boards:
 				ink, light = boardsInk, boards(wx, wz, n)
+			case ground == world.Bridge:
+				// The deck's boards lie across the way, as an east-west bridge carries it.
+				ink, light = boardsInk, boards(wz, wx, n)
 			}
 			water = ground == world.Water
 			if ground == world.Grass && r.built.banked(wx, wz) {

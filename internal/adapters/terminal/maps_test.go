@@ -437,3 +437,29 @@ func TestRoofsHideWhileTheHeroIsIndoors(t *testing.T) {
 		t.Fatal("no roof must hide the hero inside the cottage")
 	}
 }
+
+// riverCrossing stands the hero on a bridge carrying a path east over a river.
+func riverCrossing() *world.World {
+	ground := make([][]world.Ground, 30)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 40)
+		for col := 16; col < 24; col++ {
+			ground[row][col] = world.Water
+		}
+	}
+	for col := 14; col < 26; col++ {
+		ground[15][col] = world.Bridge
+	}
+	return world.NewOnMap(7, world.Map{Name: "Crossing", Ground: ground, StartCol: 20, StartRow: 15})
+}
+
+func TestABridgeIsDeckedInBoardsAndRailedOverTheWater(t *testing.T) {
+	r := newRenderer(riverCrossing(), "L’Après-Règne")
+	c := r.render(100, 27, 0)
+	if countInk(c, boardsInk) == 0 {
+		t.Error("the bridge's deck must be drawn in boards")
+	}
+	if countInk(c, plankInk) == 0 {
+		t.Error("the bridge must be railed in planks")
+	}
+}

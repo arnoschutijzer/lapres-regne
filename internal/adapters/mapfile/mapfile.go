@@ -18,7 +18,7 @@
 //	#  wall             =  fence
 //	G  gate             +  grave
 //	D  open door        b  wooden floor
-//	B  battlements
+//	B  battlements      H  bridge
 //	@  where the hero starts, on grass
 //
 // Walls, fences, gates and graves block the way.
@@ -66,6 +66,7 @@ var tiles = map[rune]tile{
 	'D': {ground: world.Door},
 	'b': {ground: world.Boards},
 	'B': {ground: world.Battlement},
+	'H': {ground: world.Bridge},
 }
 
 // Load reads the map in the file at path. A map without a name is named after its file.
