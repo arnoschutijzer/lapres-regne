@@ -500,9 +500,9 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 			drawDiagonalWalls(c, x, z, tile.diagonal, true)
 		case world.Door:
 			if tile.walled {
-				drawDoor(c, x, z, tile.joined)
+				drawDoor(c, x, z, tile.joined, false)
 			} else {
-				drawOpenGate(c, x, z, tile.joined)
+				drawGate(c, x, z, tile.joined, false)
 			}
 		case world.Fence:
 			drawRailing(c, x, z, tile.joined, 1.1, []float64{0.45, 0.9}, plankInk)
@@ -689,9 +689,9 @@ func (c *forestCanvas) slab(x0, z0, x1, z1, half, y0, y1 float64, ink int, patte
 	c.fill(face{origin: right, u: run, v: height, normal: vec{-across.x, 0, -across.z}}, ink, pattern)
 }
 
-// drawDoor sets an open wooden door in a wall: stone jambs either side of the doorway, a lintel
-// carrying the wall over it, and the door swung back against one jamb.
-func drawDoor(c *forestCanvas, x, z float64, joined [4]bool) {
+// drawDoor sets a wooden door in a wall: stone jambs either side of the doorway, a lintel
+// carrying the wall over it, and the door swung back against one jamb, or shut across the doorway.
+func drawDoor(c *forestCanvas, x, z float64, joined [4]bool, shut bool) {
 	half := wallThickness / 2
 	middleX, middleZ := x+world.TileSize/2, z+world.TileSize/2
 	size := world.TileSize
@@ -701,6 +701,10 @@ func drawDoor(c *forestCanvas, x, z float64, joined [4]bool) {
 		c.box(x+size-jambWidth, middleZ-half, x+size, middleZ+half, 0, wallHeight, [4]bool{false, joined[1], false, false}, stoneInk, stonework)
 		c.box(x+jambWidth, middleZ-half, x+size-jambWidth, middleZ+half, doorHeight, wallHeight, [4]bool{}, stoneInk, stonework)
 		c.box(x-0.08, middleZ-half-0.08, x+size+0.08, middleZ+half+0.08, wallHeight, wallHeight+copingHeight, [4]bool{}, stoneInk, plain)
+		if shut {
+			c.box(x+jambWidth, middleZ-c.thin(0.05), x+size-jambWidth, middleZ+c.thin(0.05), 0.05, doorHeight-0.1, [4]bool{}, plankInk, planks)
+			return
+		}
 		hinge := x + jambWidth
 		c.box(hinge, middleZ-half-0.9, hinge+c.thin(0.1), middleZ-half, 0.05, doorHeight-0.1, [4]bool{}, plankInk, planks)
 		return
@@ -709,23 +713,36 @@ func drawDoor(c *forestCanvas, x, z float64, joined [4]bool) {
 	c.box(middleX-half, z+size-jambWidth, middleX+half, z+size, 0, wallHeight, [4]bool{false, false, joined[2], false}, stoneInk, stonework)
 	c.box(middleX-half, z+jambWidth, middleX+half, z+size-jambWidth, doorHeight, wallHeight, [4]bool{}, stoneInk, stonework)
 	c.box(middleX-half-0.08, z-0.08, middleX+half+0.08, z+size+0.08, wallHeight, wallHeight+copingHeight, [4]bool{}, stoneInk, plain)
+	if shut {
+		c.box(middleX-c.thin(0.05), z+jambWidth, middleX+c.thin(0.05), z+size-jambWidth, 0.05, doorHeight-0.1, [4]bool{}, plankInk, planks)
+		return
+	}
 	hinge := z + jambWidth
 	c.box(middleX-half-0.9, hinge, middleX-half, hinge+c.thin(0.1), 0.05, doorHeight-0.1, [4]bool{}, plankInk, planks)
 }
 
-// drawOpenGate leaves a gap in a fence between two gateposts, with the gate swung open.
-func drawOpenGate(c *forestCanvas, x, z float64, joined [4]bool) {
+// drawGate hangs a gate in a gap in a fence between two gateposts, swung open or shut across the
+// gap.
+func drawGate(c *forestCanvas, x, z float64, joined [4]bool, shut bool) {
 	post := c.thin(0.1)
 	middleX, middleZ := x+world.TileSize/2, z+world.TileSize/2
 	if joined[0] || joined[2] {
 		for _, postZ := range []float64{z + 0.2, z + world.TileSize - 0.2} {
 			c.box(middleX-post, postZ-post, middleX+post, postZ+post, 0, 1.4, [4]bool{}, plankInk, plain)
 		}
+		if shut {
+			c.box(middleX-post/2, z+0.2, middleX+post/2, z+world.TileSize-0.2, 0.3, 1.1, [4]bool{}, plankInk, planks)
+			return
+		}
 		c.box(middleX-1.2, z+0.2-post/2, middleX, z+0.2+post/2, 0.3, 1.1, [4]bool{}, plankInk, planks)
 		return
 	}
 	for _, postX := range []float64{x + 0.2, x + world.TileSize - 0.2} {
 		c.box(postX-post, middleZ-post, postX+post, middleZ+post, 0, 1.4, [4]bool{}, plankInk, plain)
+	}
+	if shut {
+		c.box(x+0.2, middleZ-post/2, x+world.TileSize-0.2, middleZ+post/2, 0.3, 1.1, [4]bool{}, plankInk, planks)
+		return
 	}
 	c.box(x+0.2-post/2, middleZ-1.2, x+0.2+post/2, middleZ, 0.3, 1.1, [4]bool{}, plankInk, planks)
 }

@@ -34,12 +34,14 @@ type renderer struct {
 	cursor                    slotCursor
 	// built surveys a map's structures within the drawn area, each frame.
 	built builtArea
-	// menu lists the actions offered for the tree in reach, named by menuTitle; nil when closed.
-	menu      []string
-	menuTitle string
-	zoom      zoom
-	turn      turning
-	gait      gait
+	// menu lists the actions offered for the tree or doorway in reach, named by menuTitle; nil
+	// when closed. menuDoorway marks a menu offered for a doorway.
+	menu        []string
+	menuTitle   string
+	menuDoorway bool
+	zoom        zoom
+	turn        turning
+	gait        gait
 	// lastSeconds is when the last frame was rendered, so the gait can follow the time between frames.
 	lastSeconds float64
 	// palette is the color of each ink: the forest's own, then the colors of the map's models.

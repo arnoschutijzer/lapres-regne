@@ -14,6 +14,9 @@ type Edges struct {
 // TileEdges is what stands along a tile's west and north edges and diagonally across it.
 type TileEdges struct {
 	West, North, Rising, Falling Ground
+	// WestShut and NorthShut tell whether the door in a doorway along the west or north edge is
+	// shut.
+	WestShut, NorthShut bool
 }
 
 // How far either side of an edge its wall or fence keeps the hero.
@@ -37,6 +40,8 @@ func (t *terrain) edgesOf(c cell) TileEdges {
 	return TileEdges{
 		West: along(t.edges.West, c.gx, c.gz), North: along(t.edges.North, c.gx, c.gz),
 		Rising: along(t.edges.Rising, c.gx, c.gz), Falling: along(t.edges.Falling, c.gx, c.gz),
+		WestShut:  t.shut[Doorway{Col: c.gx, Row: c.gz}],
+		NorthShut: t.shut[Doorway{Col: c.gx, Row: c.gz, North: true}],
 	}
 }
 
@@ -75,8 +80,8 @@ func (t *terrain) crossed(c cell) bool {
 // segment is a stretch of an edge, from one point on the ground to another.
 type segment struct{ x0, z0, x1, z1 float64 }
 
-// barred tells whether a point lies within reach of a wall or fence standing along the edges of
-// its tile or of the tiles round it, or of the stone jambs either side of a doorway.
+// barred tells whether a point lies within reach of a wall, fence or shut door standing along the
+// edges of its tile or of the tiles round it, or of the stone jambs either side of a doorway.
 func (t *terrain) barred(x, z float64) bool {
 	here := tileOf(x, z)
 	for row := here.gz - 1; row <= here.gz+1; row++ {
@@ -86,11 +91,12 @@ func (t *terrain) barred(x, z float64) bool {
 			for _, edge := range [2]struct {
 				ground Ground
 				along  segment
+				shut   bool
 			}{
-				{edges.West, segment{left, top, left, top + TileSize}},
-				{edges.North, segment{left, top, left + TileSize, top}},
+				{edges.West, segment{left, top, left, top + TileSize}, edges.WestShut},
+				{edges.North, segment{left, top, left + TileSize, top}, edges.NorthShut},
 			} {
-				if bars(edge.ground) && edge.along.distance(x, z) < keptBy(edge.ground) {
+				if (bars(edge.ground) || edge.shut) && edge.along.distance(x, z) < keptBy(edge.ground) {
 					return true
 				}
 				if edge.ground == Door && t.jambed(edge.along, x, z) {

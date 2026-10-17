@@ -55,9 +55,9 @@ func (t *terrain) open(c cell) bool {
 }
 
 // crossable tells whether the hero may step straight from a tile to the one beside it: no rail,
-// wall or fence stands in the edge between them.
+// wall, fence or shut door stands in the edge between them.
 func (t *terrain) crossable(from, to cell) bool {
-	return !t.railed(from, to) && !bars(t.between(from, to))
+	return !t.railed(from, to) && !bars(t.between(from, to)) && !t.shut[edgeBetween(from, to)]
 }
 
 // railReach is how far in from a bridge's edge over the water its rail keeps the hero.

@@ -41,6 +41,12 @@ func (a *builtArea) meeting(col, row int) int {
 	return count
 }
 
+// walledDoorway tells whether walls meet a doorway running between two corners of tiles, making it
+// a door rather than a gate.
+func (a *builtArea) walledDoorway(startCol, startRow, endCol, endRow int) bool {
+	return a.meeting(startCol, startRow)+a.meeting(endCol, endRow) > 2
+}
+
 // indoorAt tells whether a tile is floored inside.
 func (a *builtArea) indoorAt(col, row int) bool {
 	ground := a.at(col, row).ground
@@ -59,9 +65,11 @@ func (a *builtArea) drawEdges(c *forestCanvas, col, row int, x, z, variety float
 		endCol, endRow     int
 		// inside and outside are the tiles either side of the edge.
 		inside, outside [2]int
+		// shut tells whether a doorway's door is shut.
+		shut bool
 	}{
-		{edges.West, x, z, x, z + size, col, row, col, row + 1, [2]int{col, row}, [2]int{col - 1, row}},
-		{edges.North, x, z, x + size, z, col, row, col + 1, row, [2]int{col, row}, [2]int{col, row - 1}},
+		{edges.West, x, z, x, z + size, col, row, col, row + 1, [2]int{col, row}, [2]int{col - 1, row}, edges.WestShut},
+		{edges.North, x, z, x + size, z, col, row, col + 1, row, [2]int{col, row}, [2]int{col, row - 1}, edges.NorthShut},
 	} {
 		if edge.ground == world.Grass {
 			continue
@@ -77,7 +85,7 @@ func (a *builtArea) drawEdges(c *forestCanvas, col, row int, x, z, variety float
 		case world.Fence:
 			drawFenceAlong(c, edge.x0, edge.z0, edge.x1, edge.z1)
 		case world.Door:
-			// A doorway set in walls has its frame and door; one in a fence is an open gate.
+			// A doorway set in walls has its frame and door; one in a fence is a gate.
 			northSouth := edge.x0 == edge.x1
 			joined := [4]bool{northSouth, !northSouth, northSouth, !northSouth}
 			tileX, tileZ := edge.x0, edge.z0
@@ -86,10 +94,10 @@ func (a *builtArea) drawEdges(c *forestCanvas, col, row int, x, z, variety float
 			} else {
 				tileZ -= size / 2
 			}
-			if a.meeting(edge.startCol, edge.startRow)+a.meeting(edge.endCol, edge.endRow) > 2 {
-				drawDoor(c, tileX, tileZ, joined)
+			if a.walledDoorway(edge.startCol, edge.startRow, edge.endCol, edge.endRow) {
+				drawDoor(c, tileX, tileZ, joined, edge.shut)
 			} else {
-				drawOpenGate(c, tileX, tileZ, joined)
+				drawGate(c, tileX, tileZ, joined, edge.shut)
 			}
 		}
 	}

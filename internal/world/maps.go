@@ -116,11 +116,13 @@ type terrain struct {
 	highest int
 	roofs   [][]Roofing
 	edges   Edges
-	models  []PlacedModel
+	// shut holds the doorways whose doors are shut; every door stands open at first.
+	shut   map[Doorway]bool
+	models []PlacedModel
 }
 
 func newTerrain(m Map) *terrain {
-	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, roofs: m.Roofs, edges: m.Edges, models: m.Models, trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
+	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, roofs: m.Roofs, edges: m.Edges, models: m.Models, shut: make(map[Doorway]bool), trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
 	for _, levels := range m.Heights {
 		for _, level := range levels {
 			t.highest = max(t.highest, level)
