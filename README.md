@@ -86,7 +86,8 @@ WY...
 | `:`  | earth path | `_`  | stone floor |
 | `#`  | wall    | `=`  | fence   |
 | `G`  | gate    | `+`  | grave   |
-| `D`  | open door | | |
+| `D`  | open door | `b`  | wooden floor |
+| `B`  | battlements | | |
 | `@`  | where the hero starts | | |
 
 Name parts of the map with `area <letter> <name>` settings and an `areas`

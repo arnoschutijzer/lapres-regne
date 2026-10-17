@@ -80,13 +80,13 @@ func TestAMissingMapFileIsReported(t *testing.T) {
 }
 
 func TestAMapFileLoadsBuiltGroundAndStructures(t *testing.T) {
-	loaded, err := Load(write(t, "yard.map", "terrain\n#_:@\n=G+D\n"))
+	loaded, err := Load(write(t, "yard.map", "terrain\n#_:@b\n=G+DB\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := [][]world.Ground{
-		{world.Wall, world.Floor, world.Path, world.Grass},
-		{world.Fence, world.Gate, world.Grave, world.Door},
+		{world.Wall, world.Floor, world.Path, world.Grass, world.Boards},
+		{world.Fence, world.Gate, world.Grave, world.Door, world.Battlement},
 	}
 	if !reflect.DeepEqual(loaded.Ground, want) {
 		t.Fatalf("ground = %v, want %v", loaded.Ground, want)

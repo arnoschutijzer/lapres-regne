@@ -18,9 +18,13 @@ const (
 	Path
 	// Floor is flagstones, inside buildings and courtyards.
 	Floor
+	// Boards is a floor of wooden boards, inside houses.
+	Boards
 	// Door is an open doorway through a wall, on a flagstone floor.
 	Door
 	Wall
+	// Battlement is a castle wall, crowned with merlons.
+	Battlement
 	Fence
 	Gate
 	Grave

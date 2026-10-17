@@ -181,8 +181,8 @@ func courtyard() world.Map {
 
 func TestOnlyStructuresBlockTheWay(t *testing.T) {
 	for ground, blocks := range map[world.Ground]bool{
-		world.Grass: false, world.Water: false, world.Path: false, world.Floor: false, world.Door: false,
-		world.Wall: true, world.Fence: true, world.Gate: true, world.Grave: true,
+		world.Grass: false, world.Water: false, world.Path: false, world.Floor: false, world.Boards: false, world.Door: false,
+		world.Wall: true, world.Battlement: true, world.Fence: true, world.Gate: true, world.Grave: true,
 	} {
 		if ground.Blocks() != blocks {
 			t.Errorf("ground %v blocks = %v, want %v", ground, ground.Blocks(), blocks)

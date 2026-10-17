@@ -148,6 +148,7 @@ var forestPalette = [...][3]int{
 	{150, 160, 96},  // reeds
 	{92, 120, 64},   // moss
 	{70, 96, 124},   // window glass
+	{150, 104, 62},  // wooden boards
 }
 
 // foremost marks the inks of the hero, their axe, flying chips and fireworks.
@@ -622,8 +623,10 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 				if f.Noise(wx*3, wz*3, 23) > 0.78 {
 					light += 0.3
 				}
-			case ground == world.Floor || ground == world.Wall || ground == world.Door:
+			case ground == world.Floor || isWall(ground) || ground == world.Door:
 				ink, light = floorInk, flagstones(wx, wz, n)
+			case ground == world.Boards:
+				ink, light = boardsInk, boards(wx, wz, n)
 			}
 			water = ground == world.Water
 			if ground == world.Grass && r.built.banked(wx, wz) {

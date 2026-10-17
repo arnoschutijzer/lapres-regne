@@ -33,6 +33,8 @@ func inShadow(ink int) int {
 		return shadowPathInk
 	case floorInk:
 		return shadowFloorInk
+	case boardsInk:
+		return shadowPathInk
 	}
 	return shadowGrassInk
 }
@@ -171,10 +173,11 @@ func windowed(centre float64) surface {
 	}
 }
 
-// The inks of a wall's weathering and its windows.
+// The inks of a wall's weathering and its windows, and of wooden floors.
 const (
 	mossInk = reedInk + 1 + iota
 	glassInk
+	boardsInk
 )
 
 // plain gives a structure even brightness.
@@ -198,7 +201,7 @@ type builtTile struct {
 // windowed tells whether a wall tile is a straight stretch of a building's wall, with a floor
 // on one side, where a window may be set.
 func (t builtTile) windowed() bool {
-	indoors := func(g world.Ground) bool { return g == world.Floor }
+	indoors := func(g world.Ground) bool { return g == world.Floor || g == world.Boards }
 	north, east, south, west := t.joined[0], t.joined[1], t.joined[2], t.joined[3]
 	if east && west && !north && !south {
 		return indoors(t.beside[0]) || indoors(t.beside[2])
@@ -237,10 +240,10 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 		for side, step := range neighbours {
 			beside := a.at(col+step[0], row+step[1]).ground
 			tile.beside[side] = beside
-			tile.walled = tile.walled || beside == world.Wall
+			tile.walled = tile.walled || isWall(beside)
 			switch tile.ground {
-			case world.Wall:
-				tile.joined[side] = beside == world.Wall || beside == world.Door || beside == world.Gate
+			case world.Wall, world.Battlement:
+				tile.joined[side] = isWall(beside) || beside == world.Door || beside == world.Gate
 			default:
 				tile.joined[side] = beside.Blocks() && beside != world.Grave || beside == world.Door
 			}
@@ -266,7 +269,7 @@ func tileAt(x, z float64) (col, row int, alongX, alongZ float64) {
 // underfoot is the ground to paint at a world position: beside a wall's slab, the ground of the tile
 // on that side, so grass and floors run up to the wall's foot.
 func (a *builtArea) underfoot(x, z float64, ground world.Ground) world.Ground {
-	if ground != world.Wall {
+	if !isWall(ground) {
 		return ground
 	}
 	col, row, alongX, alongZ := tileAt(x, z)
@@ -306,8 +309,12 @@ func (a *builtArea) occupied(x, y, z float64) bool {
 	across := func(along float64, width float64) bool { return math.Abs(along-middle) <= width }
 	north, east, south, west := tile.joined[0], tile.joined[1], tile.joined[2], tile.joined[3]
 	switch tile.ground {
-	case world.Wall:
-		if y > wallHeight+copingHeight {
+	case world.Wall, world.Battlement:
+		top := wallHeight + copingHeight
+		if tile.ground == world.Battlement && merlonAt(x, z, east || west) {
+			top += merlonHeight
+		}
+		if y > top {
 			return false
 		}
 		if east || west || !north && !south {
@@ -392,6 +399,9 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 		switch tile.ground {
 		case world.Wall:
 			drawWall(c, x, z, tile.joined, tile.windowed() && r.world.Random(col, row, 43) < 0.5)
+		case world.Battlement:
+			drawWall(c, x, z, tile.joined, false)
+			drawMerlons(c, x, z, tile.joined)
 		case world.Door:
 			if tile.walled {
 				drawDoor(c, x, z, tile.joined)
@@ -407,6 +417,63 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 			drawGrave(c, x, z, r.world.Random(col, row, 41))
 		}
 	}
+}
+
+// isWall tells whether stone walling stands on a tile, battlemented or not.
+func isWall(g world.Ground) bool {
+	return g == world.Wall || g == world.Battlement
+}
+
+// merlonHeight is how far a battlement's merlons rise above its coping.
+const merlonHeight = 0.5
+
+// merlonAt tells whether a battlement's merlon stands over a point, rather than a gap between
+// merlons. Merlons and gaps alternate every half unit along the wall, east to west for a wall
+// running that way and north to south otherwise, lined up across tiles.
+func merlonAt(x, z float64, eastWest bool) bool {
+	along := z
+	if eastWest {
+		along = x
+	}
+	return along-math.Floor(along) < 0.5
+}
+
+// drawMerlons crowns a wall's coping with merlons, along each stretch drawWall raises.
+func drawMerlons(c *forestCanvas, x, z float64, joined [4]bool) {
+	north, east, south, west := joined[0], joined[1], joined[2], joined[3]
+	half := wallThickness / 2
+	middleX, middleZ := x+world.TileSize/2, z+world.TileSize/2
+	bottom := wallHeight + copingHeight
+	merlons := func(from, to float64, at func(a, b float64)) {
+		for start := math.Floor(from); start < to; start++ {
+			if a, b := max(start, from), min(start+0.5, to); b > a {
+				at(a, b)
+			}
+		}
+	}
+	if east || west || !north && !south {
+		from, to := span(west, east)
+		merlons(x+from, x+to, func(a, b float64) {
+			c.box(a, middleZ-half, b, middleZ+half, bottom, bottom+merlonHeight, [4]bool{}, stoneInk, plain)
+		})
+	}
+	if north || south {
+		from, to := span(north, south)
+		merlons(z+from, z+to, func(a, b float64) {
+			c.box(middleX-half, a, middleX+half, b, bottom, bottom+merlonHeight, [4]bool{}, stoneInk, plain)
+		})
+	}
+}
+
+// boards lays a floor of wooden boards running east to west, a quarter unit wide, their ends
+// staggered from board to board, each board its own shade.
+func boards(x, z, n float64) float64 {
+	board := math.Floor(z / 0.25)
+	along := x + board*0.7
+	if z-board*0.25 < 0.03 || along-math.Floor(along/1.6)*1.6 < 0.04 {
+		return 0.08
+	}
+	return 0.24 + n*0.1 + 0.08*wave(board*2.3)
 }
 
 // thin keeps a size in world units at least a pixel across, so slender parts never vanish when the

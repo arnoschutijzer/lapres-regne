@@ -359,3 +359,48 @@ func TestOnlyTheWallsOfBuildingsHaveWindows(t *testing.T) {
 		t.Fatal("walls across open fields must have no windows")
 	}
 }
+
+// keep is meadow's open grass with a battlemented wall along row 25, and a room floored with boards
+// beyond it.
+func keep() *world.World {
+	ground := make([][]world.Ground, 60)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 80)
+	}
+	for col := 30; col < 50; col++ {
+		ground[25][col] = world.Battlement
+		for row := 20; row < 25; row++ {
+			ground[row][col] = world.Boards
+		}
+	}
+	return world.NewOnMap(7, world.Map{Name: "Keep", Ground: ground, StartCol: 40, StartRow: 30})
+}
+
+func TestBattlementsRiseInMerlonsAboveTheWall(t *testing.T) {
+	r := newRenderer(keep(), "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	c := r.render(160, 60, 0)
+	// The wall's skyline steps up over each merlon and down between them.
+	left, _, _ := c.project(76, 0, 51)
+	right, _, _ := c.project(86, 0, 51)
+	highest, lowest := c.height, 0
+	for px := int(left); px < int(right); px++ {
+		for py := range c.height {
+			if ink := c.pixels[py*c.width+px].ink; ink == stoneInk || ink == shadedStoneInk {
+				highest, lowest = min(highest, py), max(lowest, py)
+				break
+			}
+		}
+	}
+	if step := int(merlonHeight * 0.69 * c.scale); lowest-highest < step*3/4 {
+		t.Fatalf("the wall's top varies by %d pixels, want merlons rising about %d above the gaps", lowest-highest, step)
+	}
+}
+
+func TestBoardedFloorsAreDrawnInWood(t *testing.T) {
+	r := newRenderer(keep(), "L’Après-Règne")
+	r.zoom = zoom{current: 4}
+	if countInk(r.render(160, 60, 0), boardsInk) == 0 {
+		t.Fatal("the boarded floor must be drawn in wood")
+	}
+}
