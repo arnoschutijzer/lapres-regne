@@ -193,7 +193,7 @@ class Lumbridge:
 
     def kind_of(self, p):
         name = self.names.get(p["id"]) or ""
-        if "oor" in name or "ate" in name or self.wall_models(p["id"], 0) in self.door_models:
+        if "oor" in name or "ate" in name or not name and self.wall_models(p["id"], 0) in self.door_models:
             return "D"
         if p["id"] in CASTLE:
             return "C"
@@ -204,8 +204,9 @@ class Lumbridge:
             if 0 <= r < len(grid) and 0 <= c < len(grid[r]) and grid[r][c] != "D":
                 grid[r][c] = kind
 
-        # Doors are told by their names, or by sharing a named door's model, as the castle's own
-        # large doors do.
+        # Doors are told by their names, or, unnamed, by sharing a named door's model, as the
+        # castle's own large doors do. Named walls may share a door's model too: one of the game's
+        # doors is modelled as a plain stone wall.
         self.door_models = {self.wall_models(p["id"], 0) for p in self.placed if p["type"] == 0
                             and any(word in (self.names.get(p["id"]) or "") for word in ("oor", "ate"))}
         for p in self.placed:
