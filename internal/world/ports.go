@@ -16,17 +16,20 @@ type Sounds interface {
 	// OpenDoor sounds a door or gate swinging open, and CloseDoor one swinging shut.
 	OpenDoor()
 	CloseDoor()
+	// Climb sounds the hero climbing a staircase or ladder.
+	Climb(flight Fixture)
 }
 
 // silence is the default when no sound effects are wired.
 type silence struct{}
 
-func (silence) Chop()        {}
-func (silence) Fall()        {}
-func (silence) Drop(Landing) {}
-func (silence) LevelUp(bool) {}
-func (silence) OpenDoor()    {}
-func (silence) CloseDoor()   {}
+func (silence) Chop()         {}
+func (silence) Fall()         {}
+func (silence) Drop(Landing)  {}
+func (silence) LevelUp(bool)  {}
+func (silence) OpenDoor()     {}
+func (silence) CloseDoor()    {}
+func (silence) Climb(Fixture) {}
 
 // Progress keeps the hero's progress between sessions.
 type Progress interface {

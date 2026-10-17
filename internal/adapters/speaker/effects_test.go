@@ -257,3 +257,49 @@ func TestAnOpeningDoorCreaksOnAfterItsKnock(t *testing.T) {
 		t.Fatalf("end = %.3f, want the creak to fade out", end)
 	}
 }
+
+// beats tells whether a sound strikes at each of the moments, in seconds: louder just after each
+// one than in the quiet before the next.
+func beats(t *testing.T, samples []float32, moments []float64, quietAfter float64) {
+	t.Helper()
+	for _, moment := range moments {
+		if strike, quiet := loudness(samples, moment, 0.03), loudness(samples, moment+quietAfter, 0.02); strike < 3*quiet {
+			t.Fatalf("at %.2f s loudness = %.4f, %.2f s later %.4f; want a strike at %.2f s", moment, strike, quietAfter, quiet, moment)
+		}
+	}
+}
+
+func TestClimbingAStaircaseSoundsFourSoftFootfalls(t *testing.T) {
+	samples := climbSound(world.Staircase)
+	if seconds := float64(len(samples)/soundtrack.Channels) / soundtrack.SampleRate; seconds < 0.45 || seconds > 0.65 {
+		t.Fatalf("climbing lasts %.2f s, want about half a second", seconds)
+	}
+	beats(t, samples, []float64{0, 0.12, 0.24, 0.36}, 0.08)
+	if low, high := amplitudeAt(samples, 150, 0, 0.04), amplitudeAt(samples, 2500, 0, 0.04); low < 3*high {
+		t.Fatalf("150 Hz = %.4f, 2500 Hz = %.4f; want dull footfalls", low, high)
+	}
+	peak := 0.0
+	for i := 0; i < len(samples); i += soundtrack.Channels {
+		if samples[i] != samples[i+1] {
+			t.Fatalf("frame %d differs between channels; want a centred sound", i/2)
+		}
+		peak = math.Max(peak, math.Abs(float64(samples[i])))
+	}
+	if peak < 0.08 || peak > 0.6 {
+		t.Fatalf("peak = %.2f, want footfalls softer than a door's knock", peak)
+	}
+	if end := loudness(samples, float64(len(samples)/soundtrack.Channels)/soundtrack.SampleRate-0.02, 0.02); end > 0.005 {
+		t.Fatalf("end = %.4f, want the footfalls to die away", end)
+	}
+}
+
+func TestClimbingALadderKnocksBrighterOnItsRungs(t *testing.T) {
+	ladder, stairs := climbSound(world.Ladder), climbSound(world.Staircase)
+	beats(t, ladder, []float64{0, 0.17, 0.34}, 0.1)
+	brightness := func(samples []float32) float64 {
+		return amplitudeAt(samples, 800, 0, 0.04) / amplitudeAt(samples, 150, 0, 0.04)
+	}
+	if brightness(ladder) < 2*brightness(stairs) {
+		t.Fatalf("800 / 150 Hz = %.2f on a ladder, %.2f on stairs; want wooden rungs knocking brighter", brightness(ladder), brightness(stairs))
+	}
+}

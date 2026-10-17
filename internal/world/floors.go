@@ -176,6 +176,7 @@ func (w *World) Climb(up bool) bool {
 		w.storey--
 	}
 	w.land()
+	w.sounds.Climb(flight.Kind)
 	return true
 }
 

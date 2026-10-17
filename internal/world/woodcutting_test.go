@@ -133,6 +133,8 @@ type recordedSounds struct {
 	levelUps []bool
 	// doors records each door moving: "open" or "close".
 	doors []string
+	// climbs records the staircase or ladder of each climb.
+	climbs []world.Fixture
 }
 
 func (s *recordedSounds) Chop()                      { s.chops++ }
@@ -141,6 +143,7 @@ func (s *recordedSounds) Drop(landing world.Landing) { s.drops = append(s.drops,
 func (s *recordedSounds) LevelUp(unlocked bool)      { s.levelUps = append(s.levelUps, unlocked) }
 func (s *recordedSounds) OpenDoor()                  { s.doors = append(s.doors, "open") }
 func (s *recordedSounds) CloseDoor()                 { s.doors = append(s.doors, "close") }
+func (s *recordedSounds) Climb(flight world.Fixture) { s.climbs = append(s.climbs, flight) }
 
 func TestTheAxeLandsAsTheChopStartsAndEveryStrikeAfter(t *testing.T) {
 	w := besideTree()

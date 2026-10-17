@@ -24,6 +24,8 @@ type Effects struct {
 	fireworks []byte
 	// openDoor and closeDoor are a door swinging open and shut.
 	openDoor, closeDoor []byte
+	// climbs holds the sound of climbing each kind of staircase or ladder.
+	climbs map[world.Fixture][]byte
 	// playing keeps players referenced until their sound has finished.
 	playing []*oto.Player
 }
@@ -39,6 +41,10 @@ func newEffects(context *oto.Context) *Effects {
 		fireworks:        encode(fireworksSound()),
 		openDoor:         encode(doorSound(true)),
 		closeDoor:        encode(doorSound(false)),
+		climbs: map[world.Fixture][]byte{
+			world.Staircase: encode(climbSound(world.Staircase)),
+			world.Ladder:    encode(climbSound(world.Ladder)),
+		},
 	}
 }
 
@@ -85,6 +91,11 @@ func (e *Effects) OpenDoor() {
 // CloseDoor plays a door swinging shut and knocking against its frame.
 func (e *Effects) CloseDoor() {
 	e.play(e.closeDoor)
+}
+
+// Climb plays the hero climbing a staircase or ladder.
+func (e *Effects) Climb(flight world.Fixture) {
+	e.play(e.climbs[flight])
 }
 
 func (e *Effects) play(sound []byte) {

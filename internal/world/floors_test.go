@@ -1,6 +1,7 @@
 package world_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -188,5 +189,16 @@ func TestResumingOnAFloorTheMapNoLongerHasStartsAfresh(t *testing.T) {
 	}
 	if x, z := w.Hero().Position(); x != 4.5*world.TileSize || z != 2.5*world.TileSize {
 		t.Fatalf("position = %v, %v; want the start tile", x, z)
+	}
+}
+
+func TestClimbingSoundsTheStaircaseClimbed(t *testing.T) {
+	w := world.NewOnMap(7, tower())
+	sounds := &recordedSounds{}
+	w.SetSounds(sounds)
+	w.Climb(false)
+	w.Climb(true)
+	if want := []world.Fixture{world.Staircase}; !slices.Equal(sounds.climbs, want) {
+		t.Fatalf("climbs = %v, want only the climb up the staircase sounded", sounds.climbs)
 	}
 }
