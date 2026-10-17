@@ -33,9 +33,19 @@ func (w *World) Stop() {
 	w.message = ""
 }
 
+// mover is what walking orders need from the world around the hero.
+type mover interface {
+	Hero() *Character
+	// follow walks up to step toward the waypoints in turn, returning the waypoints still ahead,
+	// and false when the hero cannot get any closer to the next one.
+	follow(waypoints []point, step float64) ([]point, bool)
+	// wading shortens a distance walked while the hero stands in a river.
+	wading(distance float64) float64
+}
+
 // walk is an order to walk along waypoints round whatever blocks the way, and act on arrival.
 type walk struct {
-	world     *World
+	mover     mover
 	waypoints []point
 	// arrive acts once the hero stops, on the destination or as near as they could get to it,
 	// and returns the order that follows; nil acts on nothing.
@@ -43,7 +53,7 @@ type walk struct {
 }
 
 func (o *walk) carryOut(dt time.Duration, speed float64) order {
-	waypoints, moving := o.world.follow(o.waypoints, o.world.wading(speed*dt.Seconds()))
+	waypoints, moving := o.mover.follow(o.waypoints, o.mover.wading(speed*dt.Seconds()))
 	o.waypoints = waypoints
 	// A hero who cannot get any closer gives up on the destination.
 	if len(waypoints) > 0 && moving {
@@ -58,7 +68,7 @@ func (o *walk) carryOut(dt time.Duration, speed float64) order {
 // closeIn is an order to walk round whatever blocks the way up to a target, stopping within a
 // distance of it, and act there. A hero who cannot get any closer gives up without acting.
 type closeIn struct {
-	world  *World
+	mover  mover
 	target point
 	within float64
 	// waypoints lead round whatever blocks the way, before the last stretch straight to the target.
@@ -68,23 +78,24 @@ type closeIn struct {
 }
 
 func (o *closeIn) carryOut(dt time.Duration, speed float64) order {
-	w := o.world
+	m, hero := o.mover, o.mover.Hero()
 	if len(o.waypoints) > 0 {
-		waypoints, moving := w.follow(o.waypoints, w.wading(speed*dt.Seconds()))
+		waypoints, moving := m.follow(o.waypoints, m.wading(speed*dt.Seconds()))
 		o.waypoints = waypoints
 		if !moving {
 			return nil
 		}
 		return o
 	}
-	x, z := w.hero.Position()
+	x, z := hero.Position()
 	dx, dz := o.target.x-x, o.target.z-z
 	remaining := math.Hypot(dx, dz) - o.within
 	if remaining > 0 {
-		if w.hero.advance(dx, dz, math.Min(remaining, w.wading(speed*dt.Seconds()))) == 0 {
+		if hero.advance(dx, dz, math.Min(remaining, m.wading(speed*dt.Seconds()))) == 0 {
 			return nil
 		}
-		remaining = math.Hypot(o.target.x-w.hero.x, o.target.z-w.hero.z) - o.within
+		x, z = hero.Position()
+		remaining = math.Hypot(o.target.x-x, o.target.z-z) - o.within
 	}
 	if remaining > 1e-9 {
 		return o
@@ -121,7 +132,7 @@ func (w *World) Approach(tree Tree) bool {
 	w.Stop()
 	route := w.route(standing.X, standing.Z)
 	w.order = &closeIn{
-		world:     w,
+		mover:     w,
 		target:    point{standing.X, standing.Z},
 		within:    arrival,
 		waypoints: route[:len(route)-1],

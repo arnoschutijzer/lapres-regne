@@ -110,7 +110,7 @@ func (w *World) WalkTo(x, z float64) {
 // walkTo walks the hero to a point on the ground and acts on arrival.
 func (w *World) walkTo(x, z float64, arrive func() order) {
 	w.Stop()
-	w.order = &walk{world: w, waypoints: w.route(x, z), arrive: arrive}
+	w.order = &walk{mover: w, waypoints: w.route(x, z), arrive: arrive}
 }
 
 // wading halves the distance while the hero stands in a river.
