@@ -15,40 +15,39 @@ import (
 const heroWidth = 13
 
 var heroLegend = map[byte]color.RGBA{
-	'o': rgb(0x0a0710), // outline
-	'e': rgb(0x0a0710), // eyes
-	'H': rgb(0x4a3026), // hair in the light
-	'h': rgb(0x2a1b18), // hair in shade
-	'a': rgb(0xc89070), // skin in the light
-	'b': rgb(0x9a6248), // skin
-	'c': rgb(0x643c2e), // skin in shade
-	'w': rgb(0x9a94a2), // undershirt in the light
-	'W': rgb(0x6c6878), // undershirt
-	'v': rgb(0x3e3a4a), // undershirt in shade
-	'p': rgb(0x3a4060), // shorts in the light
-	'P': rgb(0x262a40), // shorts
-	'q': rgb(0x141626), // shorts in shade
+	'o': rgb(0x050405), // outline
+	'e': rgb(0x050405), // eyes
+	'H': rgb(0x2e221b), // hair in the light
+	'h': rgb(0x17110e), // hair in shade
+	'a': rgb(0xa07c64), // skin in the light
+	'b': rgb(0x76563f), // skin
+	'c': rgb(0x483226), // skin in shade
+	'w': rgb(0x8a8274), // undershirt in the light, worn and grimy
+	'W': rgb(0x5e584e), // undershirt
+	'v': rgb(0x34302b), // undershirt in shade
+	'p': rgb(0x3a3732), // shorts in the light
+	'P': rgb(0x24221f), // shorts
+	'q': rgb(0x121110), // shorts in shade
 }
 
-// Each facing has an upper body, from the head to the hands, and legs standing and in two strides.
+// Each facing has an upper body, from the head to the hips, and legs standing and in two strides.
 type heroPose struct {
 	upper, upperWorn []string
 	legs, legsWorn   [3][]string
 }
 
+// The body keeps real proportions: a small head, narrow shoulders and long legs.
 var (
 	frontUpper = []string{
 		".....ooo.....",
-		"....oHHHo....",
-		"...oHHHhho...",
-		"...oHHhhho...",
-		"...oHaabho...",
-		"...oaebeco...",
-		"...oabbbco...",
-		"....obbco....",
-		"....oabo.....",
-		"..oabbbbbco..",
-		".oabbbbbbbco.",
+		"....oHHho....",
+		"....oHhho....",
+		"....oebeo....",
+		"....oabco....",
+		".....obo.....",
+		"...ooabcoo...",
+		".oaabbbbbcco.",
+		".oaobbbbboco.",
 		".oaobbbbboco.",
 		".oaobbbbboco.",
 		".oaobbbbboco.",
@@ -57,19 +56,18 @@ var (
 		".oaobbbbboco.",
 		".obobbbbboco.",
 		"..oobbbbboo..",
+		"...obbbbbo...",
 	}
 	backUpper = []string{
 		".....ooo.....",
-		"....oHHHo....",
-		"...oHHHhho...",
-		"...oHHhhho...",
-		"...oHHhhho...",
-		"...oHhhhho...",
-		"...obhhhco...",
-		"....obbco....",
-		"....oabo.....",
-		"..oabbbbbco..",
-		".oabbbbbbbco.",
+		"....oHHho....",
+		"....oHhho....",
+		"....ohhho....",
+		"....obhco....",
+		".....obo.....",
+		"...ooabcoo...",
+		".oaabbbbbcco.",
+		".oaobbbbboco.",
 		".oaobbbbboco.",
 		".oaobbbbboco.",
 		".oaobbbbboco.",
@@ -78,6 +76,7 @@ var (
 		".oaobbbbboco.",
 		".obobbbbboco.",
 		"..oobbbbboo..",
+		"...obbbbbo...",
 	}
 	// The undershirt has short sleeves over the shoulders; the shorts reach the top of the legs.
 	frontUpperWorn = []string{
@@ -88,11 +87,10 @@ var (
 		".............",
 		".............",
 		".............",
-		".............",
-		".............",
-		"...wWWWWWv...",
 		"..wwWWWWWvv..",
 		"..w.WWWWW.v..",
+		"....wWWWv....",
+		"....wWWWv....",
 		"....wWWWv....",
 		"....wWWWv....",
 		"....wWWWv....",
@@ -105,7 +103,9 @@ var (
 		"...obbobbo...",
 		"...obbobco...",
 		"...obbobco...",
+		"...obbobco...",
 		"...oabobco...",
+		"...obbobco...",
 		"...obbobco...",
 		"...obbobco...",
 		"...obbobco...",
@@ -116,23 +116,27 @@ var (
 		"...obbobbo...",
 		"...obbobco...",
 		"...obbobco...",
+		"...obbobco...",
 		"...oabobco...",
 		"...obbobco...",
 		"...obbobco...",
 		"...obbobco...",
+		"...obbobco...",
 		"..oaabobco...",
-		"..oooo.bcco..",
+		"..oooo.obcco.",
 		".......oooo..",
 	}, {
 		"...obbobbo...",
 		"...obbobco...",
 		"...obbobco...",
+		"...obbobco...",
 		"...oabobco...",
 		"...obbobco...",
 		"...obbobco...",
 		"...obbobco...",
+		"...obbobco...",
 		"...obbobcco..",
-		"..oaabooooo..",
+		".oaabo.oooo..",
 		"..oooo.......",
 	}}
 	frontLegsWorn = [3][]string{
@@ -142,14 +146,13 @@ var (
 	}
 	sideUpper = []string{
 		".....ooo.....",
-		"....oHHHo....",
-		"...oHHHHho...",
-		"...oHHhhbao..",
-		"...oHhbbebo..",
-		"...ohbbbbo...",
+		"....oHHho....",
+		"....oHhabo...",
+		"....ohbbeo...",
 		"....obbbco...",
 		".....obco....",
 		".....obbo....",
+		"....oabbco...",
 		"....oabbco...",
 		"....oabbco...",
 		"....oabbco...",
@@ -169,8 +172,6 @@ var (
 		".............",
 		".............",
 		".............",
-		".............",
-		".............",
 		".....wWWv....",
 		".....wWWv....",
 		".....wWWv....",
@@ -181,12 +182,15 @@ var (
 		".....pPPq....",
 		".....pPPq....",
 		".....pPPq....",
+		".....pPPq....",
 	}
 	sideLegs = [3][]string{{
 		"....obbbo....",
 		"....obbco....",
 		"....obbco....",
+		"....obbco....",
 		"....oabco....",
+		"....obbco....",
 		"....obbco....",
 		"....obbco....",
 		"....obbco....",
@@ -197,7 +201,9 @@ var (
 		"....obbbo....",
 		"...ocbobbo...",
 		"...ocbobbo...",
+		"...ocbobbo...",
 		"...ocb.obbo..",
+		"..ocbo..obo..",
 		"..ocbo..obo..",
 		"..ocbo..obo..",
 		"..ocbo..obo..",
@@ -208,7 +214,9 @@ var (
 		"....obbbo....",
 		"...obbocbo...",
 		"...obbocbo...",
+		"...obbocbo...",
 		"...obb.ocbo..",
+		"..obbo..oco..",
 		"..obbo..oco..",
 		"..obbo..oco..",
 		"..obbo..oco..",
