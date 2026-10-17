@@ -21,7 +21,7 @@
 //	B  battlements      H  bridge
 //	@  where the hero starts, on grass
 //
-// Walls, fences, gates and graves block the way.
+// Walls, fences, gates and graves block the way, and a bridge is railed along the water.
 //
 // An areas grid, laid over the terrain, names the parts of the map. Each letter stands for the area
 // named by an "area <letter> <name>" setting, and . for none:

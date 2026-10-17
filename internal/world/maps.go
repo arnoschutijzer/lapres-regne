@@ -276,8 +276,7 @@ func (w *World) passable(x, z float64) bool {
 	if w.terrain == nil {
 		return true
 	}
-	ground, ok := w.terrain.at(x, z)
-	return ok && !ground.Blocks()
+	return w.terrain.passable(x, z)
 }
 
 // plantedTree is the tree planted on a tile of the map, placed a little off the tile's centre and

@@ -349,3 +349,66 @@ func TestBoardedRoomsAreThatchedAndStoneRoomsSlated(t *testing.T) {
 		t.Fatal("a room floored in boards must be thatched")
 	}
 }
+
+// crossing is a river running north to south with a bridge carrying the way east over it, from
+// grass on the west bank to grass on the east bank.
+func crossing() world.Map {
+	ground := make([][]world.Ground, 7)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 12)
+		for col := 3; col < 9; col++ {
+			ground[row][col] = world.Water
+		}
+	}
+	for col := 3; col < 9; col++ {
+		ground[3][col] = world.Bridge
+	}
+	return world.Map{Name: "crossing", Ground: ground, StartCol: 5, StartRow: 3}
+}
+
+func TestTheHeroWalksOverABridge(t *testing.T) {
+	m := crossing()
+	m.StartCol = 1
+	w := world.NewOnMap(7, m)
+	w.Advance(1, 0, 10*time.Second, false)
+	if x, z := w.Hero().Position(); x < 10*world.TileSize || z != 3.5*world.TileSize {
+		t.Fatalf("position = %v, %v; want the hero straight over the bridge on the east bank", x, z)
+	}
+}
+
+func TestABridgesRailsKeepTheHeroOutOfTheRiver(t *testing.T) {
+	for _, way := range []float64{-1, 1} {
+		w := world.NewOnMap(7, crossing())
+		w.Advance(0, way, 2*time.Second, false)
+		if _, z := w.Hero().Position(); z < 3*world.TileSize || z > 4*world.TileSize {
+			t.Fatalf("walking %v z = %v; want the hero kept on the bridge by its rail", way, z)
+		}
+	}
+}
+
+func TestABridgesRailsKeepTheHeroWadingBelowFromClimbingOnto(t *testing.T) {
+	m := crossing()
+	m.StartRow = 1
+	w := world.NewOnMap(7, m)
+	w.Advance(0, 1, 3*time.Second, false)
+	if _, z := w.Hero().Position(); z > 3*world.TileSize {
+		t.Fatalf("z = %v; want the hero stopped in the river against the rail", z)
+	}
+}
+
+func TestWalkingFromABridgeIntoTheRiverGoesOffItsEnd(t *testing.T) {
+	w := world.NewOnMap(7, crossing())
+	w.WalkTo(11, 3)
+	for elapsed := time.Duration(0); elapsed < 20*time.Second; elapsed += 50 * time.Millisecond {
+		fromX, fromZ := w.Hero().Position()
+		w.Advance(0, 0, 50*time.Millisecond, false)
+		toX, toZ := w.Hero().Position()
+		onSpan := func(x float64) bool { return x >= 3*world.TileSize && x < 9*world.TileSize }
+		if onSpan(fromX) && onSpan(toX) && fromZ >= 3*world.TileSize && toZ < 3*world.TileSize {
+			t.Fatalf("the hero stepped over the rail at x %v", toX)
+		}
+	}
+	if x, z := w.Hero().Position(); x != 11 || z != 3 {
+		t.Fatalf("position = %v, %v; want the hero round the bridge's end at 11, 3", x, z)
+	}
+}

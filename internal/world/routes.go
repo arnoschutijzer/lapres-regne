@@ -50,8 +50,64 @@ func (t *terrain) open(c cell) bool {
 	return ok && !ground.Blocks()
 }
 
+// railReach is how far in from a bridge's edge over the water its rail keeps the hero.
+const railReach = 0.3
+
+// railed tells whether a rail runs between two tiles side by side: along a bridge over the water.
+func (t *terrain) railed(a, b cell) bool {
+	first, _ := t.tile(a.gx, a.gz)
+	second, _ := t.tile(b.gx, b.gz)
+	return first == Bridge && second == Water || first == Water && second == Bridge
+}
+
+// passable tells whether the hero may stand at a point: on an open tile, and not against the
+// rail along a bridge's edge over the water.
+func (t *terrain) passable(x, z float64) bool {
+	here := tileOf(x, z)
+	if !t.open(here) {
+		return false
+	}
+	ground, _ := t.tile(here.gx, here.gz)
+	if ground != Bridge {
+		return true
+	}
+	alongX, alongZ := x-float64(here.gx)*TileSize, z-float64(here.gz)*TileSize
+	sides := [4]struct {
+		step    cell
+		against bool
+	}{
+		{cell{0, -1}, alongZ < railReach},
+		{cell{1, 0}, alongX > TileSize-railReach},
+		{cell{0, 1}, alongZ > TileSize-railReach},
+		{cell{-1, 0}, alongX < railReach},
+	}
+	for _, side := range sides {
+		if side.against && t.railed(here, cell{here.gx + side.step.gx, here.gz + side.step.gz}) {
+			return false
+		}
+	}
+	return true
+}
+
+// steppable tells whether the hero may step from a tile to the open tile beside it, straight
+// without crossing a rail, or diagonally without cutting the corner of a blocked or railed tile.
+func (t *terrain) steppable(from, to cell) bool {
+	if !t.open(to) {
+		return false
+	}
+	if from.gx == to.gx || from.gz == to.gz {
+		return !t.railed(from, to)
+	}
+	for _, corner := range [2]cell{{to.gx, from.gz}, {from.gx, to.gz}} {
+		if !t.open(corner) || t.railed(from, corner) || t.railed(corner, to) {
+			return false
+		}
+	}
+	return true
+}
+
 // search finds the shortest way over open tiles from start to goal, stepping straight or
-// diagonally without cutting the corner of a blocked tile. It returns the tiles from start to goal,
+// diagonally without crossing a rail or cutting the corner of a blocked tile. It returns the tiles from start to goal,
 // or to the reached tile nearest the goal when the goal cannot be reached.
 func (t *terrain) search(start, goal cell) []cell {
 	estimate := func(c cell) float64 {
@@ -73,10 +129,7 @@ func (t *terrain) search(start, goal cell) []cell {
 		for dz := -1; dz <= 1; dz++ {
 			for dx := -1; dx <= 1; dx++ {
 				next := cell{current.gx + dx, current.gz + dz}
-				if next == current || !t.open(next) {
-					continue
-				}
-				if dx != 0 && dz != 0 && (!t.open(cell{current.gx + dx, current.gz}) || !t.open(cell{current.gx, current.gz + dz})) {
+				if next == current || !t.steppable(current, next) {
 					continue
 				}
 				step := 1.0
@@ -126,7 +179,7 @@ func (t *terrain) clear(a, b point) bool {
 	steps := int(math.Ceil(math.Hypot(b.x-a.x, b.z-a.z) / 0.1))
 	for i := 1; i <= steps; i++ {
 		u := float64(i) / float64(steps)
-		if !t.open(tileOf(a.x+(b.x-a.x)*u, a.z+(b.z-a.z)*u)) {
+		if !t.passable(a.x+(b.x-a.x)*u, a.z+(b.z-a.z)*u) {
 			return false
 		}
 	}

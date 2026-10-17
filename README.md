@@ -101,8 +101,8 @@ areas
 CCC..
 ```
 
-Walls, fences, gates and graves block the way, and nothing beyond the map's
-edges can be walked on. Clicking the ground or a tree walks round whatever
+Walls, fences, gates and graves block the way, a bridge's rails keep the hero
+out of the water beside it, and nothing beyond the map's edges can be walked on. Clicking the ground or a tree walks round whatever
 blocks the way, or as close as the hero can get. Progress keeps the map's name,
 so your position and stumps return only to the map they were saved on.
 
