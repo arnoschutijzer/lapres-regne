@@ -22,7 +22,7 @@ const (
 // prominent marks the inks of structures, which count double when a braille cell picks its color,
 // so walls, fences and doors keep their color among the ground around them when zoomed out.
 func prominent(ink int) bool {
-	return ink == stoneInk || ink == shadedStoneInk || ink == ironInk || ink == plankInk
+	return ink == stoneInk || ink == shadedStoneInk || ink == ironInk || ink == plankInk || furnishing(ink)
 }
 
 // inShadow is the ink a patch of ground takes in a structure's shadow: a cooler, darker color, as a
@@ -55,6 +55,8 @@ const (
 type face struct {
 	origin, u, v, normal vec
 	triangle             bool
+	// seamless leaves the face's edges undarkened, for faces that together make one surface.
+	seamless bool
 }
 
 // surface patterns a face: the brightness of each point and its ink, or keepInk for the face's own,
@@ -95,8 +97,11 @@ func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 	if lengthU < 4*edgeU {
 		edgeU = 0
 	}
-	if lengthV < 4*edgeV {
+	if lengthV < 4*edgeV || f.seamless {
 		edgeV = 0
+	}
+	if f.seamless {
+		edgeU = 0
 	}
 	for py := max(0, top); py <= min(c.height-1, bottom); py++ {
 		for px := max(0, left); px <= min(c.width-1, right); px++ {
@@ -202,6 +207,10 @@ type builtTile struct {
 	fixture   world.Fixture
 	furnished bool
 	alike     [4]bool
+	// besideFixture is the fixture standing on the tiles to the north, east, south and west, where
+	// besideFurnished marks one.
+	besideFixture   [4]world.Fixture
+	besideFurnished [4]bool
 }
 
 // windowed tells whether a wall tile is a straight stretch of a building's wall, with a floor
@@ -257,9 +266,9 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 			beside := a.at(col+step[0], row+step[1]).ground
 			tile.beside[side] = beside
 			tile.walled = tile.walled || isWall(beside)
-			if other := a.at(col+step[0], row+step[1]); tile.furnished && other.furnished && other.fixture == tile.fixture {
-				tile.alike[side] = true
-			}
+			other := a.at(col+step[0], row+step[1])
+			tile.besideFixture[side], tile.besideFurnished[side] = other.fixture, other.furnished
+			tile.alike[side] = tile.furnished && other.furnished && other.fixture == tile.fixture
 			switch tile.ground {
 			case world.Wall, world.Battlement:
 				tile.joined[side] = isWall(beside) || beside == world.Door || beside == world.Gate
@@ -453,7 +462,7 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 			drawBridgeRails(c, x, z, tile.beside)
 		}
 		if tile.furnished {
-			drawFixture(c, x, z, tile)
+			drawFixture(c, x, z, tile, r.world.Random(col, row, 44))
 		}
 	}
 }

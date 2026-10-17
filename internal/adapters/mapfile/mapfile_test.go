@@ -184,3 +184,19 @@ func TestAnUnknownFixtureIsReported(t *testing.T) {
 		t.Fatalf("error = %v, want the unknown fixture reported on line 5", err)
 	}
 }
+
+func TestEachObjectLetterStandsForItsFixture(t *testing.T) {
+	for letter, kind := range map[string]world.Fixture{
+		"t": world.Table, "c": world.Chair, "T": world.Throne, "a": world.Armour, "r": world.Range,
+		"o": world.Barrel, "x": world.Crate, "q": world.Sacks, "s": world.Shelves, "S": world.Staircase,
+		"L": world.Ladder, "i": world.Torch, "l": world.Candles, "f": world.Standard,
+	} {
+		loaded, err := Load(write(t, "room.map", "terrain\n@.\n\nobjects\n."+letter+"\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := []world.PlacedFixture{{Col: 1, Row: 0, Kind: kind}}; !reflect.DeepEqual(loaded.Fixtures, want) {
+			t.Errorf("object %q = %+v, want %+v", letter, loaded.Fixtures, want)
+		}
+	}
+}

@@ -40,7 +40,13 @@
 // An objects grid, laid over the terrain, stands furniture and landmarks on its tiles, each blocking
 // the way, with . for none:
 //
-//	t  table
+//	t  table            c  chair
+//	T  throne           a  suit of armour
+//	r  cooking range    o  barrel
+//	x  crate            q  sacks
+//	s  shelves          S  staircase
+//	L  ladder           i  standing torch
+//	l  candles          f  standard
 //
 //	objects
 //	..t..
@@ -85,7 +91,9 @@ var tiles = map[rune]tile{
 
 // fixtures are what the characters of the objects grid stand for.
 var fixtures = map[rune]world.Fixture{
-	't': world.Table,
+	't': world.Table, 'c': world.Chair, 'T': world.Throne, 'a': world.Armour, 'r': world.Range,
+	'o': world.Barrel, 'x': world.Crate, 'q': world.Sacks, 's': world.Shelves, 'S': world.Staircase,
+	'L': world.Ladder, 'i': world.Torch, 'l': world.Candles, 'f': world.Standard,
 }
 
 // Load reads the map in the file at path. A map without a name is named after its file.

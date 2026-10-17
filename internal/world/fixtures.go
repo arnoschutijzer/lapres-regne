@@ -5,6 +5,25 @@ type Fixture byte
 
 const (
 	Table Fixture = iota
+	Chair
+	Throne
+	// Armour is a suit of armour on its stand.
+	Armour
+	// Range is a cooking range or hearth with a fire in it.
+	Range
+	Barrel
+	Crate
+	Sacks
+	// Shelves are shelves or a cabinet against a wall.
+	Shelves
+	Staircase
+	Ladder
+	// Torch is a standing torch.
+	Torch
+	// Candles are candles on a stand.
+	Candles
+	// Standard is a banner on a pole.
+	Standard
 )
 
 // PlacedFixture is a fixture standing on a tile of a map.

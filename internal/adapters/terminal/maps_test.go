@@ -495,3 +495,31 @@ func TestATableStandsOnItsTileInWood(t *testing.T) {
 		t.Fatalf("ink on the table's top = %d, want its wooden planks", ink)
 	}
 }
+
+func TestEachFixtureShowsItsTellingColour(t *testing.T) {
+	for _, fixture := range []struct {
+		kind world.Fixture
+		inks []int
+	}{
+		{world.Chair, []int{plankInk}},
+		{world.Throne, []int{blueClothInk}},
+		{world.Armour, []int{ironInk}},
+		{world.Range, []int{emberInk, flameInk}},
+		{world.Barrel, []int{plankInk}},
+		{world.Crate, []int{plankInk}},
+		{world.Sacks, []int{burlapInk}},
+		{world.Shelves, []int{plankInk}},
+		{world.Staircase, []int{stoneInk, shadedStoneInk}},
+		{world.Ladder, []int{plankInk}},
+		{world.Torch, []int{flameInk}},
+		{world.Candles, []int{waxInk}},
+		{world.Standard, []int{blueClothInk}},
+	} {
+		r := newRenderer(hall(fixture.kind), "L’Après-Règne")
+		r.zoom = zoom{current: 6}
+		c := r.render(160, 90, 0)
+		if drawn := countInk(c, fixture.inks...); drawn < 15 {
+			t.Errorf("fixture %d drew %d pixels in inks %v, want it standing in them", fixture.kind, drawn, fixture.inks)
+		}
+	}
+}

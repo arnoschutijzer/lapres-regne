@@ -127,9 +127,18 @@ objects
 ..tt.
 ```
 
-| Object | Meaning |
-| ------ | ------- |
-| `t`    | table   |
+| Object | Meaning | Object | Meaning |
+| ------ | ------- | ------ | ------- |
+| `t`    | table   | `c`    | chair   |
+| `T`    | throne  | `a`    | suit of armour |
+| `r`    | cooking range | `o` | barrel |
+| `x`    | crate   | `q`    | sacks   |
+| `s`    | shelves | `S`    | staircase |
+| `L`    | ladder  | `i`    | standing torch |
+| `l`    | candles | `f`    | standard |
+
+Chairs and thrones turn their backs on the table they stand at; other
+fixtures back onto a wall beside them.
 
 Walls, fences, gates, graves and fixtures block the way, a bridge's rails keep the hero
 out of the water beside it, and nothing beyond the map's edges can be walked on. Clicking the ground or a tree walks round whatever
