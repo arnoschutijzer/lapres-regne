@@ -1,9 +1,6 @@
 package world
 
-import (
-	"math"
-	"time"
-)
+import "math"
 
 type Facing byte
 
@@ -28,7 +25,6 @@ type Character struct {
 	stepDistance float64
 	facing       Facing
 	aimed        bool
-	lastWalk     time.Time
 	inventory    Inventory
 	// skills holds the experience gained in each skill by name; a skill never trained is absent.
 	skills map[string]Skill
@@ -39,7 +35,6 @@ type Character struct {
 func (c *Character) Position() (x, z float64) { return c.x, c.z }
 func (c *Character) Steps() int               { return c.steps }
 func (c *Character) Facing() Facing           { return c.facing }
-func (c *Character) LastWalk() time.Time      { return c.lastWalk }
 func (c *Character) Inventory() Inventory     { return c.inventory }
 
 // Skill is the experience gained in the skill of that name.
@@ -121,7 +116,6 @@ func (c *Character) move(dx, dz, distance float64) float64 {
 		c.Face(FacingToward(dx, dz))
 	}
 	if c.passable == nil {
-		c.lastWalk = time.Now()
 		c.x, c.z = c.x+dx*distance, c.z+dz*distance
 		return distance
 	}
@@ -135,9 +129,6 @@ func (c *Character) move(dx, dz, distance float64) float64 {
 			break
 		}
 		moved += covered
-	}
-	if moved > 0 {
-		c.lastWalk = time.Now()
 	}
 	return moved
 }
