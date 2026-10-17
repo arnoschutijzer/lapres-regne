@@ -79,3 +79,65 @@ func (Dithered) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell
 	}
 	return drawn
 }
+
+// PixelArt draws the forest as square pixels of flat color, two to a cell: the upper half block
+// in one, the paper under it in the other.
+type PixelArt struct{}
+
+// pixelShades is how many flat shades of each material pixel art shows.
+const pixelShades = 6
+
+func (PixelArt) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
+	top := artPixel(c, palette, col*2, row*4)
+	bottom := artPixel(c, palette, col*2, row*4+2)
+	return forestCell{bits: 3, solid: true, color: top, paper: bottom}
+}
+
+// artPixel is the color of one square art pixel, covering the 2 x 2 canvas pixels from left, top: the
+// ink covering most of them, at their mean light rounded to a flat shade.
+func artPixel(c *forestCanvas, palette [][3]int, left, top int) [3]int {
+	var tally [4]struct {
+		ink, coverage int
+		light         float64
+	}
+	inks := 0
+	for y := top; y < top+2; y++ {
+		for x := left; x < left+2; x++ {
+			p := c.pixels[y*c.width+x]
+			if p.light <= 0 {
+				continue
+			}
+			at := 0
+			for at < inks && tally[at].ink != p.ink {
+				at++
+			}
+			if at == inks {
+				tally[at].ink = p.ink
+				inks++
+			}
+			tally[at].coverage++
+			tally[at].light += p.light
+		}
+	}
+	if inks == 0 {
+		return background
+	}
+	best, score := 0, 0
+	for i, counted := range tally[:inks] {
+		// The hero, their axe and flying chips stay visible over anything else, as in the dither.
+		weight := counted.coverage
+		if foremost(counted.ink) {
+			weight += 64
+		}
+		if prominent(counted.ink) {
+			weight *= 2
+		}
+		if weight > score {
+			best, score = i, weight
+		}
+	}
+	chosen := tally[best]
+	light := min(1, chosen.light/float64(chosen.coverage))
+	shade := float64(int(light*pixelShades+0.5)) / pixelShades
+	return mix(background, palette[chosen.ink], shade)
+}
