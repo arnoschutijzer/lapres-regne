@@ -514,6 +514,10 @@ func TestEachFixtureShowsItsTellingColour(t *testing.T) {
 		{world.Torch, []int{flameInk}},
 		{world.Candles, []int{waxInk}},
 		{world.Standard, []int{blueClothInk}},
+		{world.Altar, []int{whiteClothInk}},
+		{world.Pew, []int{plankInk}},
+		{world.Organ, []int{ironInk}},
+		{world.Coffin, []int{plankInk}},
 	} {
 		r := newRenderer(hall(fixture.kind), "L’Après-Règne")
 		r.zoom = zoom{current: 6}
@@ -521,5 +525,17 @@ func TestEachFixtureShowsItsTellingColour(t *testing.T) {
 		if drawn := countInk(c, fixture.inks...); drawn < 15 {
 			t.Errorf("fixture %d drew %d pixels in inks %v, want it standing in them", fixture.kind, drawn, fixture.inks)
 		}
+	}
+}
+
+func TestAPewFacesAlongTheChurchAcrossItsRow(t *testing.T) {
+	ground := [][]world.Ground{{world.Wall, world.Floor, world.Floor, world.Floor}}
+	w := world.NewOnMap(7, world.Map{Name: "Nave", Ground: ground, Fixtures: []world.PlacedFixture{
+		{Col: 1, Row: 0, Kind: world.Pew}, {Col: 2, Row: 0, Kind: world.Pew},
+	}})
+	r := newRenderer(w, "L’Après-Règne")
+	r.render(100, 27, 0)
+	if back := backOf(r.built.at(1, 0)); back != 0 {
+		t.Fatalf("pew beside the west wall backs onto side %d, want north, facing along the nave", back)
 	}
 }

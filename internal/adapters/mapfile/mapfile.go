@@ -47,6 +47,8 @@
 //	s  shelves          S  staircase
 //	L  ladder           i  standing torch
 //	l  candles          f  standard
+//	A  altar            p  pew
+//	O  organ            k  coffin
 //
 //	objects
 //	..t..
@@ -94,6 +96,7 @@ var fixtures = map[rune]world.Fixture{
 	't': world.Table, 'c': world.Chair, 'T': world.Throne, 'a': world.Armour, 'r': world.Range,
 	'o': world.Barrel, 'x': world.Crate, 'q': world.Sacks, 's': world.Shelves, 'S': world.Staircase,
 	'L': world.Ladder, 'i': world.Torch, 'l': world.Candles, 'f': world.Standard,
+	'A': world.Altar, 'p': world.Pew, 'O': world.Organ, 'k': world.Coffin,
 }
 
 // Load reads the map in the file at path. A map without a name is named after its file.

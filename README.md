@@ -136,9 +136,12 @@ objects
 | `s`    | shelves | `S`    | staircase |
 | `L`    | ladder  | `i`    | standing torch |
 | `l`    | candles | `f`    | standard |
+| `A`    | altar   | `p`    | pew     |
+| `O`    | organ   | `k`    | coffin  |
 
 Chairs and thrones turn their backs on the table they stand at; other
-fixtures back onto a wall beside them.
+fixtures back onto a wall beside them, and a row of pews faces along the
+church.
 
 Walls, fences, gates, graves and fixtures block the way, a bridge's rails keep the hero
 out of the water beside it, and nothing beyond the map's edges can be walked on. Clicking the ground or a tree walks round whatever

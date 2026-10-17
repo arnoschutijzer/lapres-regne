@@ -34,7 +34,12 @@ const (
 // drawFixture draws the furniture or landmark standing on a tile whose north-west corner is at
 // x, z, turned to face into the room. variety, from 0 to 1, varies what it holds.
 func drawFixture(c *forestCanvas, x, z float64, tile builtTile, variety float64) {
-	p := placer{c: c, x: x, z: z, back: backOf(tile)}
+	back := backOf(tile)
+	p := placer{c: c, x: x, z: z, back: back}
+	// The sides running on into the same kind, in the fixture's own frame.
+	for side := range p.alike {
+		p.alike[side] = tile.alike[(side+back)%4]
+	}
 	switch tile.fixture {
 	case world.Table:
 		drawTable(c, x, z, tile.alike)
@@ -64,6 +69,14 @@ func drawFixture(c *forestCanvas, x, z float64, tile builtTile, variety float64)
 		drawCandles(p)
 	case world.Standard:
 		drawStandard(p)
+	case world.Altar:
+		drawAltar(p)
+	case world.Pew:
+		drawPew(p)
+	case world.Organ:
+		drawOrgan(p, variety)
+	case world.Coffin:
+		drawCoffin(p)
 	}
 }
 
@@ -104,6 +117,22 @@ type placer struct {
 	c    *forestCanvas
 	x, z float64
 	back int
+	// alike marks the sides of its frame, north, east, south and west, where the same kind
+	// stands beside it.
+	alike [4]bool
+}
+
+// across is the stretch of the frame from west to east a fixture spans, inset from each end
+// unless the same kind goes on beyond it.
+func (p placer) across(inset float64) (u0, u1 float64) {
+	u0, u1 = inset, world.TileSize-inset
+	if p.alike[3] {
+		u0 = 0
+	}
+	if p.alike[1] {
+		u1 = world.TileSize
+	}
+	return u0, u1
 }
 
 // at turns a point of the fixture's frame into the world.
@@ -361,4 +390,58 @@ func chevron(u, v float64, at vec) (float64, int) {
 		return 1, whiteClothInk
 	}
 	return 1, keepInk
+}
+
+// drawAltar raises a stone altar draped in white linen, a golden cross standing on it.
+func drawAltar(p placer) {
+	u0, u1 := p.across(0.2)
+	p.box(u0, 0.55, u1, 1.45, 0, 0.95, stoneInk, stonework)
+	p.box(u0, 0.5, u1, 1.5, 0.95, 1.02, whiteClothInk, plain)
+	p.box(u0+0.3, 1.5, u1-0.3, 1.52, 0.55, 1.02, whiteClothInk, plain)
+	if !p.alike[1] {
+		p.post(u1-0.5, 0.75, 0.08, 1.02, 1.6, goldInk)
+		p.box(u1-0.68, 0.71, u1-0.32, 0.79, 1.36, 1.44, goldInk, plain)
+	}
+}
+
+// drawPew lines up a wooden pew, its seat and back running on along the row, closed by carved
+// ends.
+func drawPew(p placer) {
+	u0, u1 := p.across(0.15)
+	p.box(u0, 0.75, u1, 1.35, 0.42, 0.5, plankInk, planks)
+	p.box(u0, 0.65, u1, 0.75, 0.42, 1.15, plankInk, planks)
+	for _, end := range []struct {
+		u     float64
+		shown bool
+	}{{u0, !p.alike[3]}, {u1 - 0.1, !p.alike[1]}} {
+		if end.shown {
+			p.box(end.u, 0.65, end.u+0.1, 1.35, 0, 1.2, plankInk, plain)
+		}
+	}
+}
+
+// drawOrgan builds a church organ against the wall: a wooden case with its keyboard, and pipes of
+// many lengths rising behind.
+func drawOrgan(p placer, variety float64) {
+	u0, u1 := p.across(0.1)
+	p.box(u0, 0.2, u1, 0.95, 0, 1.0, plankInk, planks)
+	p.box(u0+0.1, 0.95, u1-0.1, 1.25, 0.78, 0.86, whiteClothInk, keys)
+	for u := u0 + 0.12; u < u1-0.1; u += 0.2 {
+		rise := 1.2 + 0.9*(0.5+0.5*math.Sin(u*2.1+variety*6))
+		p.post(u+0.07, 0.4, 0.13, 1.0, 1.0+rise, ironInk)
+	}
+}
+
+// keys alternates an organ's white keys with dark gaps.
+func keys(u, v float64, at vec) (float64, int) {
+	if math.Mod(u, 0.09) < 0.03 {
+		return 0.3, plankInk
+	}
+	return 1, keepInk
+}
+
+// drawCoffin lays a closed wooden coffin on the floor.
+func drawCoffin(p placer) {
+	p.box(0.55, 0.25, 1.45, 1.75, 0, 0.5, plankInk, planks)
+	p.box(0.6, 0.3, 1.4, 1.7, 0.5, 0.6, plankInk, plain)
 }

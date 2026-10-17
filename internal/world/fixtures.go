@@ -24,6 +24,12 @@ const (
 	Candles
 	// Standard is a banner on a pole.
 	Standard
+	Altar
+	// Pew is a church pew.
+	Pew
+	// Organ is a church organ.
+	Organ
+	Coffin
 )
 
 // PlacedFixture is a fixture standing on a tile of a map.
