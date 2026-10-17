@@ -52,12 +52,10 @@ func (w *World) LatestLevelUp() (LevelUp, time.Duration, bool) {
 	return w.celebration.levelUp, w.celebration.since, w.celebration.active
 }
 
-// train gives the hero woodcutting experience, celebrating any level it brings.
-func (w *World) train(xp float64) {
-	level := w.hero.woodcutting.Level()
-	w.hero.woodcutting.gain(xp)
-	if reached := w.hero.woodcutting.Level(); reached > level {
-		w.celebrate(level, reached)
+// train gives the hero experience in a skill, celebrating any level it brings.
+func (w *World) train(skill string, xp float64) {
+	if from, to := w.hero.train(skill, xp); to > from {
+		w.celebrate(from, to)
 	}
 }
 
@@ -75,7 +73,7 @@ func (w *World) celebrate(from, to int) {
 
 // totalLevel adds up the hero's levels across all skills.
 func (w *World) totalLevel() int {
-	return w.hero.woodcutting.Level()
+	return w.hero.Skill(Woodcutting).Level()
 }
 
 // ageCelebration lets time pass since the last level-up.

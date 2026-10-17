@@ -18,7 +18,7 @@ func (p savedProgress) Save(world.Snapshot) error           { return nil }
 // then lets some time pass since the level-up.
 func levelledUp(t *testing.T, xp float64, after time.Duration) *world.World {
 	t.Helper()
-	w, err := world.Resume(7, savedProgress{world.Snapshot{Seed: 1, WoodcuttingXP: xp}}, time.Now())
+	w, err := world.Resume(7, savedProgress{world.Snapshot{Seed: 1, Skills: map[string]float64{world.Woodcutting: xp}}}, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

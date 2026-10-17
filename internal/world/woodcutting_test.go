@@ -301,8 +301,8 @@ func TestAChopRollsEveryFourTicksUntilALogComes(t *testing.T) {
 	if strikes := 1 + int(elapsed/world.StrikeInterval); sounds.chops != strikes {
 		t.Fatalf("chops = %d over %v, want %d strikes at their own pace", sounds.chops, elapsed, strikes)
 	}
-	if w.Hero().Inventory().Len() != 1 || w.Hero().Woodcutting().XP() != 25 {
-		t.Fatalf("logs = %d, xp = %v; want one log worth 25 xp", w.Hero().Inventory().Len(), w.Hero().Woodcutting().XP())
+	if w.Hero().Inventory().Len() != 1 || w.Hero().Skill(world.Woodcutting).XP() != 25 {
+		t.Fatalf("logs = %d, xp = %v; want one log worth 25 xp", w.Hero().Inventory().Len(), w.Hero().Skill(world.Woodcutting).XP())
 	}
 	again := besideTree()
 	again.Chop()

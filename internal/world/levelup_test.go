@@ -12,7 +12,7 @@ import (
 func besideTreeWithXP(t *testing.T, xp float64) *world.World {
 	t.Helper()
 	// Another seed's progress brings only the skills along, leaving the hero at the spawn.
-	progress := &memoryProgress{saved: true, snapshot: world.Snapshot{Seed: 1, WoodcuttingXP: xp}}
+	progress := &memoryProgress{saved: true, snapshot: world.Snapshot{Seed: 1, Skills: map[string]float64{world.Woodcutting: xp}}}
 	w, err := world.Resume(7, progress, quitAt)
 	if err != nil {
 		t.Fatal(err)

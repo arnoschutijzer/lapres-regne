@@ -321,7 +321,7 @@ func titleRow(width int, frames ...string) string {
 
 func TestAShorterSkillLeavesNothingOfTheLastOneOnTheTitleRow(t *testing.T) {
 	resumed := func(xp float64) *world.World {
-		w, err := world.Resume(7, savedProgress{world.Snapshot{Seed: 1, WoodcuttingXP: xp}}, time.Now())
+		w, err := world.Resume(7, savedProgress{world.Snapshot{Seed: 1, Skills: map[string]float64{world.Woodcutting: xp}}}, time.Now())
 		if err != nil {
 			t.Fatal(err)
 		}

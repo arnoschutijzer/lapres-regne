@@ -56,8 +56,8 @@ func TestResumingRestoresTheHeroWhereTheyStood(t *testing.T) {
 	if cameraX, cameraZ := w.Camera(); cameraX != x || cameraZ != z {
 		t.Fatalf("camera = %v, %v; want it on the hero", cameraX, cameraZ)
 	}
-	if w.Hero().Inventory().Len() != 1 || w.Hero().Woodcutting().XP() != 25 {
-		t.Fatalf("logs = %d, xp = %v; want the kept log and its 25 xp", w.Hero().Inventory().Len(), w.Hero().Woodcutting().XP())
+	if w.Hero().Inventory().Len() != 1 || w.Hero().Skill(world.Woodcutting).XP() != 25 {
+		t.Fatalf("logs = %d, xp = %v; want the kept log and its 25 xp", w.Hero().Inventory().Len(), w.Hero().Skill(world.Woodcutting).XP())
 	}
 	if tree, _ := w.TreeAt(1, 0); !tree.Stump {
 		t.Fatal("a stump must still be a stump 10 seconds later")
@@ -110,8 +110,8 @@ func TestResumingAnotherSeedKeepsOnlySkillsAndLogs(t *testing.T) {
 	if x, z := w.Hero().Position(); x != 0 || z != 0 {
 		t.Fatalf("position = %v, %v; want the spawn point of the other world", x, z)
 	}
-	if w.Hero().Inventory().Len() != 1 || w.Hero().Woodcutting().XP() != 25 {
-		t.Fatalf("logs = %d, xp = %v; want the hero's logs and xp to travel along", w.Hero().Inventory().Len(), w.Hero().Woodcutting().XP())
+	if w.Hero().Inventory().Len() != 1 || w.Hero().Skill(world.Woodcutting).XP() != 25 {
+		t.Fatalf("logs = %d, xp = %v; want the hero's logs and xp to travel along", w.Hero().Inventory().Len(), w.Hero().Skill(world.Woodcutting).XP())
 	}
 	for gz := -3; gz <= 3; gz++ {
 		for gx := -3; gx <= 3; gx++ {

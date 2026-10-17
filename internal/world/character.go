@@ -30,7 +30,8 @@ type Character struct {
 	aimed        bool
 	lastWalk     time.Time
 	inventory    Inventory
-	woodcutting  Skill
+	// skills holds the experience gained in each skill by name; a skill never trained is absent.
+	skills map[string]Skill
 	// passable tells where the character may stand; nil lets them stand anywhere.
 	passable func(x, z float64) bool
 }
@@ -40,7 +41,30 @@ func (c *Character) Steps() int               { return c.steps }
 func (c *Character) Facing() Facing           { return c.facing }
 func (c *Character) LastWalk() time.Time      { return c.lastWalk }
 func (c *Character) Inventory() Inventory     { return c.inventory }
-func (c *Character) Woodcutting() Skill       { return c.woodcutting }
+
+// Skill is the experience gained in the skill of that name.
+func (c *Character) Skill(name string) Skill { return c.skills[name] }
+
+// train gains experience in the skill of that name and reports its level before and after.
+func (c *Character) train(name string, xp float64) (from, to int) {
+	if c.skills == nil {
+		c.skills = make(map[string]Skill)
+	}
+	skill := c.skills[name]
+	from = skill.Level()
+	skill.gain(xp)
+	c.skills[name] = skill
+	return from, skill.Level()
+}
+
+// experience lists the experience gained in each skill trained, by name.
+func (c *Character) experience() map[string]float64 {
+	experience := make(map[string]float64, len(c.skills))
+	for name, skill := range c.skills {
+		experience[name] = skill.XP()
+	}
+	return experience
+}
 
 // Face turns the character without moving it.
 func (c *Character) Face(facing Facing) { c.facing = facing }

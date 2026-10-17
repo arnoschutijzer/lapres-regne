@@ -8,17 +8,17 @@ import (
 // Keep saves the hero's progress, noting now so time away can count toward regrowth.
 func (w *World) Keep(progress Progress, now time.Time) error {
 	snapshot := Snapshot{
-		Seed:          w.seed,
-		Map:           w.mapName,
-		X:             w.hero.x,
-		Z:             w.hero.z,
-		Storey:        w.storey,
-		WoodcuttingXP: w.hero.woodcutting.XP(),
-		Zoom:          w.zoom,
-		Yaw:           w.yaw,
-		Inventory:     w.hero.inventory.Slots(),
-		Stumps:        w.woodcutting.stumps(),
-		SavedAt:       now,
+		Seed:      w.seed,
+		Map:       w.mapName,
+		X:         w.hero.x,
+		Z:         w.hero.z,
+		Storey:    w.storey,
+		Skills:    w.hero.experience(),
+		Zoom:      w.zoom,
+		Yaw:       w.yaw,
+		Inventory: w.hero.inventory.Slots(),
+		Stumps:    w.woodcutting.stumps(),
+		SavedAt:   now,
 	}
 	if err := progress.Save(snapshot); err != nil {
 		return fmt.Errorf("save progress: %w", err)
@@ -41,7 +41,9 @@ func resume(w *World, progress Progress, now time.Time) (*World, error) {
 	if !saved {
 		return w, nil
 	}
-	w.hero.woodcutting.gain(snapshot.WoodcuttingXP)
+	for skill, xp := range snapshot.Skills {
+		w.hero.train(skill, xp)
+	}
 	w.ZoomBy(snapshot.Zoom)
 	w.yaw = snapshot.Yaw
 	for index, slot := range snapshot.Inventory[:min(len(snapshot.Inventory), InventorySize)] {

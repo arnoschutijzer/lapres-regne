@@ -37,8 +37,8 @@ type woods interface {
 	// say gives the game's reply to the hero's latest action.
 	say(message string)
 	effects() Sounds
-	// train gives the hero woodcutting experience.
-	train(xp float64)
+	// train gives the hero experience in a skill.
+	train(skill string, xp float64)
 }
 
 // woodcutting is the woodcutting skill at work in the woods: the trees it felled and wore down,
@@ -103,7 +103,7 @@ func (wc *woodcutting) start(tree Tree) order {
 	hero := wc.woods.Hero()
 	x, z := hero.Position()
 	hero.Face(FacingToward(tree.X-x, tree.Z-z))
-	if required := species[tree.Kind].level; hero.woodcutting.Level() < required {
+	if required := species[tree.Kind].level; hero.Skill(Woodcutting).Level() < required {
 		wc.woods.say(fmt.Sprintf("You need woodcutting level %d to chop this %s.", required, tree.Kind))
 		return nil
 	}
@@ -136,7 +136,7 @@ func (c *chop) carryOut(dt time.Duration, _ float64) order {
 		c.strikes++
 		wc.woods.effects().Chop()
 	}
-	level := wc.woods.Hero().woodcutting.Level()
+	level := wc.woods.Hero().Skill(Woodcutting).Level()
 	for c.elapsed >= time.Duration(c.rolls+1)*rollInterval {
 		c.rolls++
 		if wc.roll(c.tree, 0x10c5) < species[c.kind].chance(level) && !wc.cutLog(c) {
@@ -182,7 +182,7 @@ func (wc *woodcutting) cutLog(chop *chop) bool {
 	kind := species[chop.kind]
 	hero := wc.woods.Hero()
 	hero.inventory.add(kind.logs)
-	wc.woods.train(kind.xp)
+	wc.woods.train(Woodcutting, kind.xp)
 	if !kind.fallsWithFirstLog && wc.depletion[chop.tree] < kind.lifetime {
 		if hero.inventory.Full() {
 			wc.woods.say(inventoryFullMessage)

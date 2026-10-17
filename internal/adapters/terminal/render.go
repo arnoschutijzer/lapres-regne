@@ -636,7 +636,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height-1, string(controls[:min(width-1, len(controls))]))
 		r.lastHint = hint
 	}
-	woodcutting := r.world.Hero().Woodcutting()
+	woodcutting := r.world.Hero().Skill(world.Woodcutting)
 	skill := fmt.Sprintf("woodcutting %d · %s xp  ", woodcutting.Level(), strconv.FormatFloat(woodcutting.XP(), 'f', -1, 64))
 	if full || skill != r.lastSkill {
 		// Right-align the skill on the title row without ever covering the title. The row is cleared

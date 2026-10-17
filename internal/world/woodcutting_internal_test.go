@@ -29,8 +29,8 @@ func TestTheChanceToCutALogRisesWithLevel(t *testing.T) {
 func standBeside(w *World, tree Tree, xp float64) {
 	w.hero.x, w.hero.z = tree.X-1, tree.Z
 	w.hero.Face(FacingRight)
-	w.hero.woodcutting = Skill{}
-	w.hero.woodcutting.gain(xp)
+	w.hero.skills = nil
+	w.hero.train(Woodcutting, xp)
 }
 
 // nearestOaks finds the oaks closest to the spawn point.
@@ -68,7 +68,7 @@ func TestOaksGiveTheirXPAndFallOnlyOnceTheirTimerRunsOut(t *testing.T) {
 	oaks, logs := nearestOaks(w, 8), 0
 	for _, tree := range oaks {
 		standBeside(w, tree, levelXP[15])
-		before, startXP := w.hero.inventory.Len(), w.hero.woodcutting.XP()
+		before, startXP := w.hero.inventory.Len(), w.hero.Skill(Woodcutting).XP()
 		if !w.Chop() {
 			t.Fatalf("a level 15 hero must chop the oak at x %.1f z %.1f: %s", tree.X, tree.Z, w.Message())
 		}
@@ -76,7 +76,7 @@ func TestOaksGiveTheirXPAndFallOnlyOnceTheirTimerRunsOut(t *testing.T) {
 			t.Fatalf("the oak at x %.1f z %.1f fell after %v of chopping, want at least 27s", tree.X, tree.Z, elapsed)
 		}
 		gained := w.hero.inventory.Len() - before
-		if xp := w.hero.woodcutting.XP() - startXP; math.Abs(xp-37.5*float64(gained)) > 1e-9 {
+		if xp := w.hero.Skill(Woodcutting).XP() - startXP; math.Abs(xp-37.5*float64(gained)) > 1e-9 {
 			t.Fatalf("xp = %v for %d oak logs, want 37.5 each", xp, gained)
 		}
 		logs += gained

@@ -46,8 +46,9 @@ type Snapshot struct {
 	Map  string
 	X, Z float64
 	// Storey is the floor the hero stood on: 0 for the ground floor.
-	Storey        int
-	WoodcuttingXP float64
+	Storey int
+	// Skills holds the experience gained in each skill trained, by name.
+	Skills map[string]float64
 	// Zoom is the camera's zoom, in steps in from the forest view.
 	Zoom int
 	// Yaw is how far the camera has turned about the upright axis, in radians.

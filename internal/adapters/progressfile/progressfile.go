@@ -19,8 +19,8 @@ type File struct {
 
 // version marks the file layout so later layouts can still read older saves. Version 1
 // counted logs; version 2 lists the inventory slot by slot, naming each item and leaving ""
-// for an empty slot.
-const version = 2
+// for an empty slot; version 3 keeps the experience of every skill by name.
+const version = 3
 
 // itemNames spell each item in the file, independent of how the domain names them. Logs keep
 // the names of their trees from before items were generic.
@@ -28,14 +28,19 @@ var itemNames = map[world.Item]string{
 	world.Logs: "normal", world.OakLogs: "oak", world.WillowLogs: "willow", world.YewLogs: "yew",
 }
 
+// skillNames spell each skill in the file, independent of how the domain names them.
+var skillNames = map[string]string{world.Woodcutting: "woodcutting"}
+
 type progressJSON struct {
 	Version int    `json:"version"`
 	Seed    uint64 `json:"seed"`
 	// Map names the map the hero and stumps belong to; absent for the endless forest.
-	Map         string    `json:"map,omitempty"`
-	SavedAt     time.Time `json:"savedAt"`
-	Hero        heroJSON  `json:"hero"`
-	Woodcutting skillJSON `json:"woodcutting"`
+	Map     string               `json:"map,omitempty"`
+	SavedAt time.Time            `json:"savedAt"`
+	Hero    heroJSON             `json:"hero"`
+	Skills  map[string]skillJSON `json:"skills"`
+	// Woodcutting is the woodcutting experience of version 1 and 2 saves.
+	Woodcutting *skillJSON `json:"woodcutting,omitempty"`
 	// Camera is absent from saves made before the view could zoom, which open on the forest view.
 	Camera cameraJSON `json:"camera"`
 	// Logs is the log count of version 1 saves.
@@ -79,12 +84,26 @@ func (f File) Load() (world.Snapshot, bool, error) {
 	if err := json.Unmarshal(data, &saved); err != nil {
 		return world.Snapshot{}, false, fmt.Errorf("read %s: %w", f.Path, err)
 	}
-	if saved.Version != 1 && saved.Version != version {
+	if saved.Version < 1 || saved.Version > version {
 		return world.Snapshot{}, false, fmt.Errorf("read %s: unknown version %d", f.Path, saved.Version)
 	}
 	snapshot := world.Snapshot{
 		Seed: saved.Seed, Map: saved.Map, X: saved.Hero.X, Z: saved.Hero.Z, Storey: saved.Hero.Storey,
-		WoodcuttingXP: saved.Woodcutting.XP, Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw, SavedAt: saved.SavedAt,
+		Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw, SavedAt: saved.SavedAt,
+	}
+	// Versions 1 and 2 kept woodcutting, the only skill then, on its own.
+	if saved.Woodcutting != nil {
+		snapshot.Skills = map[string]float64{world.Woodcutting: saved.Woodcutting.XP}
+	}
+	for name, skill := range saved.Skills {
+		known, ok := skillNamed(name)
+		if !ok {
+			return world.Snapshot{}, false, fmt.Errorf("read %s: unknown skill %q", f.Path, name)
+		}
+		if snapshot.Skills == nil {
+			snapshot.Skills = make(map[string]float64)
+		}
+		snapshot.Skills[known] = skill.XP
 	}
 	// Version 1 counted logs before they had kinds; they were all normal logs.
 	for range saved.Logs {
@@ -112,11 +131,14 @@ func (f File) Load() (world.Snapshot, bool, error) {
 func (f File) Save(snapshot world.Snapshot) error {
 	saved := progressJSON{
 		Version: version, Seed: snapshot.Seed, Map: snapshot.Map, SavedAt: snapshot.SavedAt,
-		Hero:        heroJSON{X: snapshot.X, Z: snapshot.Z, Storey: snapshot.Storey},
-		Woodcutting: skillJSON{XP: snapshot.WoodcuttingXP},
-		Camera:      cameraJSON{Zoom: snapshot.Zoom, Yaw: snapshot.Yaw},
-		Inventory:   []string{},
-		Stumps:      []stumpJSON{},
+		Hero:      heroJSON{X: snapshot.X, Z: snapshot.Z, Storey: snapshot.Storey},
+		Skills:    map[string]skillJSON{},
+		Camera:    cameraJSON{Zoom: snapshot.Zoom, Yaw: snapshot.Yaw},
+		Inventory: []string{},
+		Stumps:    []stumpJSON{},
+	}
+	for skill, xp := range snapshot.Skills {
+		saved.Skills[skillNames[skill]] = skillJSON{XP: xp}
 	}
 	// Empty slots are saved as "" so items keep their places; trailing empty slots are left off.
 	last := -1
@@ -160,6 +182,15 @@ func (f File) Save(snapshot world.Snapshot) error {
 		return err
 	}
 	return os.Rename(temporary.Name(), f.Path)
+}
+
+func skillNamed(name string) (string, bool) {
+	for skill, spelled := range skillNames {
+		if spelled == name {
+			return skill, true
+		}
+	}
+	return "", false
 }
 
 func itemNamed(name string) (world.Item, bool) {
