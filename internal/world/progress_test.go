@@ -63,7 +63,7 @@ func TestResumingRestoresTheHeroWhereTheyStood(t *testing.T) {
 
 func TestTimeAwayCountsTowardRegrowth(t *testing.T) {
 	progress := keptAfterFelling(t)
-	regrow := progress.snapshot.Stumps[0].Regrow
+	regrow := progress.snapshot.Respawns[world.Woodcutting][0].In
 	w, _ := world.Resume(7, progress, quitAt.Add(regrow-time.Second))
 	if tree, _ := w.TreeAt(1, 0); !tree.Stump {
 		t.Fatal("the stump must wait out the rest of its regrow time")
@@ -80,7 +80,7 @@ func TestTimeAwayCountsTowardRegrowth(t *testing.T) {
 
 func TestAClockSetBackDoesNotStretchRegrowth(t *testing.T) {
 	progress := keptAfterFelling(t)
-	regrow := progress.snapshot.Stumps[0].Regrow
+	regrow := progress.snapshot.Respawns[world.Woodcutting][0].In
 	w, _ := world.Resume(7, progress, quitAt.Add(-time.Hour))
 	w.Advance(0, 0, regrow, false)
 	if tree, _ := w.TreeAt(1, 0); tree.Stump {

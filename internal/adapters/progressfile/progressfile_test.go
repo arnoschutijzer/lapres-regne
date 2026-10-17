@@ -16,7 +16,7 @@ func TestSavedProgressLoadsBackUnchanged(t *testing.T) {
 	snapshot := world.Snapshot{
 		Seed: 7, Map: "Lumbridge", X: 4.95, Z: -1.65, Storey: 2, Skills: map[string]float64{world.Woodcutting: 112.5},
 		Inventory: []world.Slot{{Item: world.OakLogs, Filled: true}, {}, {Item: world.WillowLogs, Filled: true}, {Item: world.YewLogs, Filled: true}},
-		Stumps:    []world.Stump{{GX: 1, GZ: 0, Regrow: 41*time.Second + 250*time.Millisecond}, {GX: -2, GZ: 3, Regrow: 8400 * time.Millisecond}},
+		Respawns:  map[string][]world.Respawn{world.Woodcutting: {{GX: 1, GZ: 0, In: 41*time.Second + 250*time.Millisecond}, {GX: -2, GZ: 3, In: 8400 * time.Millisecond}}},
 		SavedAt:   time.Date(2026, 10, 16, 21, 0, 0, 0, time.UTC),
 	}
 	if err := file.Save(snapshot); err != nil {

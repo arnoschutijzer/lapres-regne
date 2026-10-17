@@ -31,14 +31,15 @@ var skillNames = map[string]string{world.Woodcutting: "woodcutting"}
 type progressJSON struct {
 	Version int    `json:"version"`
 	Seed    uint64 `json:"seed"`
-	// Map names the map the hero and stumps belong to; absent for the endless forest.
+	// Map names the map the hero and respawns belong to; absent for the endless forest.
 	Map     string               `json:"map,omitempty"`
 	SavedAt time.Time            `json:"savedAt"`
 	Hero    heroJSON             `json:"hero"`
 	Skills  map[string]skillJSON `json:"skills"`
 	// Inventory lists the inventory slot by slot, naming each item and leaving "" for an empty slot.
-	Inventory []string    `json:"inventory"`
-	Stumps    []stumpJSON `json:"stumps"`
+	Inventory []string `json:"inventory"`
+	// Respawns lists, by skill, the resources the skill used up that are yet to come back.
+	Respawns map[string][]respawnJSON `json:"respawns"`
 }
 
 type heroJSON struct {
@@ -52,10 +53,10 @@ type skillJSON struct {
 	XP float64 `json:"xp"`
 }
 
-type stumpJSON struct {
-	GX           int   `json:"gx"`
-	GZ           int   `json:"gz"`
-	RegrowMillis int64 `json:"regrowMillis"`
+type respawnJSON struct {
+	GX       int   `json:"gx"`
+	GZ       int   `json:"gz"`
+	InMillis int64 `json:"inMillis"`
 }
 
 func (f File) Load() (world.Snapshot, bool, error) {
@@ -98,8 +99,17 @@ func (f File) Load() (world.Snapshot, bool, error) {
 		}
 		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Item: item, Filled: true})
 	}
-	for _, stump := range saved.Stumps {
-		snapshot.Stumps = append(snapshot.Stumps, world.Stump{GX: stump.GX, GZ: stump.GZ, Regrow: time.Duration(stump.RegrowMillis) * time.Millisecond})
+	for name, respawns := range saved.Respawns {
+		known, ok := skillNamed(name)
+		if !ok {
+			return world.Snapshot{}, false, fmt.Errorf("read %s: unknown skill %q", f.Path, name)
+		}
+		if snapshot.Respawns == nil {
+			snapshot.Respawns = make(map[string][]world.Respawn)
+		}
+		for _, respawn := range respawns {
+			snapshot.Respawns[known] = append(snapshot.Respawns[known], world.Respawn{GX: respawn.GX, GZ: respawn.GZ, In: time.Duration(respawn.InMillis) * time.Millisecond})
+		}
 	}
 	return snapshot, true, nil
 }
@@ -112,7 +122,7 @@ func (f File) Save(snapshot world.Snapshot) error {
 		Hero:      heroJSON{X: snapshot.X, Z: snapshot.Z, Storey: snapshot.Storey},
 		Skills:    map[string]skillJSON{},
 		Inventory: []string{},
-		Stumps:    []stumpJSON{},
+		Respawns:  map[string][]respawnJSON{},
 	}
 	for skill, xp := range snapshot.Skills {
 		name, known := skillNames[skill]
@@ -135,8 +145,15 @@ func (f File) Save(snapshot world.Snapshot) error {
 		}
 		saved.Inventory = append(saved.Inventory, name)
 	}
-	for _, stump := range snapshot.Stumps {
-		saved.Stumps = append(saved.Stumps, stumpJSON{GX: stump.GX, GZ: stump.GZ, RegrowMillis: stump.Regrow.Milliseconds()})
+	for skill, respawns := range snapshot.Respawns {
+		name, known := skillNames[skill]
+		if !known {
+			return fmt.Errorf("save %s: no spelling for skill %q", f.Path, skill)
+		}
+		saved.Respawns[name] = []respawnJSON{}
+		for _, respawn := range respawns {
+			saved.Respawns[name] = append(saved.Respawns[name], respawnJSON{GX: respawn.GX, GZ: respawn.GZ, InMillis: respawn.In.Milliseconds()})
+		}
 	}
 	data, err := json.MarshalIndent(saved, "", "  ")
 	if err != nil {

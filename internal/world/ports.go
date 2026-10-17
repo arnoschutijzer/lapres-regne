@@ -42,9 +42,9 @@ type Progress interface {
 
 // Snapshot is the progress kept between sessions.
 type Snapshot struct {
-	// Seed names the world the position and stumps belong to.
+	// Seed names the world the position and respawns belong to.
 	Seed uint64
-	// Map names the map the position and stumps belong to; empty for the endless forest.
+	// Map names the map the position and respawns belong to; empty for the endless forest.
 	Map  string
 	X, Z float64
 	// Storey is the floor the hero stood on: 0 for the ground floor.
@@ -53,12 +53,14 @@ type Snapshot struct {
 	Skills map[string]float64
 	// Inventory lists the inventory slot by slot, gaps included.
 	Inventory []Slot
-	Stumps    []Stump
-	SavedAt   time.Time
+	// Respawns holds, by skill, the resources the skill used up that are yet to come back.
+	Respawns map[string][]Respawn
+	SavedAt  time.Time
 }
 
-// Stump is a felled tree on the tree grid and how long it still takes to regrow.
-type Stump struct {
+// Respawn is a resource used up on the tree grid, such as a felled tree, and how long it still
+// takes to come back.
+type Respawn struct {
 	GX, GZ int
-	Regrow time.Duration
+	In     time.Duration
 }

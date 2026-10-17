@@ -219,11 +219,16 @@ func unlockedTrees(from, to int) string {
 	return "You can now chop " + strings.Join(names, " and ") + "."
 }
 
-// stumps lists the felled trees and how long each still takes to regrow.
-func (wc *woodcutting) stumps() []Stump {
-	var stumps []Stump
+// respawns lists the felled trees and how long each still takes to regrow.
+func (wc *woodcutting) respawns() []Respawn {
+	var respawns []Respawn
 	for tree, regrow := range wc.felled {
-		stumps = append(stumps, Stump{GX: tree.gx, GZ: tree.gz, Regrow: regrow})
+		respawns = append(respawns, Respawn{GX: tree.gx, GZ: tree.gz, In: regrow})
 	}
-	return stumps
+	return respawns
+}
+
+// deplete fells a tree until it regrows.
+func (wc *woodcutting) deplete(respawn Respawn) {
+	wc.fell(cell{respawn.GX, respawn.GZ}, respawn.In)
 }

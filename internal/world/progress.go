@@ -15,8 +15,11 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 		Storey:    w.storey,
 		Skills:    w.hero.experience(),
 		Inventory: w.hero.inventory.Slots(),
-		Stumps:    w.woodcutting.stumps(),
+		Respawns:  map[string][]Respawn{},
 		SavedAt:   now,
+	}
+	for skill, depleting := range w.depletingSkills() {
+		snapshot.Respawns[skill] = depleting.respawns()
 	}
 	if err := progress.Save(snapshot); err != nil {
 		return fmt.Errorf("save progress: %w", err)
@@ -25,8 +28,8 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 }
 
 // Resume builds a world from a seed and the saved progress. The hero's skills and inventory travel
-// to any world; their position and stumps return only to the world they were saved in, with the
-// time away since saving counted toward regrowth.
+// to any world; their position and the resources used up return only to the world they were saved
+// in, with the time away since saving counted toward respawning.
 func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 	return resume(New(seed), progress, now)
 }
@@ -60,10 +63,30 @@ func resume(w *World, progress Progress, now time.Time) (*World, error) {
 	}
 	// A clock set back before the save counts as no time away.
 	away := max(0, now.Sub(snapshot.SavedAt))
-	for _, stump := range snapshot.Stumps {
-		if stump.Regrow > away {
-			w.woodcutting.fell(cell{stump.GX, stump.GZ}, stump.Regrow-away)
+	depletingSkills := w.depletingSkills()
+	for skill, respawns := range snapshot.Respawns {
+		depleting, ok := depletingSkills[skill]
+		if !ok {
+			continue
+		}
+		for _, respawn := range respawns {
+			if respawn.In > away {
+				depleting.deplete(Respawn{GX: respawn.GX, GZ: respawn.GZ, In: respawn.In - away})
+			}
 		}
 	}
 	return w, nil
+}
+
+// depleting is a skill that uses up resources in the world, which come back after a while.
+type depleting interface {
+	// respawns lists the resources used up and how long each still takes to come back.
+	respawns() []Respawn
+	// deplete uses up a resource until it respawns.
+	deplete(Respawn)
+}
+
+// depletingSkills holds the skills that use up resources in the world, by name.
+func (w *World) depletingSkills() map[string]depleting {
+	return map[string]depleting{Woodcutting: &w.woodcutting}
 }
