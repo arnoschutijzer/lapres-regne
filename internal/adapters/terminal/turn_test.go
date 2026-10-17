@@ -33,9 +33,10 @@ func TestGroundAtFollowsTheTurnedView(t *testing.T) {
 	w.TurnBy(world.QuarterTurn)
 	r := newRenderer(w, "L’Après-Règne")
 	r.frame(100, 30, 0)
-	// A quarter turn shows the world's north on the screen's left and its east up the screen.
+	// A quarter turn shows the world's north on the screen's left and its east up the screen. The
+	// hills shift the ground a little nearer or farther than on flat ground.
 	x, z, ok := r.groundAt(10, 17)
-	if !ok || math.Abs(x) > 0.5 || z >= 0 {
+	if !ok || math.Abs(x) > -z/8 || z >= 0 {
 		t.Fatalf("groundAt(10, 17) = %v, %v, %v; want a point north of the hero", x, z, ok)
 	}
 	x, z, ok = r.groundAt(51, 3)

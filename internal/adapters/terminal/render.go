@@ -94,6 +94,31 @@ type forestCanvas struct {
 	// drawing is the standing tree being drawn, counting from 1 into the frame's trees; 0 for
 	// anything else.
 	drawing int
+	// elevation is how high the ground lies at a world position; nil for flat ground. highest is
+	// the highest it lies anywhere, and eye how high it lies under the camera, which looks down on
+	// the ground from the same height wherever it goes.
+	elevation    func(x, z float64) float64
+	highest, eye float64
+	// lift raises whatever is being drawn onto the ground it stands on.
+	lift float64
+	// under is the world position of the ground shown at each pixel, row by row.
+	under []groundPoint
+}
+
+// groundPoint is a position on the ground.
+type groundPoint struct{ x, z float64 }
+
+// heightAt is how high the ground lies at a world position.
+func (c *forestCanvas) heightAt(x, z float64) float64 {
+	if c.elevation == nil {
+		return 0
+	}
+	return c.elevation(x, z)
+}
+
+// standOn raises whatever is drawn next onto the ground at a world position.
+func (c *forestCanvas) standOn(x, z float64) {
+	c.lift = c.heightAt(x, z)
 }
 
 // turnTo sets the canvas's yaw.
@@ -178,14 +203,16 @@ func (c *forestCanvas) fromView(across, toward float64) (x, z float64) {
 
 func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
 	across, toward := c.toView(x, z)
+	y += c.lift - c.eye
 	return float64(c.width)/2 + across*c.scale,
 		float64(c.height)*0.57 + (toward*0.72-y*0.69)*c.scale,
 		-toward*0.69 - y*0.72
 }
 
-// ground inverts the projection at ground level for the canvas pixel x, y.
+// ground is the world position of the ground shown at the canvas pixel x, y.
 func (c *forestCanvas) ground(x, y float64) (float64, float64) {
-	return c.fromView((x-float64(c.width)/2)/c.scale, (y-float64(c.height)*0.57)/(0.72*c.scale))
+	point := c.under[int(y)*c.width+int(x)]
+	return point.x, point.z
 }
 
 // viewer is the direction from the ground toward the viewer, in the world.
@@ -229,12 +256,20 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	cameraX, cameraZ := f.Camera()
 	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
 	c.turnTo(r.turn.current)
+	c.elevation, c.highest, c.lift = f.Elevation, f.Highest(), 0
+	if !f.Mapped() {
+		// The endless forest's hills level out by the rivers, which are sampled below.
+		c.elevation = func(x, z float64) float64 { return f.ElevationAmid(r.rivers.at(z), x, z) }
+	}
+	c.eye = f.Elevation(cameraX, cameraZ)
 	if len(c.pixels) != c.width*c.height {
 		c.pixels = make([]forestPixel, c.width*c.height)
+		c.under = make([]groundPoint, c.width*c.height)
 	}
-	// The world area to draw holds the view, with room for trees and grass that reach into it.
+	// The world area to draw holds the view, with room for trees and grass that reach into it,
+	// reaching farther off where the ground falls away below the camera and nearer where it rises.
 	halfAcross := float64(c.width)/c.scale/2 + 5
-	far, near := -float64(c.height)/c.scale-5, float64(c.height)/c.scale+12
+	far, near := -float64(c.height)/c.scale-5-c.eye, float64(c.height)/c.scale+12+c.highest-c.eye
 	left, right, back, front := math.Inf(1), math.Inf(-1), math.Inf(1), math.Inf(-1)
 	for _, corner := range [4][2]float64{{-halfAcross, far}, {halfAcross, far}, {-halfAcross, near}, {halfAcross, near}} {
 		x, z := c.fromView(corner[0], corner[1])
@@ -263,16 +298,16 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	} else {
 		r.rivers.sample(f, back, front, left, right, 1/c.scale)
 	}
-	// Each row of ground depends only on the world, so the rows are shared out across the cores,
-	// interleaved so rows crossing a river don't all land on one core.
+	// Each column of ground depends only on the world, so the columns are shared out across the
+	// cores, interleaved so columns crossing a river don't all land on one core.
 	var ground sync.WaitGroup
 	cores := runtime.GOMAXPROCS(0)
 	for core := range cores {
 		ground.Add(1)
 		go func() {
 			defer ground.Done()
-			for y := core; y < c.height; y += cores {
-				r.groundRow(c, y, seconds)
+			for x := core; x < c.width; x += cores {
+				r.groundColumn(c, x, seconds)
 			}
 		}()
 	}
@@ -295,6 +330,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		if chopping && tree == chopped {
 			shake = jolt(sinceHit)
 		}
+		c.standOn(tree.X, tree.Z)
 		if c.mayShow(tree) {
 			if !tree.Stump {
 				c.drawing = i + 1
@@ -304,9 +340,11 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		}
 	}
 	if chopping {
+		c.standOn(chopped.X, chopped.Z)
 		drawChips(c, f, chopped, strike, sinceHit)
 	}
 	for _, item := range f.GroundItems() {
+		c.standOn(item.X, item.Z)
 		drawGroundItem(c, item)
 	}
 	r.drawCharacter(c, seconds)
@@ -318,6 +356,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 
 func (r *renderer) drawCharacter(c *forestCanvas, seconds float64) {
 	x, z := r.world.Hero().Position()
+	c.standOn(x, z)
 	r.gait.update(x, z, r.world.Hero().Facing(), min(0.1, max(0, seconds-r.lastSeconds)))
 	r.lastSeconds = seconds
 	drawDetailedHero(c, x, z, r.gait, defaultLook)
@@ -588,95 +627,125 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	return out.String()
 }
 
-// groundRow lights the ground of one canvas row: grass, canopy shade, pools of sunlight and rivers.
-func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
-	f := r.world
+// groundColumn lights the ground seen down one canvas column: grass, canopy shade, pools of
+// sunlight and rivers. It marches from the nearest ground toward the horizon a pixel's depth at a
+// time, and each step draws only the ground that rises on screen above what nearer steps drew, so
+// nearer hills hide whatever lies behind them.
+func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 	quiet := c.quiet()
-	// Every pixel of a row shows ground equally far toward the viewer.
-	toward := (float64(y) - float64(c.height)*0.57) / (0.72 * c.scale)
-	// The canopy and its pools of light change over many pixels, so they are worked out every
-	// broadStep pixels along the row and blended in between.
-	broad := func(x int) (cover, pools float64) {
-		wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
-		return f.Cover(wx, wz), f.Noise(wx/9, wz/9, 81)
+	across := (float64(x) - float64(c.width)/2) / c.scale
+	step := 1 / (0.72 * c.scale)
+	// The nearest ground that can show lies below the bottom of the canvas even where it lies
+	// highest, and the farthest lies above the top even where it lies lowest.
+	near := (0.43*float64(c.height)/c.scale+0.69*(c.highest-c.eye))/0.72 + step
+	far := (-0.57*float64(c.height)/c.scale-0.69*c.eye)/0.72 - step
+	// top is the highest row drawn so far; the march draws upward from it.
+	top := c.height
+	type sample struct{ x, z, height, toward, y float64 }
+	at := func(toward float64) sample {
+		wx, wz := c.fromView(across, toward)
+		height := c.heightAt(wx, wz) - c.eye
+		return sample{wx, wz, height, toward, float64(c.height)*0.57 + (toward*0.72-height*0.69)*c.scale}
 	}
-	var coverFrom, poolsFrom float64
-	coverTo, poolsTo := broad(0)
-	for x := range c.width {
-		if x%broadStep == 0 {
-			coverFrom, poolsFrom = coverTo, poolsTo
-			coverTo, poolsTo = broad(x + broadStep)
-		}
-		between := float64(x%broadStep) / broadStep
-		cover := coverFrom + (coverTo-coverFrom)*between
-		pools := poolsFrom + (poolsTo-poolsFrom)*between
-		wx, wz := c.fromView((float64(x)-float64(c.width)/2)/c.scale, toward)
-		n := f.Noise(wx*0.65, wz*0.65, 19)
-		ink, light := 0, 0.13+n*0.23
-		if cover < 0.38 {
-			ink, light = 1, 0.21+n*0.24
-		}
-		// Diagonal pools of sunlight survive only where the canopy opens.
-		beam := max(0, wave(wx*0.28-wz*0.19+pools*2)-0.45)
-		sun := beam * max(0, 1-cover*1.3)
-		light += sun * 0.8
-		if sun > 0.24 {
-			ink = 7
-		}
-		// Wildflowers bloom in the open, and patches of grass wear down to bare earth.
-		if speck, speckLight, ok := groundSpeck(f, wx, wz, n, c.scale); ok && (cover < 0.38 || speck == pathInk) {
-			ink, light = speck, speckLight
-		}
-		water, bank := false, false
-		if f.Mapped() {
-			ground, onMap := f.GroundAt(wx, wz)
-			ground = r.built.underfoot(wx, wz, ground)
-			switch {
-			case !onMap:
-				ink, light = 0, 0
-			case ground == world.Path:
-				ink, light = pathInk, 0.24+n*0.22
-				// Pebbles catch the light here and there along the track.
-				if f.Noise(wx*3, wz*3, 23) > 0.78 {
-					light += 0.3
-				}
-			case ground == world.Floor || isWall(ground) || ground == world.Door:
-				ink, light = floorInk, flagstones(wx, wz, n)
-			case ground == world.Boards:
-				ink, light = boardsInk, boards(wx, wz, n)
-			case ground == world.Bridge:
-				// The deck's boards lie across the way, as an east-west bridge carries it.
-				ink, light = boardsInk, boards(wz, wx, n)
+	previous := at(near)
+	for toward := near - step; toward >= far && top > 0; toward -= step {
+		current := at(toward)
+		// Each row the ground rises past between the two steps shows the ground in between.
+		for ; top > 0 && float64(top-1) >= current.y; top-- {
+			y := top - 1
+			u := min(1, max(0, (previous.y-float64(y))/(previous.y-current.y)))
+			point := sample{
+				previous.x + (current.x-previous.x)*u,
+				previous.z + (current.z-previous.z)*u,
+				previous.height + (current.height-previous.height)*u,
+				previous.toward + (current.toward-previous.toward)*u,
+				float64(y),
 			}
-			water = ground == world.Water
-			if ground == world.Grass && r.built.banked(wx, wz) {
-				ink, light = bankInk, 0.26+n*0.2
-			}
-			if onMap {
-				shade := r.built.shade(wx, wz)
-				light *= shade
-				if shade == castShadow {
-					ink = inShadow(ink)
-				}
-			}
-		} else {
-			distance, width := world.NearestRiver(r.rivers.at(wz), wx)
-			water, bank = distance < width, distance < width+0.65
+			ink, light := r.groundLight(c, point.x, point.z, point.height+c.eye, seconds)
+			c.pixels[y*c.width+x] = forestPixel{-point.toward*0.69 - point.height*0.72, light * quiet, ink, 0}
+			c.under[y*c.width+x] = groundPoint{point.x, point.z}
 		}
-		if water {
-			ink, light = 5, 0.28+n*0.3
-			if wave(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
-				ink, light = 6, 0.8
-			}
-		} else if bank {
-			ink, light = 7, 0.32+n*0.25
-		}
-		c.pixels[y*c.width+x] = forestPixel{-toward * 0.69, light * quiet, ink, 0}
+		previous = current
 	}
 }
 
-// broadStep is how many pixels apart along a row the canopy and its pools of light are worked out.
-const broadStep = 4
+// groundLight is the ink and light of the ground at a world position, lying at a height.
+func (r *renderer) groundLight(c *forestCanvas, wx, wz, height, seconds float64) (ink int, light float64) {
+	f := r.world
+	cover, pools := f.Cover(wx, wz), f.Noise(wx/9, wz/9, 81)
+	n := f.Noise(wx*0.65, wz*0.65, 19)
+	ink, light = 0, 0.13+n*0.23
+	if cover < 0.38 {
+		ink, light = 1, 0.21+n*0.24
+	}
+	// Diagonal pools of sunlight survive only where the canopy opens.
+	beam := max(0, wave(wx*0.28-wz*0.19+pools*2)-0.45)
+	sun := beam * max(0, 1-cover*1.3)
+	light += sun * 0.8
+	if sun > 0.24 {
+		ink = 7
+	}
+	// Wildflowers bloom in the open, and patches of grass wear down to bare earth.
+	if speck, speckLight, ok := groundSpeck(f, wx, wz, n, c.scale); ok && (cover < 0.38 || speck == pathInk) {
+		ink, light = speck, speckLight
+	}
+	water, bank := false, false
+	if f.Mapped() {
+		ground, onMap := f.GroundAt(wx, wz)
+		ground = r.built.underfoot(wx, wz, ground)
+		switch {
+		case !onMap:
+			ink, light = 0, 0
+		case ground == world.Path:
+			ink, light = pathInk, 0.24+n*0.22
+			// Pebbles catch the light here and there along the track.
+			if f.Noise(wx*3, wz*3, 23) > 0.78 {
+				light += 0.3
+			}
+		case ground == world.Floor || isWall(ground) || ground == world.Door:
+			ink, light = floorInk, flagstones(wx, wz, n)
+		case ground == world.Boards:
+			ink, light = boardsInk, boards(wx, wz, n)
+		case ground == world.Bridge:
+			// The deck's boards lie across the way, as an east-west bridge carries it.
+			ink, light = boardsInk, boards(wz, wx, n)
+		}
+		water = ground == world.Water
+		if ground == world.Grass && r.built.banked(wx, wz) {
+			ink, light = bankInk, 0.26+n*0.2
+		}
+		if onMap {
+			shade := r.built.shade(wx, wz)
+			light *= shade
+			if shade == castShadow {
+				ink = inShadow(ink)
+			}
+		}
+	} else {
+		distance, width := world.NearestRiver(r.rivers.at(wz), wx)
+		water, bank = distance < width, distance < width+0.65
+	}
+	if water {
+		ink, light = 5, 0.28+n*0.3
+		if wave(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
+			ink, light = 6, 0.8
+		}
+	} else if bank {
+		ink, light = 7, 0.32+n*0.25
+	}
+	return ink, light * c.slopeLight(wx, wz, height)
+}
+
+// slopeLight brightens the ground lying at a height where it slopes toward the sun and darkens it
+// where it slopes away, so the hills read by their shading; flat ground keeps its light.
+func (c *forestCanvas) slopeLight(x, z, height float64) float64 {
+	if c.elevation == nil {
+		return 1
+	}
+	const reach = 0.3
+	normal := vec{height - c.elevation(x+reach, z), reach, height - c.elevation(x, z+reach)}.unit()
+	return max(0.2, 1+2*(sunlight(normal)/sunlight(vec{0, 1, 0})-1))
+}
 
 // riverSamples holds the river channels at depths a step apart across the drawn area, so each
 // ground pixel looks up its rivers instead of working them out again.
@@ -714,6 +783,7 @@ func (c *forestCanvas) quiet() float64 {
 // halo leaves a dark ring a pixel wide around the figure standing at x, z, so their silhouette
 // reads against whatever lies behind them.
 func (c *forestCanvas) halo(x, z float64) {
+	c.standOn(x, z)
 	footX, footY, _ := c.project(x, 0, z)
 	_, headY, _ := c.project(x, 2.4, z)
 	reach := 1.5 * c.scale

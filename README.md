@@ -44,6 +44,8 @@ which keys were released.
 Trees cast shadows and you can walk freely through their trunks. Tall grass
 sways in front of the traveler, while a small canopy cutaway keeps the character
 readable under the trees. Rivers ripple and can be crossed by wading at half speed.
+The forest rolls in gentle hills that level out into the river valleys; nearer
+hills hide what lies behind them, and slopes catch or turn from the sun.
 
 Terrain is generated from world coordinates with bounded memory, so revisiting
 a place recreates the same forest. Choose another forest with a seed:

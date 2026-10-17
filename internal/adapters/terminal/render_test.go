@@ -127,6 +127,8 @@ func TestAFelledTreeDrawsAStumpWithoutACrown(t *testing.T) {
 
 func TestChoppingSwingsAnAxe(t *testing.T) {
 	w := besideTree()
+	// Up close the axe head spans several pixels, so its swing shows wherever the hero stands.
+	w.ZoomBy(4)
 	r := newRenderer(w, "L’Après-Règne")
 	w.Chop()
 	raised := countInk(r.render(100, 27, 0), 9)

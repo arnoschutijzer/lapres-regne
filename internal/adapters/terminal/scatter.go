@@ -87,6 +87,7 @@ func (r *renderer) drawScatter(c *forestCanvas, left, right, back, front float64
 		for gx := int(math.Floor(left / scatterSpacing)); gx <= int(math.Ceil(right/scatterSpacing)); gx++ {
 			x := (float64(gx) + f.Random(gx, gz, 110)) * scatterSpacing
 			z := (float64(gz) + f.Random(gx, gz, 111)) * scatterSpacing
+			c.standOn(x, z)
 			sx, sy, _ := c.project(x, 0, z)
 			if sx < -10 || sx > float64(c.width)+10 || sy < -10 || sy > float64(c.height)+10 {
 				continue

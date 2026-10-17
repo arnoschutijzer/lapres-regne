@@ -89,6 +89,7 @@ func (r *renderer) drawFireworks(c *forestCanvas) {
 		return
 	}
 	heroX, heroZ := f.Hero().Position()
+	c.standOn(heroX, heroZ)
 	drawDisplay(c, displayFor(levelUp.Milestone), levelUp.Level, since.Seconds(), heroX, heroZ, f.Random)
 }
 

@@ -15,6 +15,7 @@ func (a vec) dot(b vec) float64 { return a.x*b.x + a.y*b.y + a.z*b.z }
 func (a vec) unit() vec         { return a.mul(1 / math.Sqrt(a.dot(a))) }
 
 func (c *forestCanvas) shadow(tree world.Tree) {
+	c.standOn(tree.X+tree.Height*0.55, tree.Z+tree.Height*0.3)
 	x, y, _ := c.project(tree.X+tree.Height*0.55, 0, tree.Z+tree.Height*0.3)
 	rx, ry := tree.Radius*c.scale*1.3, tree.Radius*c.scale*0.72
 	for py := max(0, int(y-ry)); py <= min(c.height-1, int(y+ry)); py++ {
@@ -409,6 +410,7 @@ func (r *renderer) drawGrass(c *forestCanvas, left, right, back, front, seconds 
 			x := float64(gx) + f.Random(gx, gz, 32)
 			z := float64(gz) + f.Random(gx, gz, 33)
 			// Skip offscreen roots before evaluating the more expensive biome fields.
+			c.standOn(x, z)
 			sx, sy, _ := c.project(x, 0, z)
 			if sx < -3 || sx > float64(c.width)+3 || sy < 0 || sy > float64(c.height)+12 {
 				continue
