@@ -61,8 +61,9 @@ func TestXWithoutAHighlightedLogDropsTheFirstOne(t *testing.T) {
 	}
 }
 
-func TestAnItemIconIsItsShapeInItsColor(t *testing.T) {
-	if got, want := icon(world.OakLogs), foreground([3]int{178, 128, 74})+logGlyph; got != want {
+func TestALogIconIsItsBarkInItsColorThenItsPalerCutEnd(t *testing.T) {
+	oak := [3]int{178, 128, 74}
+	if got, want := icon(world.OakLogs), foreground(oak)+logBark+foreground(cutEnd(oak))+logEnd; got != want {
 		t.Fatalf("oak logs icon = %q, want %q", got, want)
 	}
 }
@@ -101,5 +102,21 @@ func TestSlotAtFindsTheClickedSlotInTheOpenPanel(t *testing.T) {
 	r.inventoryOpen = false
 	if _, ok := r.slotAt(left+3, 5); ok {
 		t.Error("a closed panel has no slots to click")
+	}
+}
+
+func TestALogsCutEndIsPalerThanItsBarkAndKeepsItsTreesTint(t *testing.T) {
+	ends := map[[3]int]bool{}
+	for _, item := range []world.Item{world.Logs, world.OakLogs, world.WillowLogs, world.YewLogs} {
+		color := item.Color()
+		bark := [3]int{int(color.R), int(color.G), int(color.B)}
+		end := cutEnd(bark)
+		if end[0]+end[1]+end[2] <= bark[0]+bark[1]+bark[2] {
+			t.Errorf("%v cut end %v must be paler than its bark %v", item, end, bark)
+		}
+		ends[end] = true
+	}
+	if len(ends) != 4 {
+		t.Fatal("each tree's logs must keep a cut end of their own")
 	}
 }

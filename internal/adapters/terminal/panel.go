@@ -13,19 +13,36 @@ const (
 	panelHeight = 11
 	// panelColumns lays the 28 slots out as Old School RuneScape does: 4 across, 7 down.
 	panelColumns = 4
-	logGlyph     = "⢴⡦"
 	emptyGlyph   = "··"
 )
 
-// shapeGlyphs draws each item shape in a slot; empty slots stay faint.
-var shapeGlyphs = map[world.Shape]string{
-	world.LogShape: logGlyph,
+// shapeIcons draws each item shape in a slot, two cells wide, from the item's tint; empty slots
+// stay faint.
+var shapeIcons = map[world.Shape]func(tint [3]int) string{
+	world.LogShape: logIcon,
 }
 
-// icon draws an item in a slot: its shape's glyph in its color.
+// A log lies on its side: its bark runs along the first cell, and its cut end, a dot taller as
+// seen at an angle, fills the second.
+const (
+	logBark = "⣶"
+	logEnd  = "⣿"
+)
+
+// logIcon draws the bark in the log's tint and the cut end in the paler wood inside.
+func logIcon(tint [3]int) string {
+	return foreground(tint) + logBark + foreground(cutEnd(tint)) + logEnd
+}
+
+// endGrain is the pale wood inside every log, which a cut end shows tinted by its tree.
+var endGrain = [3]int{226, 204, 150}
+
+func cutEnd(bark [3]int) [3]int { return mix(bark, endGrain, 0.6) }
+
+// icon draws an item in a slot: its shape in its color.
 func icon(item world.Item) string {
 	color := item.Color()
-	return foreground([3]int{int(color.R), int(color.G), int(color.B)}) + shapeGlyphs[item.Shape()]
+	return shapeIcons[item.Shape()]([3]int{int(color.R), int(color.G), int(color.B)})
 }
 
 var (
