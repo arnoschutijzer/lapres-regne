@@ -2,6 +2,8 @@ package terminal
 
 import (
 	"math"
+	"runtime"
+	"sync"
 
 	"lapresregne/internal/world"
 )
@@ -271,17 +273,14 @@ func (a *builtArea) survey(f *world.World, storey int, left, right, back, front 
 			a.roofs = append(a.roofs, roofOver(building))
 		}
 	}
-	for i := range a.tiles {
-		col, row := a.col+i%a.cols, a.row+i/a.cols
+	a.eachTile(func(tile *builtTile, col, row int) {
 		middleX, middleZ := (float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize
 		ground, onMap := f.GroundOn(storey, middleX, middleZ)
 		fixture, furnished := f.FixtureOn(storey, middleX, middleZ)
-		a.tiles[i] = builtTile{ground: ground, onMap: onMap, fixture: fixture, furnished: furnished, edges: f.EdgesOn(storey, middleX, middleZ)}
-	}
+		*tile = builtTile{ground: ground, onMap: onMap, fixture: fixture, furnished: furnished, edges: f.EdgesOn(storey, middleX, middleZ)}
+	})
 	a.modelled(f.ModelsOn(storey))
-	for i := range a.tiles {
-		tile := &a.tiles[i]
-		col, row := a.col+i%a.cols, a.row+i/a.cols
+	a.eachTile(func(tile *builtTile, col, row int) {
 		for side, step := range neighbours {
 			beside := a.at(col+step[0], row+step[1]).ground
 			tile.beside[side] = beside
@@ -305,20 +304,38 @@ func (a *builtArea) survey(f *world.World, storey int, left, right, back, front 
 			tile.diagonal[corner] = alike(tile.ground, across) && !alike(tile.ground, sideways) && !alike(tile.ground, upright)
 		}
 		tile.solid = standsOn(tile)
-	}
+	})
 	// A structure's shadow reaches no farther than the tiles beside it: the sun throws the top of a
 	// wall less than a tile east and south.
-	for i := range a.tiles {
-		col, row := a.col+i%a.cols, a.row+i/a.cols
-		for stepRow := -1; stepRow <= 1 && !a.tiles[i].near; stepRow++ {
+	a.eachTile(func(tile *builtTile, col, row int) {
+		for stepRow := -1; stepRow <= 1 && !tile.near; stepRow++ {
 			for stepCol := -1; stepCol <= 1; stepCol++ {
 				if a.at(col+stepCol, row+stepRow).solid {
-					a.tiles[i].near = true
+					tile.near = true
 					break
 				}
 			}
 		}
+	})
+}
+
+// eachTile works through every surveyed tile, sharing the rows out across the cores. Each tile is
+// worked on once, and may read the others.
+func (a *builtArea) eachTile(work func(tile *builtTile, col, row int)) {
+	var done sync.WaitGroup
+	cores := runtime.GOMAXPROCS(0)
+	for core := range cores {
+		done.Add(1)
+		go func() {
+			defer done.Done()
+			for row := core; row < a.rows; row += cores {
+				for col := range a.cols {
+					work(&a.tiles[row*a.cols+col], a.col+col, a.row+row)
+				}
+			}
+		}()
 	}
+	done.Wait()
 }
 
 // standsOn tells whether a structure fills any of a tile: a wall, door, fence, gate or grave on it,
