@@ -223,3 +223,69 @@ func TestABuildingWithNoFloorAboveRisesNoHigher(t *testing.T) {
 		t.Fatalf("buildings = %+v, want the lodge with no floor above its ground floor", buildings)
 	}
 }
+
+// stairwell is the tower with a staircase three tiles long, on column 5, rows 1 to 3, rising
+// through every floor, its north end hemmed in by crates and a wall, and the hero in the room's
+// far corner.
+func stairwell() world.Map {
+	m := tower()
+	stairs := []world.PlacedFixture{{Col: 5, Row: 1, Kind: world.Staircase}, {Col: 5, Row: 2, Kind: world.Staircase}, {Col: 5, Row: 3, Kind: world.Staircase}}
+	m.Fixtures = append(slices.Clone(stairs),
+		world.PlacedFixture{Col: 4, Row: 1, Kind: world.Crate}, world.PlacedFixture{Col: 6, Row: 1, Kind: world.Crate},
+		world.PlacedFixture{Col: 4, Row: 2, Kind: world.Crate}, world.PlacedFixture{Col: 6, Row: 2, Kind: world.Crate})
+	m.Ground[0][4], m.Ground[0][5], m.Ground[0][6] = world.Wall, world.Wall, world.Wall
+	for i := range m.Upstairs {
+		m.Upstairs[i].Fixtures = stairs
+	}
+	m.StartCol, m.StartRow = 2, 4
+	return m
+}
+
+func TestApproachingAStaircasesFarTileClimbsItFromBesideItsNearOne(t *testing.T) {
+	w := world.NewOnMap(7, stairwell())
+	w.ApproachFlight(world.Flight{Col: 5, Row: 1, Kind: world.Staircase})
+	walkFor(w, 5*time.Second)
+	if w.Storey() != 1 {
+		x, z := w.Hero().Position()
+		t.Fatalf("storey = %d with the hero at %.1f, %.1f; want them up the staircase", w.Storey(), x, z)
+	}
+}
+
+// walledStairs is the lodge with a staircase inside against its west wall, on tile 2, 2, and a
+// floor above with its top, and the hero outside the wall, beside the staircase.
+func walledStairs() world.Map {
+	m := lodge(world.Wall)
+	stairs := []world.PlacedFixture{{Col: 2, Row: 2, Kind: world.Staircase}}
+	first := make([][]world.Ground, len(m.Ground))
+	for row := range first {
+		first[row] = make([]world.Ground, len(m.Ground[row]))
+		copy(first[row], m.Ground[row])
+	}
+	m.Fixtures = stairs
+	m.Upstairs = []world.UpperFloor{{Ground: first, Edges: m.Edges, Fixtures: stairs}}
+	m.StartCol, m.StartRow = 1, 2
+	return m
+}
+
+func TestAStaircaseBehindAWallIsOutOfReach(t *testing.T) {
+	w := world.NewOnMap(7, walledStairs())
+	if flight, ok := w.FlightInReach(); ok {
+		t.Fatalf("flight in reach = %+v; want none through the wall", flight)
+	}
+	if w.Climb(true) {
+		t.Fatal("the hero climbed a staircase through a wall")
+	}
+}
+
+func TestApproachingAStaircaseBehindAWallGoesRoundThroughTheDoor(t *testing.T) {
+	w := world.NewOnMap(7, walledStairs())
+	w.ApproachFlight(world.Flight{Col: 2, Row: 2, Kind: world.Staircase})
+	walkFor(w, 10*time.Second)
+	if w.Storey() != 1 {
+		x, z := w.Hero().Position()
+		t.Fatalf("storey = %d with the hero at %.1f, %.1f; want them in through the door and up the staircase", w.Storey(), x, z)
+	}
+	if x, _ := w.Hero().Position(); x < 2*world.TileSize {
+		t.Fatalf("x = %v; want the hero to have climbed from inside the lodge", x)
+	}
+}

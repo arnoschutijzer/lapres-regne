@@ -1,6 +1,9 @@
 package world
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 // UpperFloor is a storey of a map above its ground floor: rows of tiles as the map's Ground, Grass
 // standing for open air, with the walls, fixtures and models standing on it.
@@ -131,8 +134,23 @@ func (t *terrain) block(start cell) []cell {
 	return tiles
 }
 
-// FlightInReach finds the staircase or ladder nearest the hero on a tile beside theirs, or false
-// where none is and in the endless forest.
+// standings are the tiles the hero may climb a staircase or ladder from, given its tiles: the open
+// tiles beside them, along a side no wall, fence or shut door stands in.
+func (t *terrain) standings(block []cell) []cell {
+	var found []cell
+	for _, tile := range block {
+		for _, step := range [4]cell{{0, -1}, {1, 0}, {0, 1}, {-1, 0}} {
+			beside := cell{tile.gx + step.gx, tile.gz + step.gz}
+			if t.open(beside) && t.crossable(beside, tile) && !slices.Contains(found, beside) {
+				found = append(found, beside)
+			}
+		}
+	}
+	return found
+}
+
+// FlightInReach finds the staircase or ladder nearest the hero on a tile beside theirs, with no
+// wall, fence or shut door between them, or false where none is and in the endless forest.
 func (w *World) FlightInReach() (Flight, bool) {
 	if w.terrain == nil {
 		return Flight{}, false
@@ -140,20 +158,20 @@ func (w *World) FlightInReach() (Flight, bool) {
 	return w.flightBeside(tileOf(w.hero.x, w.hero.z))
 }
 
-// flightBeside finds the staircase or ladder nearest the hero on a tile beside one.
+// flightBeside finds the staircase or ladder nearest the hero on a tile beside one, with no wall,
+// fence or shut door between.
 func (w *World) flightBeside(here cell) (Flight, bool) {
 	var nearest Flight
 	nearestDistance, found := math.Inf(1), false
-	for row := here.gz - 1; row <= here.gz+1; row++ {
-		for col := here.gx - 1; col <= here.gx+1; col++ {
-			flight, ok := w.flightAt(cell{col, row})
-			if !ok {
-				continue
-			}
-			middle := cell{col, row}.middle()
-			if distance := math.Hypot(middle.x-w.hero.x, middle.z-w.hero.z); distance < nearestDistance {
-				nearest, nearestDistance, found = flight, distance, true
-			}
+	for _, step := range [4]cell{{0, -1}, {1, 0}, {0, 1}, {-1, 0}} {
+		tile := cell{here.gx + step.gx, here.gz + step.gz}
+		flight, ok := w.flightAt(tile)
+		if !ok || !w.here().crossable(here, tile) {
+			continue
+		}
+		middle := tile.middle()
+		if distance := math.Hypot(middle.x-w.hero.x, middle.z-w.hero.z); distance < nearestDistance {
+			nearest, nearestDistance, found = flight, distance, true
 		}
 	}
 	return nearest, found
@@ -209,17 +227,39 @@ type flightApproach struct {
 	tile   cell
 }
 
-// ApproachFlight walks the hero beside a staircase or ladder, round whatever blocks the way, and
-// climbs it on arrival where it leads one way only. Where it leads both up and down, arriving
-// offers the choice, as OfferedClimb reports.
+// ApproachFlight walks the hero round whatever blocks the way to the nearest tile they may climb a
+// staircase or ladder from, beside any of its tiles, and climbs it on arrival where it leads one
+// way only. Where it leads both up and down, arriving offers the choice, as OfferedClimb reports.
+// Where no such tile can be reached, the hero walks as near to it as they can.
 func (w *World) ApproachFlight(flight Flight) {
 	if w.terrain == nil {
 		return
 	}
 	tile := cell{flight.Col, flight.Row}
-	middle := tile.middle()
+	goal := tile
+	start, shortest := tileOf(w.hero.x, w.hero.z), math.Inf(1)
+	for _, standing := range w.here().standings(w.here().block(tile)) {
+		route := w.here().search(start, standing)
+		if route[len(route)-1] != standing {
+			continue
+		}
+		if length := routeLength(route); length < shortest {
+			goal, shortest = standing, length
+		}
+	}
+	middle := goal.middle()
 	w.WalkTo(middle.x, middle.z)
 	w.flightApproach = flightApproach{active: true, tile: tile}
+}
+
+// routeLength is how many tiles a route of tiles side by side covers, diagonal steps counting as
+// the longer way they are.
+func routeLength(route []cell) float64 {
+	length := 0.0
+	for i := 1; i < len(route); i++ {
+		length += math.Hypot(float64(route[i].gx-route[i-1].gx), float64(route[i].gz-route[i-1].gz))
+	}
+	return length
 }
 
 // arriveAtFlight climbs the staircase or ladder the hero walked to, once they stop beside it.
@@ -229,8 +269,7 @@ func (w *World) arriveAtFlight() {
 	}
 	tile := w.flightApproach.tile
 	w.flightApproach = flightApproach{}
-	here := tileOf(w.hero.x, w.hero.z)
-	if tile.gx < here.gx-1 || tile.gx > here.gx+1 || tile.gz < here.gz-1 || tile.gz > here.gz+1 {
+	if !slices.Contains(w.here().standings(w.here().block(tile)), tileOf(w.hero.x, w.hero.z)) {
 		return
 	}
 	flight, ok := w.flightAt(tile)
