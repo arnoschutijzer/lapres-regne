@@ -1,6 +1,9 @@
 package world
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 // maxLevel is the highest level a skill reaches.
 const maxLevel = 99
@@ -31,6 +34,9 @@ const Woodcutting = "Woodcutting"
 
 // skillNames lists every skill the hero trains.
 var skillNames = [...]string{Woodcutting}
+
+// SkillNames lists every skill the hero trains, in the order they are shown.
+func SkillNames() []string { return slices.Clone(skillNames[:]) }
 
 // Skill is the experience gained in one skill, kept in tenths so half points add up exactly.
 type Skill struct {

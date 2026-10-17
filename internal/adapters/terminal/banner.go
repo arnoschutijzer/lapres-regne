@@ -42,6 +42,9 @@ var woodcuttingIcon = []string{
 	"............",
 }
 
+// skillIcons holds each skill's icon by name; a skill without one is celebrated in words alone.
+var skillIcons = map[string][]string{world.Woodcutting: woodcuttingIcon}
+
 // iconInk colors the icon's pixels with the forest's shaded leaves, sunlit leaves and bark.
 var iconInk = map[byte]uint8{'S': 2, 'L': 3, 'T': 4}
 
@@ -103,9 +106,12 @@ func levelUpBanner(f *world.World, cols int) *overlay {
 	if levelUp.Unlocked != "" {
 		lines = append(lines, line{levelUp.Unlocked, unlockInk})
 	}
-	icon := brailleArt(woodcuttingIcon, iconInk)
-	iconWidth := len(woodcuttingIcon[0]) / 2
-	textLeft := bannerPadding + iconWidth + 2
+	var icon [][]forestCell
+	textLeft := bannerPadding
+	if art, ok := skillIcons[levelUp.Skill]; ok {
+		icon = brailleArt(art, iconInk)
+		textLeft += len(art[0])/2 + 2
+	}
 	width := 0
 	for _, l := range lines {
 		width = max(width, textLeft+len([]rune(l.text))+bannerPadding)
@@ -135,8 +141,8 @@ func levelUpBanner(f *world.World, cols int) *overlay {
 			}
 		}
 	}
-	// The lines sit beside the icon, centered on its four rows.
-	top := 1 + (len(icon)-len(lines))/2
+	// The lines sit beside the icon, centered on the banner's rows between its quiet ones.
+	top := 1 + (bannerHeight-2-len(lines))/2
 	for i, l := range lines {
 		for col, letter := range []rune(l.text) {
 			put(top+i, textLeft+col, letter, l.ink)
