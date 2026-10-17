@@ -104,6 +104,9 @@ func (a *builtArea) drawEdges(c *forestCanvas, col, row int, x, z, variety float
 			c.drawingDoorway = 0
 		}
 	}
+	if !isWall(edges.Rising) && !isWall(edges.Falling) && edges.Rising != world.Fence && edges.Falling != world.Fence {
+		return
+	}
 	c.standOn(x+size/2, z+size/2)
 	for _, diagonal := range [2]struct {
 		ground         world.Ground

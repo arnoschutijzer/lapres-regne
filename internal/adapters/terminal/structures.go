@@ -555,7 +555,8 @@ func (a *builtArea) shade(x, z float64) float64 {
 // drawStructures draws the walls, doors, fences, gates, graves and fixtures standing on the
 // surveyed tiles.
 func (r *renderer) drawStructures(c *forestCanvas, a *builtArea) {
-	for i, tile := range a.tiles {
+	for i := range a.tiles {
+		tile := &a.tiles[i]
 		col, row := a.col+i%a.cols, a.row+i/a.cols
 		if !tile.onMap || tile.covered {
 			// Walls still stand along the edges of a tile beyond a floor's edge, or under a floor
@@ -595,7 +596,7 @@ func (r *renderer) drawStructures(c *forestCanvas, a *builtArea) {
 		a.drawEdges(c, col, row, x, z, r.world.Random(col, row, 45))
 		if tile.furnished && !tile.shaped {
 			c.standOn(x+world.TileSize/2, z+world.TileSize/2)
-			drawFixture(c, x, z, tile, r.world.Random(col, row, 44))
+			drawFixture(c, x, z, *tile, r.world.Random(col, row, 44))
 		}
 	}
 }
