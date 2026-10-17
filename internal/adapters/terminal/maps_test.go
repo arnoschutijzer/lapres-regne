@@ -3,6 +3,7 @@ package terminal
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"lapresregne/internal/world"
 )
@@ -321,7 +322,8 @@ func TestWaterIsEdgedWithMuddyBanksAndReeds(t *testing.T) {
 	}
 }
 
-// cottage is meadow's open grass with a walled room of flagstones north of the hero.
+// cottage is meadow's open grass with a walled room of flagstones north of the hero, its door in
+// the middle of its south wall.
 func cottage() *world.World {
 	ground := make([][]world.Ground, 60)
 	for row := range ground {
@@ -335,6 +337,7 @@ func cottage() *world.World {
 			}
 		}
 	}
+	ground[27][40] = world.Door
 	return world.NewOnMap(7, world.Map{Name: "Cottage", Ground: ground, StartCol: 40, StartRow: 30})
 }
 
@@ -402,5 +405,35 @@ func TestBoardedFloorsAreDrawnInWood(t *testing.T) {
 	r.zoom = zoom{current: 4}
 	if countInk(r.render(160, 60, 0), boardsInk) == 0 {
 		t.Fatal("the boarded floor must be drawn in wood")
+	}
+}
+
+// roofInks are the inks a roof is drawn in.
+var roofInks = []int{thatchInk, shadedThatchInk, slateInk, shadedSlateInk}
+
+func TestBuildingsAreRoofedFromOutside(t *testing.T) {
+	r := newRenderer(cottage(), "L’Après-Règne")
+	r.zoom = zoom{current: 3}
+	c := r.render(160, 60, 0)
+	if countInk(c, slateInk, shadedSlateInk) == 0 {
+		t.Fatal("the stone-floored cottage must be roofed in slate")
+	}
+	// The roof's ridge stands well above the walls, over the middle of the cottage.
+	x, y, _ := c.project(80, wallHeight+copingHeight+1.5, 50)
+	if ink := c.pixels[int(y)*c.width+int(x)].ink; ink != slateInk && ink != shadedSlateInk {
+		t.Fatalf("ink at the roof's ridge = %d, want slate", ink)
+	}
+}
+
+func TestRoofsHideWhileTheHeroIsIndoors(t *testing.T) {
+	w := cottage()
+	w.WalkTo(80, 50)
+	for range 200 {
+		w.Advance(0, 0, 50*time.Millisecond, false)
+	}
+	r := newRenderer(w, "L’Après-Règne")
+	r.zoom = zoom{current: 3}
+	if !w.Indoors() || countInk(r.render(160, 60, 0), roofInks...) != 0 {
+		t.Fatal("no roof must hide the hero inside the cottage")
 	}
 }

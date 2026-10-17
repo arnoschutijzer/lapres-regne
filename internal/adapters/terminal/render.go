@@ -152,6 +152,10 @@ var forestPalette = [...][3]int{
 	{70, 96, 124},   // window glass
 	{150, 104, 62},  // wooden boards
 	{143, 118, 80},  // axe handle
+	{176, 148, 88},  // thatch
+	{120, 98, 60},   // shaded thatch
+	{96, 104, 120},  // slate
+	{64, 70, 86},    // shaded slate
 }
 
 // foremost marks the inks of the hero, their axe, flying chips and fireworks.
@@ -275,6 +279,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	ground.Wait()
 	if f.Mapped() {
 		r.drawStructures(c)
+		r.drawRoofs(c)
 	}
 	r.drawScatter(c, left, right, back, front)
 	for _, tree := range trees {

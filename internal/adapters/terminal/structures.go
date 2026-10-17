@@ -51,9 +51,10 @@ const (
 )
 
 // face is a flat rectangle of a structure: from its corner origin along the edges u and v, lit as
-// facing along normal.
+// facing along normal. A triangle face keeps only the half from origin to the ends of u and v.
 type face struct {
 	origin, u, v, normal vec
+	triangle             bool
 }
 
 // surface patterns a face: the brightness of each point and its ink, or keepInk for the face's own,
@@ -85,9 +86,9 @@ func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 	lengthU, lengthV := math.Sqrt(f.u.dot(f.u)), math.Sqrt(f.v.dot(f.v))
 	// Structures are lit a little brighter than leaves, so even a shaded face shows in braille.
 	light := 0.45 + 0.55*sunlight(f.normal)
-	// Stone turned away from the sun takes a darker color, giving walls their form.
-	if ink == stoneInk && sunlight(f.normal) < 0.5 {
-		ink = shadedStoneInk
+	// Stone and roofs turned away from the sun take a darker color, giving them their form.
+	if sunlight(f.normal) < 0.5 {
+		ink = shadedOf(ink)
 	}
 	// Only faces several pixels across get an outline; a thin rail would vanish inside its own.
 	edgeU, edgeV := 0.7/c.scale, 0.7/c.scale
@@ -102,7 +103,7 @@ func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 			// The pixel's place on the face, as fractions along u and v.
 			dx, dy := float64(px)-ox, float64(py)-oy
 			s, t := (dx*vy-dy*vx)/determinant, (ux*dy-uy*dx)/determinant
-			if s < 0 || s > 1 || t < 0 || t > 1 {
+			if s < 0 || s > 1 || t < 0 || t > 1 || f.triangle && s+t > 1 {
 				continue
 			}
 			alongU, alongV := s*lengthU, t*lengthV
@@ -124,12 +125,12 @@ func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 // Sides listed in hidden, as north, east, south, west, are left out where they meet another block.
 func (c *forestCanvas) box(x0, z0, x1, z1, y0, y1 float64, hidden [4]bool, ink int, pattern surface) {
 	width, depth, height := vec{x1 - x0, 0, 0}, vec{0, 0, z1 - z0}, vec{0, y1 - y0, 0}
-	c.fill(face{vec{x0, y1, z0}, width, depth, vec{0, 1, 0}}, ink, pattern)
+	c.fill(face{origin: vec{x0, y1, z0}, u: width, v: depth, normal: vec{0, 1, 0}}, ink, pattern)
 	sides := [4]face{
-		{vec{x0, y0, z0}, width, height, vec{0, 0, -1}},
-		{vec{x1, y0, z0}, depth, height, vec{1, 0, 0}},
-		{vec{x0, y0, z1}, width, height, vec{0, 0, 1}},
-		{vec{x0, y0, z0}, depth, height, vec{-1, 0, 0}},
+		{origin: vec{x0, y0, z0}, u: width, v: height, normal: vec{0, 0, -1}},
+		{origin: vec{x1, y0, z0}, u: depth, v: height, normal: vec{1, 0, 0}},
+		{origin: vec{x0, y0, z1}, u: width, v: height, normal: vec{0, 0, 1}},
+		{origin: vec{x0, y0, z0}, u: depth, v: height, normal: vec{-1, 0, 0}},
 	}
 	for side, f := range sides {
 		if !hidden[side] {
@@ -217,6 +218,8 @@ func (t builtTile) windowed() bool {
 type builtArea struct {
 	col, row, cols, rows int
 	tiles                []builtTile
+	// roofs are the roofs drawn this frame: none while the hero is indoors.
+	roofs []roof
 }
 
 // survey records what stands on every tile from left to right and back to front, with a tile's
@@ -229,6 +232,12 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 		a.tiles = make([]builtTile, a.cols*a.rows)
 	}
 	a.tiles = a.tiles[:a.cols*a.rows]
+	a.roofs = a.roofs[:0]
+	if !f.Indoors() {
+		for _, building := range f.Buildings() {
+			a.roofs = append(a.roofs, roofOver(building))
+		}
+	}
 	for i := range a.tiles {
 		col, row := a.col+i%a.cols, a.row+i/a.cols
 		ground, onMap := f.GroundAt((float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize)
@@ -376,6 +385,18 @@ func (a *builtArea) shade(x, z float64) float64 {
 	for height := 0.1; height <= wallHeight+copingHeight; height += 0.2 {
 		if a.occupied(x-sunX*height, height, z-sunZ*height) {
 			return castShadow
+		}
+	}
+	for _, roof := range a.roofs {
+		ridge := roof.ridge()
+		// A roof's shadow falls no nearer than its eaves throw it, and no farther than its ridge.
+		if x < roof.x0+sunX*eaves || x > roof.x1+sunX*ridge || z < roof.z0+sunZ*eaves || z > roof.z1+sunZ*ridge {
+			continue
+		}
+		for height := eaves; height <= ridge; height += 0.2 {
+			if roof.covers(x-sunX*height, height, z-sunZ*height) {
+				return castShadow
+			}
 		}
 	}
 	shade := 1.0

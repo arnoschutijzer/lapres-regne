@@ -2,6 +2,7 @@ package world_test
 
 import (
 	"math"
+	"reflect"
 	"testing"
 	"time"
 
@@ -301,5 +302,45 @@ func TestASavedPlaceTheMapNowBlocksSendsTheHeroToTheStart(t *testing.T) {
 	}
 	if x, z := w.Hero().Position(); x != 5 || z != 3 {
 		t.Fatalf("position = %v, %v; want the start, as a fence now stands where the hero was kept", x, z)
+	}
+}
+
+func TestAClosedRoomIsARoofedBuilding(t *testing.T) {
+	m := courtyard()
+	m.Ground[3][2] = world.Door
+	w := world.NewOnMap(7, m)
+	want := []world.Building{{Col: 0, Row: 0, Cols: 5, Rows: 4}}
+	if buildings := w.Buildings(); !reflect.DeepEqual(buildings, want) {
+		t.Fatalf("buildings = %+v, want %+v", buildings, want)
+	}
+	if !w.Indoors() {
+		t.Fatal("the hero starts inside the room")
+	}
+	w.WalkTo(11, 3)
+	walkFor(w, 10*time.Second)
+	if w.Indoors() {
+		t.Fatal("the hero has walked out of the room")
+	}
+}
+
+func TestARoomOpenToTheOutsideHasNoRoof(t *testing.T) {
+	if buildings := world.NewOnMap(7, courtyard()).Buildings(); len(buildings) != 0 {
+		t.Fatalf("buildings = %+v, want none, as the gap in the wall leads straight outside", buildings)
+	}
+}
+
+func TestBoardedRoomsAreThatchedAndStoneRoomsSlated(t *testing.T) {
+	m := courtyard()
+	m.Ground[3][2] = world.Door
+	if building := world.NewOnMap(7, m).Buildings()[0]; building.Thatched {
+		t.Fatal("a room floored in stone must be slated")
+	}
+	for row := 1; row <= 2; row++ {
+		for col := 1; col <= 3; col++ {
+			m.Ground[row][col] = world.Boards
+		}
+	}
+	if building := world.NewOnMap(7, m).Buildings()[0]; !building.Thatched {
+		t.Fatal("a room floored in boards must be thatched")
 	}
 }

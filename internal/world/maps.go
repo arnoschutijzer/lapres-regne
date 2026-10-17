@@ -61,10 +61,21 @@ const (
 	treeTopCover = 0.75
 )
 
+// Building is a roofed building on a map: a room closed in by its walls and doors, spanning the
+// tiles from Col, Row across Cols and Rows, walls included.
+type Building struct {
+	Col, Row, Cols, Rows int
+	// Thatched marks a building floored mostly with boards; one floored with stone is slated.
+	Thatched bool
+}
+
 // terrain answers questions about the tiles of a map.
 type terrain struct {
 	ground [][]Ground
 	areas  [][]string
+	// buildings lists the map's roofed buildings, and rooms the tiles inside each of them.
+	buildings []Building
+	rooms     map[cell]int
 	trees  map[cell]TreeKind
 	// cover is the canopy over each tile, row by row.
 	cover [][]float64
@@ -93,7 +104,64 @@ func newTerrain(m Map) *terrain {
 			t.cover[tree.Row][tree.Col] = treeTopCover
 		}
 	}
+	t.findBuildings()
 	return t
+}
+
+// indoor tells whether a tile is floored inside, as rooms are.
+func indoor(g Ground) bool { return g == Floor || g == Boards }
+
+// findBuildings finds every room of flagstones or boards closed in by walls and doors alone, and
+// roofs it as a building.
+func (t *terrain) findBuildings() {
+	t.rooms = make(map[cell]int)
+	seen := make(map[cell]bool)
+	steps := [4]cell{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+	for row := range t.ground {
+		for col := range t.ground[row] {
+			start := cell{col, row}
+			if seen[start] || !indoor(t.ground[row][col]) {
+				continue
+			}
+			// Gather the room, noting whether it opens onto anything but its walls and doors.
+			room, open, boards := []cell{start}, false, 0
+			seen[start] = true
+			for i := 0; i < len(room); i++ {
+				here := room[i]
+				if t.ground[here.gz][here.gx] == Boards {
+					boards++
+				}
+				for _, step := range steps {
+					next := cell{here.gx + step.gx, here.gz + step.gz}
+					ground, ok := t.tile(next.gx, next.gz)
+					switch {
+					case !ok:
+						open = true
+					case indoor(ground):
+						if !seen[next] {
+							seen[next] = true
+							room = append(room, next)
+						}
+					case ground != Wall && ground != Battlement && ground != Door:
+						open = true
+					}
+				}
+			}
+			if open {
+				continue
+			}
+			left, top, right, bottom := start.gx, start.gz, start.gx, start.gz
+			for _, c := range room {
+				left, right = min(left, c.gx), max(right, c.gx)
+				top, bottom = min(top, c.gz), max(bottom, c.gz)
+				t.rooms[c] = len(t.buildings)
+			}
+			t.buildings = append(t.buildings, Building{
+				Col: left - 1, Row: top - 1, Cols: right - left + 3, Rows: bottom - top + 3,
+				Thatched: boards*2 > len(room),
+			})
+		}
+	}
 }
 
 // tile is the ground of a tile, or false beyond the map's edges.
@@ -151,6 +219,23 @@ func NewOnMap(seed uint64, m Map) *World {
 // returns to where they stood only when the progress was saved on the same map.
 func ResumeOn(m Map, seed uint64, progress Progress, now time.Time) (*World, error) {
 	return resume(NewOnMap(seed, m), progress, now)
+}
+
+// Buildings lists the roofed buildings of the map; none in the endless forest.
+func (w *World) Buildings() []Building {
+	if w.terrain == nil {
+		return nil
+	}
+	return w.terrain.buildings
+}
+
+// Indoors tells whether the hero stands inside a roofed building.
+func (w *World) Indoors() bool {
+	if w.terrain == nil {
+		return false
+	}
+	_, inside := w.terrain.rooms[tileOf(w.hero.x, w.hero.z)]
+	return inside
 }
 
 // Mapped tells whether the world is a map rather than the endless forest.
