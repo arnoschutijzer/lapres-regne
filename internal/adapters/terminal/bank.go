@@ -8,13 +8,12 @@ import (
 )
 
 // The bank lays its stacks out in a grid as Old School RuneScape does, 8 across, each stack's
-// count over its icon's top left corner. Stacks sit a cell apart, and the highlighted stack's
-// brackets take the cells either side of it.
+// count over its icon's top left corner. Stacks sit as the inventory's slots do.
 const (
-	bankPitch      = iconCells + 1
+	bankPitch      = slotPitch
 	bankMaxColumns = 8
 	// bankRows is how many rows of stacks the panel shows below its title, and bankHeight its lines.
-	bankRows   = 4
+	bankRows   = 8
 	bankHeight = slotLine + bankRows*iconLines
 )
 
@@ -63,32 +62,21 @@ func bankPanel(bank world.Bank, columns int, cursor bankCursor, top int) []strin
 			break
 		}
 		shown := stacks[row*columns : min(len(stacks), (row+1)*columns)]
-		highlighted := func(column int) bool {
-			return cursor.active && cursor.stack == row*columns+column
+		drawn := make([][]string, len(shown))
+		highlighted := -1
+		for column, stack := range shown {
+			cells := iconCellsOf(stack.Item)
+			count := bankCount(stack.Count)
+			drawn[column] = []string{countTint(stack.Count) + count + strings.Join(cells[0][min(len(count), iconCells):], "") + paperOf(background)}
+			for _, line := range cells[1:] {
+				drawn[column] = append(drawn[column], strings.Join(line, "")+paperOf(background))
+			}
+			if cursor.active && cursor.stack == row*columns+column {
+				highlighted = column
+			}
 		}
-		for line := range iconLines {
-			text := strings.Repeat(" ", slotIndent)
-			for column, stack := range shown {
-				switch {
-				case highlighted(column):
-					text += "["
-				case column > 0 && highlighted(column-1):
-					text += "]"
-				default:
-					text += " "
-				}
-				cells := iconCellsOf(stack.Item)[line]
-				if line == 0 {
-					count := bankCount(stack.Count)
-					text += countTint(stack.Count) + count
-					cells = cells[len(count):]
-				}
-				text += strings.Join(cells, "") + paperOf(background) + panelText
-			}
-			if highlighted(len(shown) - 1) {
-				text += "]"
-			}
-			lines = append(lines, pad(text, slotIndent+len(shown)*bankPitch))
+		for _, line := range slotLines(drawn, highlighted) {
+			lines = append(lines, pad(line, slotIndent+len(shown)*bankPitch))
 		}
 	}
 	for len(lines) < bankHeight {
@@ -112,15 +100,18 @@ func bankTitle(top, rows int) string {
 	return title
 }
 
-// bankCount shortens a stack's count to four characters, in thousands or millions when large.
+// bankCount shortens a stack's count to four characters, the width of an icon, in thousands,
+// millions or billions when large.
 func bankCount(count int) string {
 	switch {
 	case count < 10_000:
 		return fmt.Sprint(count)
 	case count < 1_000_000:
 		return fmt.Sprintf("%dK", count/1_000)
+	case count < 1_000_000_000:
+		return fmt.Sprintf("%dM", count/1_000_000)
 	}
-	return fmt.Sprintf("%dM", count/1_000_000)
+	return fmt.Sprintf("%dB", count/1_000_000_000)
 }
 
 // toggleBank opens or closes the bank; opening it shows the inventory to deposit from.

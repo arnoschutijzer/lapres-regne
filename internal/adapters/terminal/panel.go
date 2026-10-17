@@ -8,11 +8,11 @@ import (
 	"lapresregne/internal/world"
 )
 
-// Slots sit slotPitch cells apart from slotIndent on: a bracket or space, the icon, a bracket or
-// space.
+// Slots sit slotPitch cells apart from slotIndent on, a cell between each, and the highlighted
+// slot's brackets take the cells either side of it.
 const (
 	slotIndent = 2
-	slotPitch  = iconCells + 2
+	slotPitch  = iconCells + 1
 	// slotLine is the panel line holding the first row of slots, just below the title.
 	slotLine = 1
 	// panelColumns lays the 28 slots out as Old School RuneScape does: 4 across, 7 down.
@@ -22,9 +22,9 @@ const (
 	panelHeight = slotLine + world.InventorySize/panelColumns*iconLines
 )
 
-// shapeIcons shades each item shape in a slot from the item's tint.
-var shapeIcons = map[world.Shape]iconShader{
-	world.LogShape: logShader,
+// shapeIcons draws each item shape's pixels from the item's tint.
+var shapeIcons = map[world.Shape]func(tint [3]int) [][][3]int{
+	world.LogShape: logPixels,
 }
 
 // endGrain is the pale wood inside every log, which a cut end shows tinted by its tree.
@@ -41,7 +41,7 @@ func iconCellsOf(item world.Item) [][]string {
 		return drawn.([][]string)
 	}
 	color := item.Color()
-	drawn := renderIcon(shapeIcons[item.Shape()], [3]int{int(color.R), int(color.G), int(color.B)}, iconCells, iconLines)
+	drawn := renderIcon(shapeIcons[item.Shape()]([3]int{int(color.R), int(color.G), int(color.B)}))
 	icons.Store(item, drawn)
 	return drawn
 }
@@ -72,18 +72,25 @@ func emptyIcon() []string {
 	return lines
 }
 
-// slotLines lays out one row of slots, a line for each line of the icons, the highlighted slot
-// bracketed.
+// slotLines lays out one row of slots, a line for each line of the icons, the highlighted slot's
+// brackets in the cells either side of it.
 func slotLines(icons [][]string, highlighted int) []string {
 	lines := make([]string, iconLines)
 	for line := range lines {
 		lines[line] = strings.Repeat(" ", slotIndent)
 		for column, drawn := range icons {
-			if column == highlighted {
-				lines[line] += "[" + drawn[line] + panelText + "]"
-			} else {
-				lines[line] += " " + drawn[line] + panelText + " "
+			switch {
+			case column == highlighted:
+				lines[line] += "["
+			case column > 0 && column-1 == highlighted:
+				lines[line] += "]"
+			default:
+				lines[line] += " "
 			}
+			lines[line] += drawn[line] + panelText
+		}
+		if highlighted == len(icons)-1 {
+			lines[line] += "]"
 		}
 	}
 	return lines

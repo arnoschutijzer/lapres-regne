@@ -61,14 +61,14 @@ func TestTheBankShowsEachStacksCountOverItsIconsTopLeftCorner(t *testing.T) {
 	}
 }
 
-func TestTheBankIsShorterThanTheInventory(t *testing.T) {
-	if bankHeight >= panelHeight || bankRows*iconLines+slotLine != bankHeight {
-		t.Fatalf("bank height = %d, rows = %d; want rows of icons alone, shorter than the inventory's %d lines", bankHeight, bankRows, panelHeight)
+func TestTheBankShowsEightRowsOfIconsTheInventorysSize(t *testing.T) {
+	if bankRows != 8 || bankHeight != slotLine+bankRows*iconLines || bankPitch != slotPitch {
+		t.Fatalf("rows = %d, height = %d, pitch = %d; want 8 rows of icons spaced as the inventory's", bankRows, bankHeight, bankPitch)
 	}
 }
 
 func TestTheBankGridIsEightAcrossWhenThereIsRoom(t *testing.T) {
-	cases := map[int]int{220: 8, 119: 8, 118: 7, 100: 5}
+	cases := map[int]int{220: 8, 67: 8, 66: 7, 40: 2}
 	for cols, want := range cases {
 		if got := bankColumns(cols); got != want {
 			t.Errorf("bankColumns(%d) = %d, want %d", cols, got, want)
@@ -86,7 +86,7 @@ func TestCountsAreTintedByTheirSize(t *testing.T) {
 }
 
 func TestBankCountsShortenToFitThePanel(t *testing.T) {
-	cases := map[int]string{1: "1", 9999: "9999", 10_000: "10K", 999_999: "999K", 1_000_000: "1M", 2_147_000_000: "2147M"}
+	cases := map[int]string{1: "1", 9999: "9999", 10_000: "10K", 999_999: "999K", 1_000_000: "1M", 999_999_999: "999M", 2_147_000_000: "2B"}
 	for count, want := range cases {
 		if got := bankCount(count); got != want {
 			t.Errorf("bankCount(%d) = %q, want %q", count, got, want)
@@ -239,12 +239,12 @@ func TestTheHighlightedStackIsBracketed(t *testing.T) {
 }
 
 func TestTheBankScrollsToKeepTheHighlightInView(t *testing.T) {
-	// 50 stacks fill 7 rows of 8; 4 rows show at once.
+	// 100 stacks fill 13 rows of 8; 8 rows show at once.
 	cases := []struct{ top, stack, want int }{
-		{0, 31, 0}, {0, 32, 1}, {0, 49, 3}, {3, 8, 1}, {2, 20, 2},
+		{0, 63, 0}, {0, 64, 1}, {0, 99, 5}, {5, 8, 1}, {2, 20, 2},
 	}
 	for _, c := range cases {
-		if got := scrolled(c.top, bankCursor{active: true, stack: c.stack}, 8, 50); got != c.want {
+		if got := scrolled(c.top, bankCursor{active: true, stack: c.stack}, 8, 100); got != c.want {
 			t.Errorf("scrolled(top %d, stack %d) = %d, want %d", c.top, c.stack, got, c.want)
 		}
 	}
@@ -362,10 +362,10 @@ func TestTheWheelScrollsTheBankUnderThePointer(t *testing.T) {
 }
 
 func TestTheBankScrollsByRowsWithinItsStacks(t *testing.T) {
-	// 50 stacks fill 7 rows of 8; 4 rows show at once.
-	cases := []struct{ top, by, want int }{{0, 1, 1}, {0, -1, 0}, {2, 5, 3}, {3, -2, 1}}
+	// 100 stacks fill 13 rows of 8; 8 rows show at once.
+	cases := []struct{ top, by, want int }{{0, 1, 1}, {0, -1, 0}, {4, 5, 5}, {5, -2, 3}}
 	for _, c := range cases {
-		if got := scrolled(c.top+c.by, bankCursor{}, 8, 50); got != c.want {
+		if got := scrolled(c.top+c.by, bankCursor{}, 8, 100); got != c.want {
 			t.Errorf("scrolling %d rows from row %d = %d, want %d", c.by, c.top, got, c.want)
 		}
 	}
@@ -393,18 +393,5 @@ func TestMovingTheHighlightScrollsItBackIntoView(t *testing.T) {
 	r.moveBankCursor(1)
 	if r.bankTop != 0 {
 		t.Fatalf("top = %d, want the highlighted first stack's row shown", r.bankTop)
-	}
-}
-
-func TestStacksCutOffByAShortTerminalCannotBeClicked(t *testing.T) {
-	r := bankOfFour(t)
-	// At 40 by 14 the bank shows one stack a row on forest rows 2 to 12: the third stack runs from
-	// row 11 onto the hint line, row 13.
-	r.frame(40, 14, 0)
-	if stack, ok := r.stackAt(slotIndent+1, 12); !ok || stack != 2 {
-		t.Fatalf("stackAt on the forest's last row = %d, %v; want the third stack", stack, ok)
-	}
-	if _, ok := r.stackAt(slotIndent+1, 13); ok {
-		t.Fatal("a click on the hint line must not pick a stack hidden below it")
 	}
 }

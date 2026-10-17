@@ -75,17 +75,22 @@ func TestAnIconIsLinesOfHalfBlockPixels(t *testing.T) {
 
 func TestALogIconShowsAPaleCutEndAtItsUpperRightAndBarkBelowIt(t *testing.T) {
 	oak := [3]int{178, 128, 74}
-	pixels := ditherIcon(logShader, oak, 16, 16)
-	// The cut end is centred toward the upper right; the bark runs down to the lower left.
-	end, bark := pixels[5][10], pixels[11][4]
-	if end == background || bark == background {
-		t.Fatalf("end %v, bark %v; want the log to cover both", end, bark)
+	pixels := logPixels(oak)
+	if len(pixels) != iconLines*2 || len(pixels[0]) != iconCells {
+		t.Fatalf("pixels = %d by %d, want %d by %d", len(pixels[0]), len(pixels), iconCells, iconLines*2)
 	}
-	if end[0]+end[1]+end[2] <= bark[0]+bark[1]+bark[2] {
-		t.Fatalf("cut end %v must be paler than the bark %v", end, bark)
+	end, bark := pixels[0][3], pixels[2][1]
+	if end != cutEnd(oak) || bark != oak {
+		t.Fatalf("end %v, bark %v; want the cut end's pale wood at the upper right and the oak's bark below", end, bark)
 	}
-	if pixels[0][0] != background || pixels[15][15] != background {
+	if pixels[0][0] != background || pixels[3][3] != background {
 		t.Fatal("the corners away from the log must show the background")
+	}
+}
+
+func TestTheInventoryIsCompact(t *testing.T) {
+	if panelWidth != 23 || panelHeight != 15 {
+		t.Fatalf("inventory = %d by %d, want 23 by 15", panelWidth, panelHeight)
 	}
 }
 
@@ -161,13 +166,13 @@ func TestALogsCutEndIsPalerThanItsBarkAndKeepsItsTreesTint(t *testing.T) {
 func TestSlotsCutOffByAShortTerminalCannotBeClicked(t *testing.T) {
 	r := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne")
 	r.inventoryOpen = true
-	// A terminal 20 rows tall shows the forest on rows 2 to 18, below the title row.
-	r.frame(100, 20, 0)
+	// A terminal 14 rows tall shows the forest on rows 2 to 12, below the title row.
+	r.frame(100, 14, 0)
 	first := 100 - panelWidth + 1 + slotIndent
-	if _, ok := r.slotAt(first, 18); !ok {
+	if _, ok := r.slotAt(first, 12); !ok {
 		t.Fatal("a slot on the forest's last row must still be clickable")
 	}
-	if _, ok := r.slotAt(first, 19); ok {
+	if _, ok := r.slotAt(first, 13); ok {
 		t.Fatal("a click on the hint line must not pick a slot hidden below it")
 	}
 }
