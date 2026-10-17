@@ -135,6 +135,10 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 				view.clickSlot(slot)
 				return false
 			}
+			if stack, ok := view.stackAt(event.column, event.row); ok {
+				world.Withdraw(stack)
+				return false
+			}
 			// Clicking a tree walks there to chop it, clicking a door or gate walks there to open or
 			// close it, clicking a staircase or ladder walks there to climb it, clicking the ground
 			// walks there, and clicking anything else stops.

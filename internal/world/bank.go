@@ -38,3 +38,27 @@ func (w *World) Deposit(slot int) bool {
 	w.bank.deposit(item)
 	return true
 }
+
+// withdraw takes one item from the pile in a place, clearing the place once the pile is gone.
+func (b *Bank) withdraw(index int) Item {
+	item := b.stacks[index].Item
+	b.stacks[index].Count--
+	if b.stacks[index].Count == 0 {
+		b.stacks = append(b.stacks[:index], b.stacks[index+1:]...)
+	}
+	return item
+}
+
+// Withdraw takes one item from a pile in the bank into the first empty inventory slot, reporting
+// whether it did; a full inventory leaves the item in the bank.
+func (w *World) Withdraw(stack int) bool {
+	if stack < 0 || stack >= len(w.bank.stacks) {
+		return false
+	}
+	if w.hero.inventory.Full() {
+		w.say("You don't have enough inventory space.")
+		return false
+	}
+	w.hero.inventory.add(w.bank.withdraw(stack))
+	return true
+}

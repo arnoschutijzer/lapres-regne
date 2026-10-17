@@ -49,3 +49,57 @@ func TestAnEmptySlotDepositsNothing(t *testing.T) {
 		t.Fatal("an empty slot must not deposit anything")
 	}
 }
+
+func TestWithdrawingTakesOneItemBackIntoTheFirstEmptySlot(t *testing.T) {
+	w := carrying(t, world.OakLogs, world.OakLogs, world.YewLogs)
+	for slot := range 3 {
+		w.Deposit(slot)
+	}
+	if !w.Withdraw(0) {
+		t.Fatal("a stack must withdraw an item")
+	}
+	if slots := w.Hero().Inventory().Slots(); slots[0] != (world.Slot{Item: world.OakLogs, Filled: true}) || w.Hero().Inventory().Len() != 1 {
+		t.Fatalf("slots = %v, want one oak log back in the first slot", slots[:3])
+	}
+	want := []world.Stack{{Item: world.OakLogs, Count: 1}, {Item: world.YewLogs, Count: 1}}
+	if stacks := w.Bank().Stacks(); !reflect.DeepEqual(stacks, want) {
+		t.Fatalf("stacks = %v, want %v", stacks, want)
+	}
+}
+
+func TestWithdrawingTheLastItemOfAStackClearsItsPlace(t *testing.T) {
+	w := carrying(t, world.OakLogs, world.YewLogs)
+	w.Deposit(0)
+	w.Deposit(1)
+	w.Withdraw(0)
+	want := []world.Stack{{Item: world.YewLogs, Count: 1}}
+	if stacks := w.Bank().Stacks(); !reflect.DeepEqual(stacks, want) {
+		t.Fatalf("stacks = %v, want %v", stacks, want)
+	}
+	if w.Withdraw(1) {
+		t.Fatal("a place with no stack must withdraw nothing")
+	}
+}
+
+func TestAFullInventoryWithdrawsNothing(t *testing.T) {
+	w := carrying(t, make([]world.Item, world.InventorySize)...)
+	w.Deposit(0)
+	// Walk to the tree beside the spawn and chop a log to fill the gap again.
+	for range 3 {
+		w.Walk(0, 1, false)
+	}
+	for range 9 {
+		w.Walk(1, 0, false)
+	}
+	w.Chop()
+	chopUntilFelled(t, w)
+	if !w.Hero().Inventory().Full() {
+		t.Fatal("the chopped log must fill the inventory")
+	}
+	if w.Withdraw(0) || w.Bank().Stacks()[0].Count != 1 {
+		t.Fatal("a full inventory must leave the item in the bank")
+	}
+	if w.Message() != "You don't have enough inventory space." {
+		t.Fatalf("message = %q, want the hero told there is no room", w.Message())
+	}
+}

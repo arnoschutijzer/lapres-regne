@@ -72,3 +72,17 @@ func (r *renderer) removeFromSlot() {
 	}
 	r.cursor.remove(r.world, remove)
 }
+
+// stackAt finds the bank stack listed under a 1-based terminal cell of the open bank panel.
+func (r *renderer) stackAt(column, row int) (int, bool) {
+	if !r.bankOpen || r.screenWidth == 0 || r.canvas.width == 0 {
+		return 0, false
+	}
+	cols := r.canvas.width / 2
+	panelColumn := column - 1 - (r.screenWidth-cols)/2
+	stack := row - 2 - slotLine
+	if panelColumn < 0 || panelColumn >= bankWidth || stack < 0 || stack >= min(bankRows, len(r.world.Bank().Stacks())) {
+		return 0, false
+	}
+	return stack, true
+}

@@ -98,3 +98,28 @@ func TestWhileTheBankIsOpenXDepositsInsteadOfDropping(t *testing.T) {
 		t.Fatal("with the bank closed, X must drop the log")
 	}
 }
+
+func TestStackAtFindsTheClickedStackInTheOpenBank(t *testing.T) {
+	w := withLogs(t, 1)
+	w.Deposit(0)
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
+	r.toggleBank()
+	r.frame(100, 30, 0)
+	// The first stack sits on the panel's fourth line, the fifth row of the screen.
+	if stack, ok := r.stackAt(1, 5); !ok || stack != 0 {
+		t.Fatalf("stackAt(1, 5) = %d, %v; want the first stack", stack, ok)
+	}
+	if _, ok := r.stackAt(bankWidth, 5); !ok {
+		t.Error("the stack's line must be clickable to the panel's right edge")
+	}
+	if _, ok := r.stackAt(bankWidth+1, 5); ok {
+		t.Error("a click beside the panel must not pick a stack")
+	}
+	if _, ok := r.stackAt(1, 6); ok {
+		t.Error("a line with no stack must not pick one")
+	}
+	r.toggleBank()
+	if _, ok := r.stackAt(1, 5); ok {
+		t.Error("a closed bank has no stacks to click")
+	}
+}
