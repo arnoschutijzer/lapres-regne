@@ -8,7 +8,7 @@ import (
 
 func TestASavedViewLoadsBackUnchanged(t *testing.T) {
 	file := File{Path: filepath.Join(t.TempDir(), "nested", "view.json")}
-	kept := View{Zoom: 5, Yaw: -0.375}
+	kept := View{Zoom: 5, Yaw: -0.375, Style: "dither"}
 	if err := file.Save(kept); err != nil {
 		t.Fatal(err)
 	}

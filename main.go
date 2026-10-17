@@ -26,13 +26,13 @@ func main() {
 	mute := flag.Bool("mute", false, "disable the soundtrack and sound effects")
 	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
 	savePath := flag.String("save", "", "file keeping progress between sessions (default in the user config folder)")
-	style := flag.String("style", "dither", "how the world is drawn: dither (braille dots) or pixel (pixel art)")
+	style := flag.String("style", "", "how the world is drawn: pixel (pixel art) or dither (braille dots); V switches while playing (default the last one used, or pixel)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: lapresregne [--seed number] [--map file] [--mute] [--save file] [--style dither|pixel]\n\nWalk through an endless dithered forest, or a hand-made map.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Click                 walk to the ground clicked, to a tree to chop it, to a door to open or close it, or to stairs to climb them\n  E                     act on a tree, door, staircase or ladder within reach (1 or 2 picks the action)\n  Tab                   show or hide the inventory\n  [ / ]                 highlight the previous / next inventory slot (or click one)\n  X                     drop the highlighted log, or the first one (deposit it while the bank is open)\n  B                     open or close the bank, and click an inventory slot to deposit its item or a bank stack to withdraw one\n  Shift-[ / Shift-]     highlight the previous / next bank stack (opens the bank)\n  Shift-X               withdraw one item from the highlighted bank stack, or the first one\n  Right-click           with the bank open, deposit or withdraw one or all of an item (1 or 2 picks)\n  Wheel                 zoom, or scroll the bank while the pointer is over it\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: lapresregne [--seed number] [--map file] [--mute] [--save file] [--style pixel|dither]\n\nWalk through an endless dithered forest, or a hand-made map.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Click                 walk to the ground clicked, to a tree to chop it, to a door to open or close it, or to stairs to climb them\n  E                     act on a tree, door, staircase or ladder within reach (1 or 2 picks the action)\n  Tab                   show or hide the inventory\n  [ / ]                 highlight the previous / next inventory slot (or click one)\n  X                     drop the highlighted log, or the first one (deposit it while the bank is open)\n  B                     open or close the bank, and click an inventory slot to deposit its item or a bank stack to withdraw one\n  Shift-[ / Shift-]     highlight the previous / next bank stack (opens the bank)\n  Shift-X               withdraw one item from the highlighted bank stack, or the first one\n  Right-click           with the bank open, deposit or withdraw one or all of an item (1 or 2 picks)\n  Wheel                 zoom, or scroll the bank while the pointer is over it\n  V                     switch between pixel art and dithered braille\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	if flag.NArg() != 0 || *style != "dither" && *style != "pixel" {
+	if flag.NArg() != 0 || *style != "" && *style != "pixel" && *style != "dither" {
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -107,12 +107,12 @@ func run(seed uint64, mapPath string, mute bool, musicDir, savePath, styleName s
 		}
 	}
 	camera := terminal.NewCamera(view.Zoom, view.Yaw)
-	var style terminal.Style = terminal.Dithered{}
-	if styleName == "pixel" {
-		style = terminal.PixelArt{}
+	if styleName == "" {
+		styleName = view.Style
 	}
+	looks := terminal.NewLooks(styleName, terminal.PixelArt{}, terminal.Dithered{})
 	// Progress and the view are kept however the session ends, even when it ends with an error.
-	played := session.Run(forest, camera, style, music, appTitle)
-	kept := views.Save(viewfile.View{Zoom: camera.Zoom(), Yaw: camera.Yaw()})
+	played := session.Run(forest, camera, looks, music, appTitle)
+	kept := views.Save(viewfile.View{Zoom: camera.Zoom(), Yaw: camera.Yaw(), Style: looks.Name()})
 	return errors.Join(played, forest.Keep(progress, time.Now()), kept)
 }

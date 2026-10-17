@@ -3,12 +3,42 @@ package terminal
 // Style turns the canvas pixels under one terminal cell into the cell drawn there, so the same
 // forest can be drawn in different looks.
 type Style interface {
+	// Name is what the style is called on the command line and in the kept view.
+	Name() string
 	cell(c *forestCanvas, palette [][3]int, col, row int) forestCell
 }
+
+// Looks are the styles V switches between, and the one the world is drawn in now.
+type Looks struct {
+	styles  []Style
+	current int
+}
+
+// NewLooks opens on the style with a name, as kept from an earlier session, or on the first style
+// when none has that name.
+func NewLooks(name string, styles ...Style) *Looks {
+	l := &Looks{styles: styles}
+	for i, style := range styles {
+		if style.Name() == name {
+			l.current = i
+		}
+	}
+	return l
+}
+
+// Name is the name of the style the world is drawn in now.
+func (l *Looks) Name() string { return l.style().Name() }
+
+func (l *Looks) style() Style { return l.styles[l.current] }
+
+// next switches to the following style, and from the last back to the first.
+func (l *Looks) next() { l.current = (l.current + 1) % len(l.styles) }
 
 // Dithered draws the scenery as braille dots in an ordered dither over a faint material paper, and
 // the hero in solid quadrants.
 type Dithered struct{}
+
+func (Dithered) Name() string { return "dither" }
 
 func (Dithered) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 	bits, ink := 0, 0
@@ -83,6 +113,8 @@ func (Dithered) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell
 // PixelArt draws the forest as square pixels of flat color, two to a cell: the upper half block
 // in one, the paper under it in the other.
 type PixelArt struct{}
+
+func (PixelArt) Name() string { return "pixel" }
 
 // pixelShades is how many flat shades of each material pixel art shows.
 const pixelShades = 6

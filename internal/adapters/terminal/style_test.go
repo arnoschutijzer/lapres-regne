@@ -64,3 +64,31 @@ func TestDitheredFramesDrawBraille(t *testing.T) {
 		t.Error("a dithered frame draws no braille dots")
 	}
 }
+
+func TestLooksStartOnTheNamedStyle(t *testing.T) {
+	looks := NewLooks("dither", PixelArt{}, Dithered{})
+	if looks.Name() != "dither" {
+		t.Fatalf("looks open on %q; want the named dither", looks.Name())
+	}
+	if _, ok := looks.style().(Dithered); !ok {
+		t.Fatalf("looks draw in %T; want Dithered", looks.style())
+	}
+}
+
+func TestLooksStartOnTheFirstStyleForAnUnknownName(t *testing.T) {
+	if looks := NewLooks("", PixelArt{}, Dithered{}); looks.Name() != "pixel" {
+		t.Fatalf("looks open on %q; want the first style, pixel", looks.Name())
+	}
+}
+
+func TestLooksCycleThroughEveryStyle(t *testing.T) {
+	looks := NewLooks("pixel", PixelArt{}, Dithered{})
+	looks.next()
+	if looks.Name() != "dither" {
+		t.Fatalf("after one switch looks show %q; want dither", looks.Name())
+	}
+	looks.next()
+	if looks.Name() != "pixel" {
+		t.Fatalf("after two switches looks show %q; want pixel again", looks.Name())
+	}
+}

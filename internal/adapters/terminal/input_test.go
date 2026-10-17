@@ -137,3 +137,10 @@ func TestTheWheelScrollingSidewaysTurnsTheCamera(t *testing.T) {
 		t.Fatalf("event = %+v, want scrolling right to turn the camera on", toRight)
 	}
 }
+
+func TestVSwitchesTheStyle(t *testing.T) {
+	var d keyDecoder
+	if event := d.feed('v'); event.action != nextStyle {
+		t.Fatalf("event = %+v, want V to switch the style", event)
+	}
+}

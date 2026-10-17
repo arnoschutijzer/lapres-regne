@@ -27,6 +27,7 @@ const (
 	previousStack
 	nextStack
 	withdrawStack
+	nextStyle
 )
 
 type keyEvent struct {
@@ -113,6 +114,8 @@ func keyAction(key int) action {
 		return previousStack
 	case '}':
 		return nextStack
+	case 'v', 'V':
+		return nextStyle
 	}
 	return none
 }
