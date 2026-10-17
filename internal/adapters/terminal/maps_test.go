@@ -528,6 +528,8 @@ func TestEachFixtureShowsItsTellingColour(t *testing.T) {
 		{world.Scarecrow, []int{burlapInk, redClothInk}},
 		{world.Crop, []int{leafInk, shadedLeafInk}},
 		{world.Anvil, []int{ironInk}},
+		{world.Counter, []int{plankInk}},
+		{world.Bed, []int{redClothInk}},
 	} {
 		r := newRenderer(hall(fixture.kind), "L’Après-Règne")
 		r.zoom = zoom{current: 6}

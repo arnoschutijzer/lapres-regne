@@ -102,6 +102,10 @@ func drawFixture(c *forestCanvas, x, z float64, tile builtTile, variety float64)
 		drawCrop(c, x, z, variety)
 	case world.Anvil:
 		drawAnvil(p)
+	case world.Counter:
+		drawCounter(p)
+	case world.Bed:
+		drawBed(c, x, z, tile.alike)
 	}
 }
 
@@ -602,4 +606,32 @@ func drawAnvil(p placer) {
 	p.box(0.82, 0.8, 1.18, 1.2, 0.45, 0.62, ironInk, plain)
 	p.box(0.55, 0.78, 1.45, 1.22, 0.62, 0.82, ironInk, plain)
 	p.box(1.45, 0.88, 1.65, 1.12, 0.7, 0.8, ironInk, plain)
+}
+
+// drawCounter builds a shop's wooden counter, running on along the shop.
+func drawCounter(p placer) {
+	u0, u1 := p.across(0.1)
+	p.box(u0, 0.55, u1, 1.35, 0, 0.92, plankInk, planks)
+	p.box(u0, 0.5, u1, 1.45, 0.92, 1.02, plankInk, plain)
+}
+
+// drawBed makes up a wooden bed under a red blanket, a pillow at its head: the north end of a
+// bed running north to south, the west end of one running east to west.
+func drawBed(c *forestCanvas, x, z float64, alike [4]bool) {
+	x0, z0, x1, z1 := footprint(x, z, 0.2, alike)
+	c.box(x0, z0, x1, z1, 0, 0.4, [4]bool{}, plankInk, planks)
+	c.box(x0+0.05, z0+0.05, x1-0.05, z1-0.05, 0.4, 0.52, [4]bool{}, whiteClothInk, plain)
+	alongX := (alike[1] || alike[3]) && !alike[0] && !alike[2]
+	head := !alike[0] && !alongX || alongX && !alike[3]
+	blanketX0, blanketZ0 := x0, z0
+	if head && alongX {
+		c.box(x0, z0, x0+0.1, z1, 0.4, 1.0, [4]bool{}, plankInk, planks)
+		c.box(x0+0.2, z0+0.2, x0+0.65, z1-0.2, 0.52, 0.64, [4]bool{}, whiteClothInk, plain)
+		blanketX0 = x0 + 0.75
+	} else if head {
+		c.box(x0, z0, x1, z0+0.1, 0.4, 1.0, [4]bool{}, plankInk, planks)
+		c.box(x0+0.2, z0+0.2, x1-0.2, z0+0.65, 0.52, 0.64, [4]bool{}, whiteClothInk, plain)
+		blanketZ0 = z0 + 0.75
+	}
+	c.box(blanketX0, blanketZ0, x1, z1, 0.4, 0.58, alike, redClothInk, plain)
 }

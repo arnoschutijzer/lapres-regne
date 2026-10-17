@@ -143,6 +143,7 @@ objects
 | `n`    | signpost | `C`   | cart    |
 | `g`    | trough  | `y`    | scarecrow |
 | `v`    | crops   | `N`    | anvil   |
+| `K`    | counter | `b`    | bed     |
 
 A fountain, well or haystack filling a square of four tiles stands as one
 where they meet.

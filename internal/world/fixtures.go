@@ -42,6 +42,9 @@ const (
 	// Crop is a farm's vegetables growing in a row, low enough to walk among.
 	Crop
 	Anvil
+	// Counter is a shop's counter.
+	Counter
+	Bed
 )
 
 // PlacedFixture is a fixture standing on a tile of a map.
