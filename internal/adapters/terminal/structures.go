@@ -227,6 +227,9 @@ type builtTile struct {
 	// besideFurnished marks one.
 	besideFixture   [4]world.Fixture
 	besideFurnished [4]bool
+	// solid marks a tile where a structure stands, on it or along its sides, and near marks one
+	// with a solid tile around it or on it, close enough to cast a shadow on it.
+	solid, near bool
 }
 
 // windowed tells whether a wall tile is a straight stretch of a building's wall, with a floor
@@ -301,7 +304,36 @@ func (a *builtArea) survey(f *world.World, storey int, left, right, back, front 
 			sideways, upright := a.at(col+step[0], row).ground, a.at(col, row+step[1]).ground
 			tile.diagonal[corner] = alike(tile.ground, across) && !alike(tile.ground, sideways) && !alike(tile.ground, upright)
 		}
+		tile.solid = standsOn(*tile)
 	}
+	// A structure's shadow reaches no farther than the tiles beside it: the sun throws the top of a
+	// wall less than a tile east and south.
+	for i := range a.tiles {
+		col, row := a.col+i%a.cols, a.row+i/a.cols
+		for stepRow := -1; stepRow <= 1 && !a.tiles[i].near; stepRow++ {
+			for stepCol := -1; stepCol <= 1; stepCol++ {
+				if a.at(col+stepCol, row+stepRow).solid {
+					a.tiles[i].near = true
+					break
+				}
+			}
+		}
+	}
+}
+
+// standsOn tells whether a structure fills any of a tile: a wall, door, fence, gate or grave on it,
+// or a wall along one of its sides or across it.
+func standsOn(tile builtTile) bool {
+	switch tile.ground {
+	case world.Wall, world.Battlement, world.Door, world.Fence, world.Gate, world.Grave:
+		return true
+	}
+	for _, side := range tile.sides {
+		if isWall(side) {
+			return true
+		}
+	}
+	return isWall(tile.edges.Rising) || isWall(tile.edges.Falling)
 }
 
 // cover marks the tiles under any of the floors surveyed above, which hide whatever stands on them.
@@ -469,7 +501,9 @@ const sunX, sunZ = 0.55, 0.3
 // shade darkens the ground at x, z lying in a structure's shadow, and a little at the foot of
 // one, where little sky reaches.
 func (a *builtArea) shade(x, z float64) float64 {
-	for height := 0.1; height <= wallHeight+copingHeight; height += 0.2 {
+	col, row, _, _ := tileAt(x, z)
+	near := a.at(col, row).near
+	for height := 0.1; near && height <= wallHeight+copingHeight; height += 0.2 {
 		if a.occupied(x-sunX*height, height, z-sunZ*height) {
 			return castShadow
 		}
@@ -488,7 +522,7 @@ func (a *builtArea) shade(x, z float64) float64 {
 	}
 	shade := 1.0
 	for _, step := range [4][2]float64{{0.3, 0}, {-0.3, 0}, {0, 0.3}, {0, -0.3}} {
-		if a.occupied(x+step[0], 0.2, z+step[1]) {
+		if near && a.occupied(x+step[0], 0.2, z+step[1]) {
 			shade -= 0.15
 		}
 	}
