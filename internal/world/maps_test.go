@@ -462,3 +462,13 @@ func TestWalkingToAPointBeyondAFixtureGoesAroundIt(t *testing.T) {
 		t.Fatalf("position = %v, %v; want the hero round the table at 7, 3", x, z)
 	}
 }
+
+func TestCropsLetTheHeroWalkAmongThem(t *testing.T) {
+	m := courtyard()
+	m.Fixtures = []world.PlacedFixture{{Col: 3, Row: 1, Kind: world.Crop}}
+	w := world.NewOnMap(7, m)
+	w.Advance(1, 0, 2*time.Second, false)
+	if x, _ := w.Hero().Position(); x < 3*world.TileSize {
+		t.Fatalf("x = %v; want the hero walked among the crops to the east", x)
+	}
+}

@@ -18,6 +18,13 @@ const (
 	burlapInk
 )
 
+// The inks of water and leaves, shared with the river and the trees.
+const (
+	waterInk      = 5
+	shadedLeafInk = 2
+	leafInk       = 3
+)
+
 // furnishing tells whether an ink belongs to furniture, which stands out among the floor around it
 // as walls do.
 func furnishing(ink int) bool {
@@ -77,6 +84,24 @@ func drawFixture(c *forestCanvas, x, z float64, tile builtTile, variety float64)
 		drawOrgan(p, variety)
 	case world.Coffin:
 		drawCoffin(p)
+	case world.Fountain, world.Well, world.Haystack:
+		if middleX, middleZ, size, ok := gathered(x, z, tile.alike); ok {
+			drawRound(c, tile.fixture, middleX, middleZ, size)
+		}
+	case world.Statue:
+		drawStatue(p)
+	case world.Signpost:
+		drawSignpost(p)
+	case world.Cart:
+		drawCart(p)
+	case world.Trough:
+		drawTrough(p)
+	case world.Scarecrow:
+		drawScarecrow(p)
+	case world.Crop:
+		drawCrop(c, x, z, variety)
+	case world.Anvil:
+		drawAnvil(p)
 	}
 }
 
@@ -444,4 +469,137 @@ func keys(u, v float64, at vec) (float64, int) {
 func drawCoffin(p placer) {
 	p.box(0.55, 0.25, 1.45, 1.75, 0, 0.5, plankInk, planks)
 	p.box(0.6, 0.3, 1.4, 1.7, 0.5, 0.6, plankInk, plain)
+}
+
+// gathered finds the middle of a round fixture and how many tiles it spans: alone it stands in the
+// middle of its tile; four of a kind in a square stand as one where their tiles meet, drawn by the
+// north-west tile and by no other.
+func gathered(x, z float64, alike [4]bool) (middleX, middleZ, size float64, ok bool) {
+	north, east, south, west := alike[0], alike[1], alike[2], alike[3]
+	switch {
+	case !north && !east && !south && !west:
+		return x + world.TileSize/2, z + world.TileSize/2, 1, true
+	case east && south && !north && !west:
+		return x + world.TileSize, z + world.TileSize, 2, true
+	}
+	return 0, 0, 0, false
+}
+
+// drawRound draws a fountain, a well or a haystack a number of tiles across, round about its middle.
+func drawRound(c *forestCanvas, kind world.Fixture, x, z, size float64) {
+	switch kind {
+	case world.Fountain:
+		// A low stone basin brimming with water, a pedestal in its middle lifting a bowl.
+		radius := 0.85 * size
+		c.drum(x, z, radius, 0, 0.55, stoneInk, stonework)
+		c.drum(x, z, radius-0.18, 0.55, 0.57, waterInk, ripples)
+		c.drum(x, z, 0.12+0.12*size, 0.57, 1.3, stoneInk, plain)
+		c.drum(x, z, 0.25+0.2*size, 1.3, 1.45, stoneInk, plain)
+		c.drum(x, z, 0.15+0.18*size, 1.45, 1.47, waterInk, ripples)
+	case world.Well:
+		// A stone ring round dark water, its winch on two posts under a little roof.
+		radius := 0.55 + 0.25*size
+		c.drum(x, z, radius, 0, 0.75, stoneInk, stonework)
+		c.drum(x, z, radius-0.15, 0.75, 0.77, shadedSlateInk, plain)
+		post := c.thin(0.07)
+		for _, side := range []float64{-1, 1} {
+			c.box(x+side*radius-post, z-post, x+side*radius+post, z+post, 0.75, 2.0, [4]bool{}, plankInk, plain)
+		}
+		c.box(x-radius, z-0.05, x+radius, z+0.05, 1.45, 1.53, [4]bool{}, plankInk, plain)
+		c.box(x-radius-0.15, z-0.45, x+radius+0.15, z+0.45, 2.0, 2.12, [4]bool{}, slateInk, plain)
+	case world.Haystack:
+		// Hay heaped in a mound, each layer drawn in a little from the last.
+		radius := 0.75 * size
+		for layer, height := range []float64{0.7, 1.25, 1.65, 1.85} {
+			from := 0.0
+			if layer > 0 {
+				from = []float64{0.7, 1.25, 1.65}[layer-1]
+			}
+			c.drum(x, z, radius*(1-0.24*float64(layer)), from, height, thatchInk, thatch)
+		}
+	}
+}
+
+// ripples glints across water in a fountain's basin.
+func ripples(u, v float64, at vec) (float64, int) {
+	if wave(at.x*3.1+at.z*1.7) > 0.8 {
+		return 1.3, keepInk
+	}
+	return 0.85, keepInk
+}
+
+// drawStatue raises a stone figure on its plinth, one arm lifted.
+func drawStatue(p placer) {
+	p.box(0.45, 0.45, 1.55, 1.55, 0, 0.6, stoneInk, stonework)
+	p.box(0.78, 0.82, 1.22, 1.18, 0.6, 1.55, stoneInk, plain)
+	p.box(0.72, 0.8, 1.28, 1.2, 1.55, 2.05, stoneInk, plain)
+	p.box(0.88, 0.88, 1.12, 1.12, 2.05, 2.35, stoneInk, plain)
+	p.box(1.28, 0.9, 1.4, 1.1, 1.7, 2.6, stoneInk, plain)
+	p.box(0.6, 0.9, 0.72, 1.1, 1.3, 2.0, stoneInk, plain)
+}
+
+// drawSignpost raises a wooden post with arms pointing off two ways.
+func drawSignpost(p placer) {
+	p.post(1, 1, 0.12, 0, 2.1, plankInk)
+	p.box(0.35, 0.95, 1.6, 1.05, 1.65, 1.85, plankInk, planks)
+	p.box(0.95, 0.4, 1.05, 1.65, 1.35, 1.55, plankInk, planks)
+}
+
+// drawCart stands a wooden cart on two wheels, its shafts resting on the ground.
+func drawCart(p placer) {
+	p.box(0.35, 0.3, 1.65, 1.5, 0.55, 0.65, plankInk, planks)
+	p.box(0.35, 0.3, 1.65, 0.38, 0.65, 1.0, plankInk, planks)
+	p.box(0.35, 0.3, 0.43, 1.5, 0.65, 1.0, plankInk, plain)
+	p.box(1.57, 0.3, 1.65, 1.5, 0.65, 1.0, plankInk, plain)
+	for _, u := range []float64{0.25, 1.7} {
+		p.box(u, 0.6, u+0.07, 1.25, 0, 0.65, plankInk, spokes)
+	}
+	p.box(0.75, 1.5, 0.82, 1.95, 0.05, 0.55, plankInk, plain)
+	p.box(1.18, 1.5, 1.25, 1.95, 0.05, 0.55, plankInk, plain)
+}
+
+// spokes darkens a cart wheel between its rim and hub.
+func spokes(u, v float64, at vec) (float64, int) {
+	if u > 0.1 && u < 0.55 && v > 0.1 && v < 0.55 && math.Abs(u-v) > 0.06 && math.Abs(u+v-0.65) > 0.06 {
+		return 0.35, keepInk
+	}
+	return 1, keepInk
+}
+
+// drawTrough sets a wooden trough of water along a tile, running on into the next.
+func drawTrough(p placer) {
+	u0, u1 := p.across(0.2)
+	p.box(u0, 0.6, u1, 1.4, 0, 0.55, plankInk, planks)
+	p.box(u0+0.08, 0.68, u1-0.08, 1.32, 0.55, 0.56, waterInk, ripples)
+}
+
+// drawScarecrow stands a scarecrow on its pole: a sacking head and a red shirt stuffed with straw.
+func drawScarecrow(p placer) {
+	p.post(1, 1, 0.1, 0, 1.9, plankInk)
+	p.box(0.4, 0.95, 1.6, 1.05, 1.5, 1.6, plankInk, plain)
+	p.box(0.72, 0.85, 1.28, 1.15, 1.0, 1.65, redClothInk, plain)
+	p.box(0.42, 0.88, 0.72, 1.12, 1.42, 1.62, redClothInk, plain)
+	p.box(1.28, 0.88, 1.58, 1.12, 1.42, 1.62, redClothInk, plain)
+	p.box(0.84, 0.86, 1.16, 1.14, 1.65, 1.98, burlapInk, plain)
+	p.box(0.74, 0.76, 1.26, 1.24, 1.98, 2.04, thatchInk, plain)
+}
+
+// drawCrop grows a farm's vegetables in a row of leafy clumps, set out by variety.
+func drawCrop(c *forestCanvas, x, z, variety float64) {
+	leaf := c.thin(0.12)
+	for i := range 4 {
+		u := 0.3 + 0.45*float64(i%2) + 0.25*variety
+		v := 0.35 + 0.45*float64(i/2) + 0.2*math.Mod(variety*7, 1)
+		height := 0.28 + 0.12*math.Mod(variety*13+float64(i), 1)
+		c.box(x+u-leaf*1.6, z+v-leaf, x+u+leaf*1.6, z+v+leaf, 0, height*0.6, [4]bool{}, shadedLeafInk, plain)
+		c.box(x+u-leaf, z+v-leaf*1.4, x+u+leaf, z+v+leaf*1.4, height*0.6, height, [4]bool{}, leafInk, plain)
+	}
+}
+
+// drawAnvil sets an iron anvil on a wooden block.
+func drawAnvil(p placer) {
+	p.box(0.7, 0.7, 1.3, 1.3, 0, 0.45, plankInk, plain)
+	p.box(0.82, 0.8, 1.18, 1.2, 0.45, 0.62, ironInk, plain)
+	p.box(0.55, 0.78, 1.45, 1.22, 0.62, 0.82, ironInk, plain)
+	p.box(1.45, 0.88, 1.65, 1.12, 0.7, 0.8, ironInk, plain)
 }

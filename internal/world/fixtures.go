@@ -30,6 +30,18 @@ const (
 	// Organ is a church organ.
 	Organ
 	Coffin
+	Fountain
+	Statue
+	Well
+	Haystack
+	// Signpost is a signpost or a noticeboard.
+	Signpost
+	Cart
+	Trough
+	Scarecrow
+	// Crop is a farm's vegetables growing in a row, low enough to walk among.
+	Crop
+	Anvil
 )
 
 // PlacedFixture is a fixture standing on a tile of a map.
@@ -38,9 +50,9 @@ type PlacedFixture struct {
 	Kind     Fixture
 }
 
-// Blocks tells whether the fixture keeps the hero off its tile.
+// Blocks tells whether the fixture keeps the hero off its tile: everything does but crops.
 func (f Fixture) Blocks() bool {
-	return true
+	return f != Crop
 }
 
 // FixtureAt is the fixture standing on the tile at a world position, or false where none stands

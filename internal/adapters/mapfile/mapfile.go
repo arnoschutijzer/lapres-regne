@@ -38,7 +38,7 @@
 //	00122
 //
 // An objects grid, laid over the terrain, stands furniture and landmarks on its tiles, each blocking
-// the way, with . for none:
+// the way but crops, with . for none:
 //
 //	t  table            c  chair
 //	T  throne           a  suit of armour
@@ -49,6 +49,11 @@
 //	l  candles          f  standard
 //	A  altar            p  pew
 //	O  organ            k  coffin
+//	F  fountain         u  statue
+//	w  well             h  haystack
+//	n  signpost         C  cart
+//	g  trough           y  scarecrow
+//	v  crops            N  anvil
 //
 //	objects
 //	..t..
@@ -97,6 +102,8 @@ var fixtures = map[rune]world.Fixture{
 	'o': world.Barrel, 'x': world.Crate, 'q': world.Sacks, 's': world.Shelves, 'S': world.Staircase,
 	'L': world.Ladder, 'i': world.Torch, 'l': world.Candles, 'f': world.Standard,
 	'A': world.Altar, 'p': world.Pew, 'O': world.Organ, 'k': world.Coffin,
+	'F': world.Fountain, 'u': world.Statue, 'w': world.Well, 'h': world.Haystack, 'n': world.Signpost,
+	'C': world.Cart, 'g': world.Trough, 'y': world.Scarecrow, 'v': world.Crop, 'N': world.Anvil,
 }
 
 // Load reads the map in the file at path. A map without a name is named after its file.

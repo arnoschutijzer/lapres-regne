@@ -518,6 +518,16 @@ func TestEachFixtureShowsItsTellingColour(t *testing.T) {
 		{world.Pew, []int{plankInk}},
 		{world.Organ, []int{ironInk}},
 		{world.Coffin, []int{plankInk}},
+		{world.Fountain, []int{waterInk}},
+		{world.Statue, []int{stoneInk, shadedStoneInk}},
+		{world.Well, []int{stoneInk, shadedStoneInk}},
+		{world.Haystack, []int{thatchInk, shadedThatchInk}},
+		{world.Signpost, []int{plankInk}},
+		{world.Cart, []int{plankInk}},
+		{world.Trough, []int{waterInk}},
+		{world.Scarecrow, []int{burlapInk, redClothInk}},
+		{world.Crop, []int{leafInk, shadedLeafInk}},
+		{world.Anvil, []int{ironInk}},
 	} {
 		r := newRenderer(hall(fixture.kind), "L’Après-Règne")
 		r.zoom = zoom{current: 6}
@@ -537,5 +547,33 @@ func TestAPewFacesAlongTheChurchAcrossItsRow(t *testing.T) {
 	r.render(100, 27, 0)
 	if back := backOf(r.built.at(1, 0)); back != 0 {
 		t.Fatalf("pew beside the west wall backs onto side %d, want north, facing along the nave", back)
+	}
+}
+
+func TestAFountainOfFourTilesRisesOnceFromTheirMiddle(t *testing.T) {
+	ground := make([][]world.Ground, 30)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 40)
+	}
+	var fountain []world.PlacedFixture
+	for _, tile := range [4][2]int{{20, 12}, {21, 12}, {20, 13}, {21, 13}} {
+		fountain = append(fountain, world.PlacedFixture{Col: tile[0], Row: tile[1], Kind: world.Fountain})
+	}
+	w := world.NewOnMap(7, world.Map{Name: "Courtyard", Ground: ground, StartCol: 20, StartRow: 16, Fixtures: fountain})
+	r := newRenderer(w, "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	c := r.render(160, 90, 0)
+	// The pedestal stands where the four tiles meet, its front showing below the bowl it lifts.
+	x, y, _ := c.project(21*world.TileSize, 0.7, 13*world.TileSize+0.3)
+	stone := 0
+	for dy := -2; dy <= 2; dy++ {
+		for dx := -2; dx <= 2; dx++ {
+			if ink := c.pixels[(int(y)+dy)*c.width+int(x)+dx].ink; ink == stoneInk || ink == shadedStoneInk {
+				stone++
+			}
+		}
+	}
+	if stone < 10 {
+		t.Fatalf("stone pixels where the four tiles meet = %d of 25, want the fountain's pedestal", stone)
 	}
 }

@@ -191,6 +191,8 @@ func TestEachObjectLetterStandsForItsFixture(t *testing.T) {
 		"o": world.Barrel, "x": world.Crate, "q": world.Sacks, "s": world.Shelves, "S": world.Staircase,
 		"L": world.Ladder, "i": world.Torch, "l": world.Candles, "f": world.Standard,
 		"A": world.Altar, "p": world.Pew, "O": world.Organ, "k": world.Coffin,
+		"F": world.Fountain, "u": world.Statue, "w": world.Well, "h": world.Haystack, "n": world.Signpost,
+		"C": world.Cart, "g": world.Trough, "y": world.Scarecrow, "v": world.Crop, "N": world.Anvil,
 	} {
 		loaded, err := Load(write(t, "room.map", "terrain\n@.\n\nobjects\n."+letter+"\n"))
 		if err != nil {
