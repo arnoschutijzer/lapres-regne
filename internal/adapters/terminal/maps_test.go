@@ -788,3 +788,37 @@ func TestStepsAreDrawnInStone(t *testing.T) {
 		t.Fatalf("%d of 25 pixels of stone on the steps, want them drawn in stone", found)
 	}
 }
+
+func TestTheHeroIsJudgedHiddenAfreshOnceTheyStepBehindABuilding(t *testing.T) {
+	w := cottage()
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
+	r.zoom = zoom{current: 3}
+	if r.heroHidden(r.render(160, 60, 0)) {
+		t.Fatal("the hero in the open must not be judged hidden")
+	}
+	w.WalkTo(81, 43)
+	for range 400 {
+		w.Advance(0, 0, 50*time.Millisecond, false)
+	}
+	if !r.heroHidden(r.render(160, 60, 0)) {
+		t.Fatal("the hero behind the cottage must be judged hidden once they step there")
+	}
+}
+
+func TestAShutDoorLeavesTheJudgmentOfTheHeroHiddenAsCast(t *testing.T) {
+	w := edgedLodge(world.Wall)
+	// Inside the lodge, just behind its door.
+	w.WalkTo(41, 27.4)
+	for range 80 {
+		w.Advance(0, 0, 50*time.Millisecond, false)
+	}
+	r, c := closeView(w)
+	r.heroHidden(c)
+	if !w.ToggleDoor() {
+		t.Fatal("the door in reach must swing shut")
+	}
+	c = r.render(160, 90, 0)
+	if kept, cast := r.heroHidden(c), r.castHidden(c); kept != cast {
+		t.Fatalf("hidden = %v after the door shut, but the rays cast afresh say %v", kept, cast)
+	}
+}

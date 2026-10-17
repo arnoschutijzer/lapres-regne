@@ -58,6 +58,9 @@ type renderer struct {
 	// revealing marks that a frame has set it, so the first frame shows it settled.
 	revealed  float64
 	revealing bool
+	// hiddenFrom is what the hero was last judged hidden or not from, and hidden the judgment.
+	hiddenFrom hidingView
+	hidden     bool
 }
 
 // newRenderer opens the view on the hero at the camera's zoom and yaw, so a resumed session starts
@@ -904,10 +907,35 @@ func (r *renderer) reveal(c *forestCanvas, seconds float64) {
 	c.clearing.up *= r.revealed
 }
 
+// hidingView is everything that decides whether the structures hide the hero: where they stand,
+// how the view looks on them and which part of the map is surveyed. A map's structures never
+// move, and a door hides the hero no more shut than open, so nothing else changes the judgment.
+type hidingView struct {
+	judged                        bool
+	x, z, yawSin, yawCos, highest float64
+	storey, floors, roofs         int
+	col, row, cols, rows          int
+}
+
 // heroHidden tells whether the walls, doors, fences, roofs and floors above hide most of the hero
-// from the viewer, judged by rays cast toward the viewer from points across the hero's body.
-// Furniture and models never count: the hero is not shown through them.
+// from the viewer. The rays are cast afresh only once the hero, the view or the surveyed part of
+// the map changes.
 func (r *renderer) heroHidden(c *forestCanvas) bool {
+	x, z := r.world.Hero().Position()
+	view := hidingView{
+		judged: true, x: x, z: z, yawSin: c.yawSin, yawCos: c.yawCos, highest: c.highest,
+		storey: r.world.Storey(), floors: len(r.upstairs), roofs: len(r.built.roofs),
+		col: r.built.col, row: r.built.row, cols: r.built.cols, rows: r.built.rows,
+	}
+	if view != r.hiddenFrom {
+		r.hiddenFrom, r.hidden = view, r.castHidden(c)
+	}
+	return r.hidden
+}
+
+// castHidden judges whether the hero is hidden by rays cast toward the viewer from points across
+// the hero's body. Furniture and models never count: the hero is not shown through them.
+func (r *renderer) castHidden(c *forestCanvas) bool {
 	f := r.world
 	x, z := f.Hero().Position()
 	base := f.ElevationOn(f.Storey(), x, z)
