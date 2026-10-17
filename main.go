@@ -14,6 +14,7 @@ import (
 	"lapresregne/internal/adapters/speaker"
 	"lapresregne/internal/adapters/terminal"
 	"lapresregne/internal/adapters/viewfile"
+	"lapresregne/internal/adapters/window"
 	"lapresregne/internal/soundtrack"
 	"lapresregne/internal/world"
 )
@@ -26,9 +27,10 @@ func main() {
 	mute := flag.Bool("mute", false, "disable the soundtrack and sound effects")
 	musicDir := flag.String("music-dir", "music", "folder containing music (missing or empty means no soundtrack)")
 	savePath := flag.String("save", "", "file keeping progress between sessions (default in the user config folder)")
-	style := flag.String("style", "", "how the world is drawn: pixel (pixel art) or dither (braille dots); V switches while playing (default the last one used, or pixel)")
+	inTerminal := flag.Bool("terminal", false, "explore in the terminal instead of a window")
+	style := flag.String("style", "", "how the terminal draws the world: pixel (pixel art) or dither (braille dots); V switches while playing (default the last one used, or pixel)")
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: lapresregne [--seed number] [--map file] [--mute] [--save file] [--style pixel|dither]\n\nWalk through an endless dithered forest, or a hand-made map.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Click                 walk to the ground clicked, to a tree to chop it, to a door to open or close it, or to stairs to climb them\n  E                     act on a tree, door, staircase or ladder within reach (1 or 2 picks the action)\n  Tab                   show or hide the inventory\n  [ / ]                 highlight the previous / next inventory slot (or click one)\n  X                     drop the highlighted log, or the first one (deposit it while the bank is open)\n  B                     open or close the bank, and click an inventory slot to deposit its item or a bank stack to withdraw one\n  Shift-[ / Shift-]     highlight the previous / next bank stack (opens the bank)\n  Shift-X               withdraw one item from the highlighted bank stack, or the first one\n  Right-click           with the bank open, deposit or withdraw one or all of an item (1 or 2 picks)\n  Wheel                 zoom, or scroll the bank while the pointer is over it\n  V                     switch between pixel art and dithered braille\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
+		fmt.Fprintln(flag.CommandLine.Output(), appTitle+"\n\nUsage: lapresregne [--seed number] [--map file] [--mute] [--save file] [--terminal [--style pixel|dither]]\n\nWalk through an endless forest, or a hand-made map, in a window or in the terminal.\n\n  Arrows / WASD / IJKL   walk (I up, J left, K down, L right)\n  Shift                 run at twice the walking speed\n  Click                 walk to the ground clicked, to a tree to chop it, to a door to open or close it, or to stairs to climb them\n  E                     act on a tree, door, staircase or ladder within reach (1 or 2 picks the action)\n  Tab                   show or hide the inventory\n  [ / ]                 highlight the previous / next inventory slot (or click one)\n  X                     drop the highlighted log, or the first one (deposit it while the bank is open)\n  B                     open or close the bank, and click an inventory slot to deposit its item or a bank stack to withdraw one\n  Shift-[ / Shift-]     highlight the previous / next bank stack (opens the bank)\n  Shift-X               withdraw one item from the highlighted bank stack, or the first one\n  Right-click           with the bank open, deposit or withdraw one or all of an item (1 or 2 picks)\n  Wheel                 zoom, or scroll the bank while the pointer is over it\n  V                     in the terminal, switch between pixel art and dithered braille\n  N / P                 next / previous music track\n  Q / Ctrl-C            quit")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -44,7 +46,7 @@ func main() {
 		}
 		*savePath = filepath.Join(config, "lapresregne", "progress.json")
 	}
-	if err := run(*seed, *mapPath, *mute, *musicDir, *savePath, *style); err != nil {
+	if err := run(*seed, *mapPath, *mute, *musicDir, *savePath, *style, *inTerminal); err != nil {
 		fmt.Fprintln(os.Stderr, "lapresregne:", err)
 		os.Exit(1)
 	}
@@ -63,7 +65,7 @@ func startMusic(device *speaker.Device, directory string) (*speaker.Playback, er
 }
 
 // run is the composition root: it builds every adapter and wires it to the domain.
-func run(seed uint64, mapPath string, mute bool, musicDir, savePath, styleName string) error {
+func run(seed uint64, mapPath string, mute bool, musicDir, savePath, styleName string, inTerminal bool) error {
 	progress := progressfile.File{Path: savePath}
 	// The view is kept beside the progress, in a file of its own.
 	views := viewfile.File{Path: filepath.Join(filepath.Dir(savePath), "view.json")}
@@ -84,11 +86,14 @@ func run(seed uint64, mapPath string, mute bool, musicDir, savePath, styleName s
 	if err != nil {
 		return fmt.Errorf("%w (move or remove %s to start afresh)", err, savePath)
 	}
-	session, err := terminal.Open()
-	if err != nil {
-		return err
+	var session *terminal.Session
+	if inTerminal {
+		session, err = terminal.Open()
+		if err != nil {
+			return err
+		}
+		defer session.Close()
 	}
-	defer session.Close()
 	var music soundtrack.Player
 	if !mute {
 		device, err := speaker.Open()
@@ -105,6 +110,11 @@ func run(seed uint64, mapPath string, mute bool, musicDir, savePath, styleName s
 			defer playback.Close()
 			music = playback
 		}
+	}
+	if !inTerminal {
+		// Progress is kept however the window closes, even when it closes with an error.
+		played := window.Run(forest, music, appTitle)
+		return errors.Join(played, forest.Keep(progress, time.Now()))
 	}
 	camera := terminal.NewCamera(view.Zoom, view.Yaw)
 	if styleName == "" {
