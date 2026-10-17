@@ -369,6 +369,15 @@ func TestABuildingIsRoofedAsTheMapSaysWhateverItsFloor(t *testing.T) {
 	}
 }
 
+func TestARoomLeftUnroofedOnTheMapIsNoBuilding(t *testing.T) {
+	m := courtyard()
+	m.Ground[3][2] = world.Door
+	m.Roofs = [][]world.Roofing{{}, {world.Unroofed, world.Unroofed, world.Unroofed}, {world.Unroofed, world.Unroofed, world.Unroofed}}
+	if buildings := world.NewOnMap(7, m).Buildings(); len(buildings) != 0 {
+		t.Fatalf("buildings = %+v, want none, as the map leaves the room open to the sky", buildings)
+	}
+}
+
 // crossing is a river running north to south with a bridge carrying the way east over it, from
 // grass on the west bank to grass on the east bank.
 func crossing() world.Map {

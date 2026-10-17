@@ -206,11 +206,11 @@ func TestEachObjectLetterStandsForItsFixture(t *testing.T) {
 }
 
 func TestAMapFileRoofsItsBuildings(t *testing.T) {
-	loaded, err := Load(write(t, "houses.map", "terrain\n@...\n\nroofs\n.stc\n"))
+	loaded, err := Load(write(t, "houses.map", "terrain\n@....\n\nroofs\n.stc-\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := [][]world.Roofing{{world.Slate, world.Slate, world.Thatch, world.ClayTiles}}
+	want := [][]world.Roofing{{world.Slate, world.Slate, world.Thatch, world.ClayTiles, world.Unroofed}}
 	if !reflect.DeepEqual(loaded.Roofs, want) {
 		t.Fatalf("roofs = %v, want %v", loaded.Roofs, want)
 	}

@@ -103,3 +103,20 @@ func TestARoomFencedInHasNoRoof(t *testing.T) {
 		t.Fatalf("buildings = %+v, want none, as a fence closes in no building", buildings)
 	}
 }
+
+func TestARoomWithDiagonalWallsAcrossItsCornersIsARoofedBuilding(t *testing.T) {
+	m := lodge(world.Wall)
+	m.Edges.Rising, m.Edges.Falling = make([][]world.Ground, 7), make([][]world.Ground, 7)
+	for row := range 7 {
+		m.Edges.Rising[row], m.Edges.Falling[row] = make([]world.Ground, 9), make([]world.Ground, 9)
+	}
+	// The room's corners are cut off by walls running diagonally across the corner tiles, the
+	// tiles still floored beneath them, as the game's octagonal towers are.
+	m.Edges.West[1][2], m.Edges.North[1][2], m.Edges.Rising[1][2] = world.Grass, world.Grass, world.Wall
+	m.Edges.West[1][5], m.Edges.North[1][4], m.Edges.Falling[1][4] = world.Grass, world.Grass, world.Wall
+	m.Edges.West[3][2], m.Edges.North[4][2], m.Edges.Falling[3][2] = world.Grass, world.Grass, world.Wall
+	m.Edges.West[3][5], m.Edges.North[4][4], m.Edges.Rising[3][4] = world.Grass, world.Grass, world.Wall
+	if buildings := world.NewOnMap(7, m).Buildings(); len(buildings) != 1 {
+		t.Fatalf("buildings = %+v, want the room roofed, its cut corners closing it in", buildings)
+	}
+}

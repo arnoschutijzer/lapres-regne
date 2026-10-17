@@ -135,8 +135,9 @@ walls
 
 A room closed in by walls and doors is roofed while the hero is outside it.
 Lay each building's roof with a `roofs` grid over the terrain: `s` for slate,
-`t` for thatch or `c` for red clay tiles; a building takes whichever most of its
-rooms lie under, and tiles the grid leaves out, or marks `.`, lie under slate.
+`t` for thatch or `c` for red clay tiles, or `-` to leave rooms open to the sky;
+a building takes whichever most of its rooms lie under, and tiles the grid
+leaves out, or marks `.`, lie under slate.
 
 ```text
 roofs

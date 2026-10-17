@@ -94,6 +94,8 @@ const (
 	Thatch
 	// ClayTiles are red clay roof tiles.
 	ClayTiles
+	// Unroofed leaves a room open to the sky: no building at all.
+	Unroofed
 )
 
 // terrain answers questions about the tiles of a map.
@@ -153,7 +155,8 @@ func newTerrain(m Map) *terrain {
 func indoor(g Ground) bool { return g == Floor || g == Boards }
 
 // findBuildings finds every room of flagstones or boards closed in by walls and doors alone,
-// whether standing on tiles of their own or along the tiles' edges, and roofs it as a building.
+// whether standing on tiles of their own or along the tiles' edges, and roofs it as a building
+// unless the map leaves it open to the sky.
 func (t *terrain) findBuildings() {
 	t.rooms = make(map[cell]int)
 	seen := make(map[cell]bool)
@@ -161,7 +164,7 @@ func (t *terrain) findBuildings() {
 	for row := range t.ground {
 		for col := range t.ground[row] {
 			start := cell{col, row}
-			if seen[start] || !indoor(t.ground[row][col]) {
+			if seen[start] || !indoor(t.ground[row][col]) || t.crossed(start) {
 				continue
 			}
 			// Gather the room, noting whether it opens onto anything but its walls and doors.
@@ -187,7 +190,7 @@ func (t *terrain) findBuildings() {
 					case !ok:
 						open = true
 					case t.crossed(next):
-						open = true
+						// A wall running diagonally across the tile closes the room off there.
 					case indoor(ground):
 						if !seen[next] {
 							seen[next] = true
@@ -200,7 +203,7 @@ func (t *terrain) findBuildings() {
 					}
 				}
 			}
-			if open {
+			if open || t.roofing(room) == Unroofed {
 				continue
 			}
 			left, top, right, bottom := start.gx, start.gz, start.gx, start.gz

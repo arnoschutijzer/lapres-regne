@@ -53,8 +53,8 @@
 //	+###+
 //
 // A roofs grid, laid over the terrain, lays each building's roof: s slate, t thatch or c clay
-// tiles, whichever most of its rooms lie under. Tiles the grid leaves out, or marks ., lie under
-// slate:
+// tiles, whichever most of its rooms lie under; - leaves rooms open to the sky. Tiles the grid
+// leaves out, or marks ., lie under slate:
 //
 //	roofs
 //	..ccc
@@ -131,7 +131,7 @@ var fixtures = map[rune]world.Fixture{
 }
 
 // roofings are what the characters of the roofs grid stand for.
-var roofings = map[rune]world.Roofing{'.': world.Slate, 's': world.Slate, 't': world.Thatch, 'c': world.ClayTiles}
+var roofings = map[rune]world.Roofing{'.': world.Slate, 's': world.Slate, 't': world.Thatch, 'c': world.ClayTiles, '-': world.Unroofed}
 
 // barriers are what the characters along the edges of the walls grid stand for.
 var barriers = map[rune]world.Ground{
