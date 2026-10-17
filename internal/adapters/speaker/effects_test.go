@@ -129,8 +129,17 @@ func TestAFallingTreeCreaksThenLandsWithALowThud(t *testing.T) {
 	}
 }
 
+func TestEveryEffectHasASound(t *testing.T) {
+	effects := newEffects(nil)
+	for effect := world.AxeStrike; effect <= world.LadderClimb; effect++ {
+		if len(effects.sounds[effect]) == 0 {
+			t.Errorf("effect %d has no sound", effect)
+		}
+	}
+}
+
 func TestAWoodenThudPlaysTheClunk(t *testing.T) {
-	if !reflect.DeepEqual(landingSound(world.WoodenThud), dropSound()) {
+	if !reflect.DeepEqual(newEffects(nil).sounds[world.WoodenThud], encode(dropSound())) {
 		t.Fatal("a wooden thud must play the dull clunk of a log landing")
 	}
 }

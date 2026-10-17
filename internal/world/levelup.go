@@ -63,7 +63,11 @@ func (w *World) train(skill string, xp float64, unlocked unlocks) {
 // celebrate notes a level reached.
 func (w *World) celebrate(levelUp LevelUp) {
 	w.celebration = celebration{active: true, levelUp: levelUp}
-	w.sounds.LevelUp(levelUp.Unlocked != "")
+	if levelUp.Unlocked != "" {
+		w.play(UnlockingJingle)
+	} else {
+		w.play(LevelUpJingle)
+	}
 }
 
 // totalLevel adds up the hero's levels across all skills.

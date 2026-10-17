@@ -194,7 +194,11 @@ func (w *World) Climb(up bool) bool {
 		w.storey--
 	}
 	w.land()
-	w.sounds.Climb(flight.Kind)
+	if flight.Kind == Ladder {
+		w.play(LadderClimb)
+	} else {
+		w.play(StairsClimb)
+	}
 	return true
 }
 

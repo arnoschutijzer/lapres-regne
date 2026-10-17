@@ -115,7 +115,7 @@ func (w *World) toggle(doorway Doorway) bool {
 	w.hero.Face(FacingToward(middle.x-w.hero.x, middle.z-w.hero.z))
 	if w.here().shut[doorway] {
 		delete(w.here().shut, doorway)
-		w.sounds.OpenDoor()
+		w.play(DoorOpening)
 		return true
 	}
 	w.here().shut[doorway] = true
@@ -124,6 +124,6 @@ func (w *World) toggle(doorway Doorway) bool {
 		w.message = standingInTheWay
 		return false
 	}
-	w.sounds.CloseDoor()
+	w.play(DoorClosing)
 	return true
 }

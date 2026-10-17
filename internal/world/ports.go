@@ -4,32 +4,34 @@ import "time"
 
 // Sounds plays the world's sound effects.
 type Sounds interface {
-	// Chop sounds an axe landing on a tree.
-	Chop()
-	// Fall sounds a chopped tree coming down.
-	Fall()
-	// Drop sounds a dropped item landing on the ground.
-	Drop(Landing)
-	// LevelUp plays the jingle for a new level; unlocked picks the variant for a level that lets
-	// the hero chop a new kind of tree.
-	LevelUp(unlocked bool)
-	// OpenDoor sounds a door or gate swinging open, and CloseDoor one swinging shut.
-	OpenDoor()
-	CloseDoor()
-	// Climb sounds the hero climbing a staircase or ladder.
-	Climb(flight Fixture)
+	Play(Effect)
 }
+
+// Effect is a sound effect the world plays.
+type Effect byte
+
+const (
+	// AxeStrike is an axe landing on a tree, and TreeFall a chopped tree coming down.
+	AxeStrike Effect = iota
+	TreeFall
+	// WoodenThud is a dropped wooden item landing on the ground.
+	WoodenThud
+	// LevelUpJingle plays for a new level, and UnlockingJingle for one that lets the hero do
+	// something new.
+	LevelUpJingle
+	UnlockingJingle
+	// DoorOpening is a door or gate swinging open, and DoorClosing one swinging shut.
+	DoorOpening
+	DoorClosing
+	// StairsClimb is the hero climbing a staircase, and LadderClimb a ladder.
+	StairsClimb
+	LadderClimb
+)
 
 // silence is the default when no sound effects are wired.
 type silence struct{}
 
-func (silence) Chop()         {}
-func (silence) Fall()         {}
-func (silence) Drop(Landing)  {}
-func (silence) LevelUp(bool)  {}
-func (silence) OpenDoor()     {}
-func (silence) CloseDoor()    {}
-func (silence) Climb(Fixture) {}
+func (silence) Play(Effect) {}
 
 // Progress keeps the hero's progress between sessions.
 type Progress interface {

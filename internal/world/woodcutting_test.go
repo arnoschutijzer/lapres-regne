@@ -141,7 +141,7 @@ type recordedSounds struct {
 	chops int
 	falls int
 	// drops records the landing sound of each dropped item.
-	drops []world.Landing
+	drops []world.Effect
 	// levelUps records each level-up jingle, true when the new level unlocked something.
 	levelUps []bool
 	// doors records each door moving: "open" or "close".
@@ -150,13 +150,26 @@ type recordedSounds struct {
 	climbs []world.Fixture
 }
 
-func (s *recordedSounds) Chop()                      { s.chops++ }
-func (s *recordedSounds) Fall()                      { s.falls++ }
-func (s *recordedSounds) Drop(landing world.Landing) { s.drops = append(s.drops, landing) }
-func (s *recordedSounds) LevelUp(unlocked bool)      { s.levelUps = append(s.levelUps, unlocked) }
-func (s *recordedSounds) OpenDoor()                  { s.doors = append(s.doors, "open") }
-func (s *recordedSounds) CloseDoor()                 { s.doors = append(s.doors, "close") }
-func (s *recordedSounds) Climb(flight world.Fixture) { s.climbs = append(s.climbs, flight) }
+func (s *recordedSounds) Play(effect world.Effect) {
+	switch effect {
+	case world.AxeStrike:
+		s.chops++
+	case world.TreeFall:
+		s.falls++
+	case world.WoodenThud:
+		s.drops = append(s.drops, effect)
+	case world.LevelUpJingle, world.UnlockingJingle:
+		s.levelUps = append(s.levelUps, effect == world.UnlockingJingle)
+	case world.DoorOpening:
+		s.doors = append(s.doors, "open")
+	case world.DoorClosing:
+		s.doors = append(s.doors, "close")
+	case world.StairsClimb:
+		s.climbs = append(s.climbs, world.Staircase)
+	case world.LadderClimb:
+		s.climbs = append(s.climbs, world.Ladder)
+	}
+}
 
 func TestTheAxeLandsAsTheChopStartsAndEveryStrikeAfter(t *testing.T) {
 	w := besideTree()

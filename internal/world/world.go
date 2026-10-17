@@ -37,7 +37,7 @@ func New(seed uint64) *World {
 // SetSounds plays the world's sound effects through sounds.
 func (w *World) SetSounds(sounds Sounds) { w.sounds = sounds }
 
-func (w *World) effects() Sounds { return w.sounds }
+func (w *World) play(effect Effect) { w.sounds.Play(effect) }
 
 // Message is the game's reply to the hero's latest action, or empty when there is none.
 func (w *World) Message() string { return w.message }

@@ -37,7 +37,7 @@ type woods interface {
 	Hero() *Character
 	// say gives the game's reply to the hero's latest action.
 	say(message string)
-	effects() Sounds
+	play(Effect)
 	// train gives the hero experience in a skill, celebrating a new level with what it unlocks.
 	train(skill string, xp float64, unlocked unlocks)
 }
@@ -113,7 +113,7 @@ func (wc *woodcutting) start(tree Tree) order {
 		return nil
 	}
 	wc.woods.say("")
-	wc.woods.effects().Chop()
+	wc.woods.play(AxeStrike)
 	return &chop{woodcutting: wc, tree: tree.cell, kind: tree.Kind}
 }
 
@@ -135,7 +135,7 @@ func (c *chop) carryOut(dt time.Duration, _ float64) order {
 	}
 	for c.elapsed >= time.Duration(c.strikes+1)*StrikeInterval {
 		c.strikes++
-		wc.woods.effects().Chop()
+		wc.woods.play(AxeStrike)
 	}
 	level := wc.woods.Hero().Skill(Woodcutting).Level()
 	for c.elapsed >= time.Duration(c.rolls+1)*rollInterval {
@@ -193,7 +193,7 @@ func (wc *woodcutting) cutLog(chop *chop) bool {
 	}
 	wc.fell(chop.tree, kind.respawn+time.Duration(wc.roll(chop.tree, 0x9e60)*float64(kind.respawnSpread)))
 	delete(wc.depletion, chop.tree)
-	wc.woods.effects().Fall()
+	wc.woods.play(TreeFall)
 	return false
 }
 

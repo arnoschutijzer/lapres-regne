@@ -70,7 +70,7 @@ func TestADroppedLogSoundsAsItLands(t *testing.T) {
 		t.Fatalf("drops = %v, want silence when an empty slot drops nothing", sounds.drops)
 	}
 	w.Drop(0)
-	if !reflect.DeepEqual(sounds.drops, []world.Landing{world.WoodenThud}) {
+	if !reflect.DeepEqual(sounds.drops, []world.Effect{world.WoodenThud}) {
 		t.Fatalf("drops = %v, want one log heard landing with a wooden thud", sounds.drops)
 	}
 }

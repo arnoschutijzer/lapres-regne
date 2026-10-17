@@ -20,19 +20,12 @@ const (
 // Color is an item's tint as red, green and blue.
 type Color struct{ R, G, B uint8 }
 
-// Landing is the sound an item makes as it hits the ground.
-type Landing byte
-
-const (
-	WoodenThud Landing = iota
-)
-
 // itemDetails describes one kind of item.
 type itemDetails struct {
 	name    string
 	shape   Shape
 	color   Color
-	landing Landing
+	landing Effect
 }
 
 var items = [...]itemDetails{
@@ -51,4 +44,4 @@ func (i Item) Shape() Shape { return items[i].shape }
 func (i Item) Color() Color { return items[i].color }
 
 // Landing is the sound the item makes when dropped.
-func (i Item) Landing() Landing { return items[i].landing }
+func (i Item) Landing() Effect { return items[i].landing }

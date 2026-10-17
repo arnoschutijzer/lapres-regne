@@ -14,88 +14,42 @@ import (
 // Effects plays short synthesized sound effects on the device.
 type Effects struct {
 	context *oto.Context
-	chop    []byte
-	fall    []byte
-	// landings holds the sound each kind of landing makes.
-	landings map[world.Landing][]byte
-	// levelUp holds the level-up jingle, and unlockingLevelUp the one for a level that unlocks a tree.
-	levelUp, unlockingLevelUp []byte
+	// sounds holds the sound of each effect.
+	sounds map[world.Effect][]byte
 	// fireworks crackle over the jingle of every level-up.
 	fireworks []byte
-	// openDoor and closeDoor are a door swinging open and shut.
-	openDoor, closeDoor []byte
-	// climbs holds the sound of climbing each kind of staircase or ladder.
-	climbs map[world.Fixture][]byte
 	// playing keeps players referenced until their sound has finished.
 	playing []*oto.Player
 }
 
 func newEffects(context *oto.Context) *Effects {
 	return &Effects{
-		context:          context,
-		chop:             encode(chopSound()),
-		fall:             encode(fallSound()),
-		landings:         map[world.Landing][]byte{world.WoodenThud: encode(landingSound(world.WoodenThud))},
-		levelUp:          encode(levelUpSound(false)),
-		unlockingLevelUp: encode(levelUpSound(true)),
-		fireworks:        encode(fireworksSound()),
-		openDoor:         encode(doorSound(true)),
-		closeDoor:        encode(doorSound(false)),
-		climbs: map[world.Fixture][]byte{
-			world.Staircase: encode(climbSound(world.Staircase)),
-			world.Ladder:    encode(climbSound(world.Ladder)),
+		context: context,
+		sounds: map[world.Effect][]byte{
+			// An axe lands with a woody tok, and a tree creaks and lands with a thud.
+			world.AxeStrike:  encode(chopSound()),
+			world.TreeFall:   encode(fallSound()),
+			world.WoodenThud: encode(dropSound()),
+			// A level-up jingle gains its melody when the level unlocks something.
+			world.LevelUpJingle:   encode(levelUpSound(false)),
+			world.UnlockingJingle: encode(levelUpSound(true)),
+			// A door knocks back against its stop and creaks on as it opens, and knocks against
+			// its frame as it shuts.
+			world.DoorOpening: encode(doorSound(true)),
+			world.DoorClosing: encode(doorSound(false)),
+			world.StairsClimb: encode(climbSound(world.Staircase)),
+			world.LadderClimb: encode(climbSound(world.Ladder)),
 		},
+		fireworks: encode(fireworksSound()),
 	}
 }
 
-// Chop plays a woody tok as an axe lands.
-func (e *Effects) Chop() {
-	e.play(e.chop)
-}
-
-// Fall plays a tree creaking and landing with a thud.
-func (e *Effects) Fall() {
-	e.play(e.fall)
-}
-
-// Drop plays a dropped item landing on the ground.
-func (e *Effects) Drop(landing world.Landing) {
-	e.play(e.landings[landing])
-}
-
-// landingSound synthesizes the sound of a kind of landing.
-func landingSound(landing world.Landing) []float32 {
-	switch landing {
-	case world.WoodenThud:
-		return dropSound()
+// Play plays a sound effect, with fireworks going off over the jingle of a level-up.
+func (e *Effects) Play(effect world.Effect) {
+	e.play(e.sounds[effect])
+	if effect == world.LevelUpJingle || effect == world.UnlockingJingle {
+		e.play(e.fireworks)
 	}
-	return nil
-}
-
-// LevelUp plays the level-up jingle, with its melody when the level unlocks a tree, and the
-// fireworks going off over it.
-func (e *Effects) LevelUp(unlocked bool) {
-	if unlocked {
-		e.play(e.unlockingLevelUp)
-	} else {
-		e.play(e.levelUp)
-	}
-	e.play(e.fireworks)
-}
-
-// OpenDoor plays a door swinging open: it knocks back against its stop and creaks on.
-func (e *Effects) OpenDoor() {
-	e.play(e.openDoor)
-}
-
-// CloseDoor plays a door swinging shut and knocking against its frame.
-func (e *Effects) CloseDoor() {
-	e.play(e.closeDoor)
-}
-
-// Climb plays the hero climbing a staircase or ladder.
-func (e *Effects) Climb(flight world.Fixture) {
-	e.play(e.climbs[flight])
 }
 
 func (e *Effects) play(sound []byte) {

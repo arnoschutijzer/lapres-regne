@@ -146,11 +146,14 @@ func TestOaksWillowsAndYewsRegrowAfterTheirRespawnTime(t *testing.T) {
 
 // countedFalls counts the trees heard falling.
 type countedFalls struct {
-	silence
 	falls int
 }
 
-func (c *countedFalls) Fall() { c.falls++ }
+func (c *countedFalls) Play(effect Effect) {
+	if effect == TreeFall {
+		c.falls++
+	}
+}
 
 func TestAnOakFallsOnlyOnceAfterGivingSeveralLogs(t *testing.T) {
 	w := New(7)
