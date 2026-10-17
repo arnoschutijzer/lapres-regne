@@ -162,7 +162,8 @@ Chairs and thrones turn their backs on the table they stand at; other
 fixtures back onto a wall beside them, and a row of pews faces along the
 church.
 
-Walls, fences, gates, graves and fixtures other than crops block the way, a bridge's rails keep the hero
+Walls and fences stepping diagonally from tile to tile join across the corners
+between them. Walls, fences, gates, graves and fixtures other than crops block the way, a bridge's rails keep the hero
 out of the water beside it, and nothing beyond the map's edges can be walked on. Clicking the ground or a tree walks round whatever
 blocks the way, or as close as the hero can get. Progress keeps the map's name,
 so your position and stumps return only to the map they were saved on.
