@@ -134,7 +134,7 @@ func treeSprite(kind world.TreeKind, crownWidth, height int, variation float64) 
 			if math.IsInf(nearest, 1) {
 				continue
 			}
-			tone := int(math.Floor((shade+0.55+leaf(x, y)*0.16)*3.4)) + 1
+			tone := int(math.Floor((shade+0.42+leaf(x, y)*0.16)*3.4)) + 1
 			if rim {
 				// The underside of each lobe sinks into the dark between it and the next.
 				tone = min(tone, 1)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"math"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -75,8 +76,10 @@ type game struct {
 	music soundtrack.Player
 	view  camera
 	gait  gait
-	art   *sprites
-	scene []placed
+	// seconds is how long the window has been open, for the atmosphere's slow drift.
+	seconds float64
+	art     *sprites
+	scene   []placed
 	// shadows are laid on the ground through shade, an image of the screen, so that where they
 	// overlap they stay one flat shade.
 	shadows []placed
@@ -85,6 +88,9 @@ type game struct {
 	// painted ground near the camera.
 	drawn  map[*image.RGBA]*ebiten.Image
 	chunks map[image.Point]*ebiten.Image
+	// The atmosphere's pictures, sent to the graphics card once.
+	vignette, shafts   *ebiten.Image
+	goldGlow, paleGlow *ebiten.Image
 }
 
 func newGame(w *world.World, music soundtrack.Player) *game {
@@ -123,6 +129,7 @@ func (g *game) step(c controls, dt time.Duration) error {
 	}
 	x, z := g.world.Hero().Position()
 	g.view.follow(x, z, dt.Seconds())
+	g.seconds += dt.Seconds()
 	g.gait.follow(x, z)
 	g.scene, g.shadows = arrange(g.world, g.view.snapped(), g.art, g.gait.frame())
 	return nil
@@ -152,6 +159,35 @@ func (g *game) Draw(screen *ebiten.Image) {
 	for _, p := range g.scene {
 		g.drawSprite(screen, p)
 	}
+	g.drawAtmosphere(screen)
+}
+
+// drawAtmosphere lays the light shafts, the drifting motes and the darkening edges over the scene.
+func (g *game) drawAtmosphere(screen *ebiten.Image) {
+	if g.vignette == nil {
+		g.vignette = ebiten.NewImageFromImage(vignetteImage())
+		g.shafts = ebiten.NewImageFromImage(shaftsImage())
+		g.goldGlow = ebiten.NewImageFromImage(moteImage(goldTones))
+		g.paleGlow = ebiten.NewImageFromImage(moteImage(paleTones))
+	}
+	originX, originY := g.view.snapped().origin()
+	for offset := shaftOffset(originX, g.seconds); offset < screenWidth; offset += shaftPeriod {
+		options := &ebiten.DrawImageOptions{Blend: ebiten.BlendLighter}
+		options.GeoM.Translate(math.Round(offset), 0)
+		screen.DrawImage(g.shafts, options)
+	}
+	for _, m := range motes(originX, originY, g.seconds) {
+		glow := g.goldGlow
+		if m.pale {
+			glow = g.paleGlow
+		}
+		options := &ebiten.DrawImageOptions{Blend: ebiten.BlendLighter}
+		options.GeoM.Translate(math.Round(m.x)-1, math.Round(m.y)-1)
+		options.ColorScale.ScaleAlpha(float32(m.glow))
+		options.ColorScale.Scale(float32(m.glow), float32(m.glow), float32(m.glow), 1)
+		screen.DrawImage(glow, options)
+	}
+	screen.DrawImage(g.vignette, nil)
 }
 
 // drawSprite draws a placed sprite, sending its art to the graphics card the first time.

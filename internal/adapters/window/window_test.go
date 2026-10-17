@@ -258,3 +258,43 @@ func TestTheHeroStridesOnlyWhileWalking(t *testing.T) {
 		t.Fatalf("two seconds of walking showed frames %v; want both strides", frames)
 	}
 }
+
+func TestTheScreensEdgesSinkIntoDarkness(t *testing.T) {
+	if middle, corner := vignette(screenWidth/2, screenHeight/2), vignette(0, 0); middle != 0 || corner <= 0.5 {
+		t.Errorf("the vignette is %v in the middle and %v in the corner; want none and deep", middle, corner)
+	}
+}
+
+func TestLightShaftsLeanDownToTheRightAndDriftSlowly(t *testing.T) {
+	// The brightest point of the top row lies left of the brightest of a row further down.
+	brightest := func(y int) int {
+		best, at := 0.0, 0
+		for x := range shaftPeriod {
+			if light := shaft(float64(x) - float64(y)*shaftSlant); light > best {
+				best, at = light, x
+			}
+		}
+		return at
+	}
+	if top, lower := brightest(0), brightest(100); lower <= top {
+		t.Errorf("the brightest shaft is at x %d up top and %d further down; want it leaning right", top, lower)
+	}
+	// The offset wraps round the period, so the drift is the shorter way round.
+	moved := math.Mod(math.Abs(shaftOffset(0, 10)-shaftOffset(0, 0)), shaftPeriod)
+	moved = math.Min(moved, shaftPeriod-moved)
+	if moved == 0 || moved > 30 {
+		t.Errorf("the shafts drift %v pixels in ten seconds; want a slow drift", moved)
+	}
+}
+
+func TestMotesDriftSlowlyInTheAir(t *testing.T) {
+	before, after := motes(0, 0, 3), motes(0, 0, 3.5)
+	if len(before) == 0 || len(before) != len(after) {
+		t.Fatalf("%d motes, then %d half a second later; want the same few", len(before), len(after))
+	}
+	for i := range before {
+		if moved := math.Hypot(after[i].x-before[i].x, after[i].y-before[i].y); moved > 4 {
+			t.Errorf("mote %d moves %v pixels in half a second; want a slow drift", i, moved)
+		}
+	}
+}
