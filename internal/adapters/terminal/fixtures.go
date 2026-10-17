@@ -41,7 +41,7 @@ const (
 // drawFixture draws the furniture or landmark standing on a tile whose north-west corner is at
 // x, z, turned to face into the room. variety, from 0 to 1, varies what it holds.
 func drawFixture(c *forestCanvas, x, z float64, tile builtTile, variety float64) {
-	back := backOf(tile)
+	back := backOf(&tile)
 	p := placer{c: c, x: x, z: z, back: back}
 	// The sides running on into the same kind, in the fixture's own frame.
 	for side := range p.alike {
@@ -119,7 +119,7 @@ func seated(f world.Fixture) bool {
 // backOf is the side, north, east, south or west, a fixture turns its back to: a seat's back is to
 // the table's far side; anything else backs onto a wall beside it, but never across a run of its
 // own kind, so a row of pews faces along the room. With nothing to back onto it faces south.
-func backOf(tile builtTile) int {
+func backOf(tile *builtTile) int {
 	if seated(tile.fixture) {
 		for side, beside := range tile.besideFixture {
 			if tile.besideFurnished[side] && beside == world.Table {

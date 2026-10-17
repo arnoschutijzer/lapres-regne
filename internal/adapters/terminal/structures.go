@@ -304,7 +304,7 @@ func (a *builtArea) survey(f *world.World, storey int, left, right, back, front 
 			sideways, upright := a.at(col+step[0], row).ground, a.at(col, row+step[1]).ground
 			tile.diagonal[corner] = alike(tile.ground, across) && !alike(tile.ground, sideways) && !alike(tile.ground, upright)
 		}
-		tile.solid = standsOn(*tile)
+		tile.solid = standsOn(tile)
 	}
 	// A structure's shadow reaches no farther than the tiles beside it: the sun throws the top of a
 	// wall less than a tile east and south.
@@ -323,7 +323,7 @@ func (a *builtArea) survey(f *world.World, storey int, left, right, back, front 
 
 // standsOn tells whether a structure fills any of a tile: a wall, door, fence, gate or grave on it,
 // or a wall along one of its sides or across it.
-func standsOn(tile builtTile) bool {
+func standsOn(tile *builtTile) bool {
 	switch tile.ground {
 	case world.Wall, world.Battlement, world.Door, world.Fence, world.Gate, world.Grave:
 		return true
@@ -363,13 +363,16 @@ func alike(this, other world.Ground) bool {
 	return false
 }
 
-// at is what stands on a tile; nothing beyond the surveyed area.
-func (a *builtArea) at(col, row int) builtTile {
+// nothingBuilt is what stands beyond the surveyed area; it is never changed.
+var nothingBuilt builtTile
+
+// at is what stands on a tile; nothing beyond the surveyed area. It is read, never changed.
+func (a *builtArea) at(col, row int) *builtTile {
 	col, row = col-a.col, row-a.row
 	if col < 0 || row < 0 || col >= a.cols || row >= a.rows {
-		return builtTile{}
+		return &nothingBuilt
 	}
-	return a.tiles[row*a.cols+col]
+	return &a.tiles[row*a.cols+col]
 }
 
 // tileAt finds the tile holding a world position, and the position within it.
