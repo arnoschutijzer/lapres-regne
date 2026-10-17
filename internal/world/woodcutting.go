@@ -132,6 +132,7 @@ func (w *World) Approach(tree Tree) bool {
 func (w *World) Stop() {
 	w.destination = destination{}
 	w.doorApproach = doorApproach{}
+	w.flightApproach = flightApproach{}
 	w.approach = approach{}
 	w.chop = chop{}
 	w.message = ""

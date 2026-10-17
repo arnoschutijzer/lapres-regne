@@ -83,6 +83,17 @@
 //
 //	objects
 //	..t..
+//
+// The terrain, walls and objects grids lay out the ground floor. Followed by a floor's number,
+// they lay out a floor above it, a storey higher than the one below: its terrain floors tiles as
+// the ground floor's does, . leaving them open to the air, and grows no trees. A staircase or
+// ladder leads up where one stands on the same tile of the floor above:
+//
+//	terrain 1
+//	.bbb.
+//
+//	objects 1
+//	...S.
 package mapfile
 
 import (
@@ -165,14 +176,14 @@ func Load(path string) (world.Map, error) {
 // read reads a map and the name of the models file it names, if any.
 func read(lines *bufio.Scanner, name string) (world.Map, string, error) {
 	m := world.Map{Name: name}
-	// grid is the grid being read, or empty between grids.
-	grid, hasTerrain, hasStart := "", false, false
+	// grid is the grid being read, or empty between grids, and floor the floor it lays out.
+	grid, floor, hasTerrain, hasStart := "", 0, false, false
 	// areas names each letter of the areas grid.
 	areas := map[rune]string{}
-	// objectRows counts the rows of the objects grid read so far.
-	objectRows := 0
-	// walls are the lines of the walls grid read so far.
-	var walls []string
+	// objectRows counts the rows of each floor's objects grid read so far.
+	objectRows := map[int]int{}
+	// walls are the lines of each floor's walls grid read so far.
+	walls := map[int][]string{}
 	// models names the models file the map's fixtures are shaped by.
 	models := ""
 	for number := 1; lines.Scan(); number++ {
@@ -182,12 +193,19 @@ func read(lines *bufio.Scanner, name string) (world.Map, string, error) {
 		case line == "":
 			grid = ""
 		case grid == "terrain":
-			row := len(m.Ground)
+			grounds := floorOf(&m, floor).ground
+			row := len(*grounds)
 			ground := make([]world.Ground, 0, len(line))
 			for col, char := range []rune(line) {
 				meaning, known := tiles[char]
 				if !known {
 					return world.Map{}, "", fmt.Errorf("line %d: unknown tile %q", number, char)
+				}
+				if floor > 0 && meaning.tree {
+					return world.Map{}, "", fmt.Errorf("line %d: no tree grows above the ground floor", number)
+				}
+				if floor > 0 && char == '@' {
+					return world.Map{}, "", fmt.Errorf("line %d: the hero starts on the ground floor", number)
 				}
 				ground = append(ground, meaning.ground)
 				if meaning.tree {
@@ -200,7 +218,7 @@ func read(lines *bufio.Scanner, name string) (world.Map, string, error) {
 					m.StartCol, m.StartRow, hasStart = col, row, true
 				}
 			}
-			m.Ground = append(m.Ground, ground)
+			*grounds = append(*grounds, ground)
 		case grid == "heights":
 			row := make([]int, 0, len(line))
 			for _, char := range line {
@@ -219,9 +237,10 @@ func read(lines *bufio.Scanner, name string) (world.Map, string, error) {
 				if !known {
 					return world.Map{}, "", fmt.Errorf("line %d: unknown object %q", number, char)
 				}
-				m.Fixtures = append(m.Fixtures, world.PlacedFixture{Col: col, Row: objectRows, Kind: fixture})
+				placed := floorOf(&m, floor).fixtures
+				*placed = append(*placed, world.PlacedFixture{Col: col, Row: objectRows[floor], Kind: fixture})
 			}
-			objectRows++
+			objectRows[floor]++
 		case grid == "roofs":
 			row := make([]world.Roofing, 0, len(line))
 			for _, char := range line {
@@ -233,10 +252,10 @@ func read(lines *bufio.Scanner, name string) (world.Map, string, error) {
 			}
 			m.Roofs = append(m.Roofs, row)
 		case grid == "walls":
-			if err := readWalls(&m.Edges, len(walls), line); err != nil {
+			if err := readWalls(floorOf(&m, floor).edges, len(walls[floor]), line); err != nil {
 				return world.Map{}, "", fmt.Errorf("line %d: %w", number, err)
 			}
-			walls = append(walls, line)
+			walls[floor] = append(walls[floor], line)
 		case grid == "areas":
 			row := make([]string, 0, len(line))
 			for _, char := range []rune(line) {
@@ -247,10 +266,21 @@ func read(lines *bufio.Scanner, name string) (world.Map, string, error) {
 				row = append(row, name)
 			}
 			m.Areas = append(m.Areas, row)
-		case line == "terrain":
-			grid, hasTerrain = line, true
-		case line == "areas" || line == "heights" || line == "objects" || line == "roofs" || line == "walls":
-			grid = line
+		case isGrid(line):
+			name, value, _ := strings.Cut(line, " ")
+			grid, floor = name, 0
+			if value != "" {
+				if name != "terrain" && name != "walls" && name != "objects" {
+					return world.Map{}, "", fmt.Errorf("line %d: want %q", number, name)
+				}
+				if _, err := fmt.Sscanf(value, "%d", &floor); err != nil || floor < 1 {
+					return world.Map{}, "", fmt.Errorf("line %d: want \"%s <floor>\"", number, name)
+				}
+				for len(m.Upstairs) < floor {
+					m.Upstairs = append(m.Upstairs, world.UpperFloor{})
+				}
+			}
+			hasTerrain = hasTerrain || line == "terrain"
 		default:
 			setting, value, _ := strings.Cut(line, " ")
 			switch setting {
@@ -286,11 +316,41 @@ func read(lines *bufio.Scanner, name string) (world.Map, string, error) {
 	if !hasStart {
 		return world.Map{}, "", fmt.Errorf("no start tile '@' or start setting")
 	}
-	if err := diagonals(&m.Edges, walls); err != nil {
-		return world.Map{}, "", err
+	for floor := 0; floor <= len(m.Upstairs); floor++ {
+		grids := floorOf(&m, floor)
+		if err := diagonals(grids.edges, walls[floor]); err != nil {
+			return world.Map{}, "", err
+		}
+		trim(grids.edges, *grids.ground)
 	}
-	trim(&m.Edges, m.Ground)
 	return m, models, nil
+}
+
+// isGrid tells whether a line names a grid, those laying out a floor above the ground floor
+// followed by its number.
+func isGrid(line string) bool {
+	name, _, _ := strings.Cut(line, " ")
+	switch name {
+	case "terrain", "areas", "heights", "objects", "roofs", "walls":
+		return true
+	}
+	return false
+}
+
+// floorGrids are the grids of one floor of a map.
+type floorGrids struct {
+	ground   *[][]world.Ground
+	edges    *world.Edges
+	fixtures *[]world.PlacedFixture
+}
+
+// floorOf is the grids of a floor of a map: 0 for the ground floor, 1 for the first floor.
+func floorOf(m *world.Map, floor int) floorGrids {
+	if floor == 0 {
+		return floorGrids{&m.Ground, &m.Edges, &m.Fixtures}
+	}
+	up := &m.Upstairs[floor-1]
+	return floorGrids{&up.Ground, &up.Edges, &up.Fixtures}
 }
 
 // readWalls reads the edges along one line of the walls grid, the index-th: an even line runs

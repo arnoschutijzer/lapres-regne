@@ -71,7 +71,7 @@ func (a *builtArea) drawEdges(c *forestCanvas, col, row int, x, z, variety float
 		{edges.West, x, z, x, z + size, col, row, col, row + 1, [2]int{col, row}, [2]int{col - 1, row}, edges.WestShut},
 		{edges.North, x, z, x + size, z, col, row, col + 1, row, [2]int{col, row}, [2]int{col, row - 1}, edges.NorthShut},
 	} {
-		if edge.ground == world.Grass {
+		if edge.ground == world.Grass || a.at(edge.inside[0], edge.inside[1]).covered && a.at(edge.outside[0], edge.outside[1]).covered {
 			continue
 		}
 		c.standOn((edge.x0+edge.x1)/2, (edge.z0+edge.z1)/2)

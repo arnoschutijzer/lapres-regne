@@ -130,12 +130,15 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 				return false
 			}
 			// Clicking a tree walks there to chop it, clicking a door or gate walks there to open or
-			// close it, clicking the ground walks there, and clicking anything else stops.
+			// close it, clicking a staircase or ladder walks there to climb it, clicking the ground
+			// walks there, and clicking anything else stops.
 			view.menu = nil
 			if tree, ok := view.treeAt(event.column, event.row); ok {
 				world.Approach(tree)
 			} else if doorway, ok := view.doorwayAt(event.column, event.row); ok {
 				world.ApproachDoor(doorway)
+			} else if flight, ok := view.flightAt(event.column, event.row); ok {
+				world.ApproachFlight(flight)
 			} else if x, z, ok := view.groundAt(event.column, event.row); ok {
 				world.WalkTo(x, z)
 			} else {
@@ -163,7 +166,7 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			return false
 		}
 		if event.action == interact {
-			// E opens the action menu for the tree or doorway in reach, or closes an open menu.
+			// E opens the action menu for what is in reach, or closes an open menu.
 			if !event.repeat {
 				view.toggleMenu()
 			}
@@ -190,9 +193,9 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			}
 			return false
 		}
-		if event.action == firstChoice {
+		if event.action == firstChoice || event.action == secondChoice {
 			if !event.repeat {
-				view.chooseFirst()
+				view.choose(int(event.action - firstChoice))
 			}
 			return false
 		}
@@ -247,6 +250,10 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			lastFrame = now
 			dx, dz := held.direction()
 			world.Advance(dx, dz, dt, held.sprinting())
+			// Arriving at a staircase leading both up and down asks which way to climb.
+			if world.OfferedClimb() && view.menu == nil {
+				view.openMenu()
+			}
 			world.Follow(dt)
 			view.zoom.step(world.Zoom(), dt)
 			view.turn.step(world.Yaw(), dt)

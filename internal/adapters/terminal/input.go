@@ -18,6 +18,7 @@ const (
 	previousTrack
 	interact
 	firstChoice
+	secondChoice
 	toggleInventory
 	dropLog
 	previousSlot
@@ -90,6 +91,8 @@ func keyAction(key int) action {
 		return interact
 	case '1':
 		return firstChoice
+	case '2':
+		return secondChoice
 	case '\t':
 		return toggleInventory
 	case 'x', 'X':

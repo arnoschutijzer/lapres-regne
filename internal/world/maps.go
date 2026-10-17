@@ -60,6 +60,8 @@ type Map struct {
 	Edges Edges
 	// Models are the shapes of fixtures as the game models them, each over the tiles it stands on.
 	Models []PlacedModel
+	// Upstairs are the floors above the ground floor, the first floor first.
+	Upstairs []UpperFloor
 }
 
 // LevelHeight is how much higher each level of a map's heights lies than the last, in world units.
@@ -119,6 +121,8 @@ type terrain struct {
 	// shut holds the doorways whose doors are shut; every door stands open at first.
 	shut   map[Doorway]bool
 	models []PlacedModel
+	// aloft marks a floor above the ground floor, whose Grass is open air.
+	aloft bool
 }
 
 func newTerrain(m Map) *terrain {
@@ -354,6 +358,11 @@ func NewOnMap(seed uint64, m Map) *World {
 	w := New(seed)
 	w.mapName = m.Name
 	w.terrain = newTerrain(m)
+	for _, floor := range m.Upstairs {
+		upper := newTerrain(Map{Ground: floor.Ground, Edges: floor.Edges, Fixtures: floor.Fixtures, Models: floor.Models})
+		upper.aloft = true
+		w.floors = append(w.floors, upper)
+	}
 	w.hero.passable = w.passable
 	w.hero.x, w.hero.z = (float64(m.StartCol)+0.5)*TileSize, (float64(m.StartRow)+0.5)*TileSize
 	w.cameraX, w.cameraZ = w.hero.x, w.hero.z
@@ -374,10 +383,14 @@ func (w *World) Buildings() []Building {
 	return w.terrain.buildings
 }
 
-// Indoors tells whether the hero stands inside a roofed building.
+// Indoors tells whether the hero stands inside a roofed building, as they always do above the
+// ground floor.
 func (w *World) Indoors() bool {
 	if w.terrain == nil {
 		return false
+	}
+	if w.storey > 0 {
+		return true
 	}
 	_, inside := w.terrain.rooms[tileOf(w.hero.x, w.hero.z)]
 	return inside
@@ -411,7 +424,7 @@ func (w *World) passable(x, z float64) bool {
 	if w.terrain == nil {
 		return true
 	}
-	return w.terrain.passable(x, z)
+	return w.here().passable(x, z)
 }
 
 // plantedTree is the tree planted on a tile of the map, placed a little off the tile's centre and

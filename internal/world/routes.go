@@ -21,7 +21,7 @@ func (w *World) route(x, z float64) []point {
 	}
 	start := tileOf(w.hero.x, w.hero.z)
 	goal := tileOf(x, z)
-	tiles := w.terrain.search(start, goal)
+	tiles := w.here().search(start, goal)
 	waypoints := make([]point, 0, len(tiles))
 	for _, tile := range tiles[1:] {
 		waypoints = append(waypoints, tile.middle())
@@ -33,7 +33,7 @@ func (w *World) route(x, z float64) []point {
 			waypoints[len(waypoints)-1] = point{x, z}
 		}
 	}
-	return w.terrain.straighten(point{w.hero.x, w.hero.z}, waypoints)
+	return w.here().straighten(point{w.hero.x, w.hero.z}, waypoints)
 }
 
 func tileOf(x, z float64) cell {
@@ -48,6 +48,9 @@ func (c cell) middle() point {
 // no wall or fence runs diagonally across it.
 func (t *terrain) open(c cell) bool {
 	ground, ok := t.tile(c.gx, c.gz)
+	if t.aloft && ground == Grass {
+		return false
+	}
 	if fixture, stands := t.fixtures[c]; stands && fixture.Blocks() {
 		return false
 	}

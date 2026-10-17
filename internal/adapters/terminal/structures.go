@@ -213,6 +213,8 @@ type builtTile struct {
 	alike     [4]bool
 	// shaped marks a tile a model stands over, which shapes its fixture instead.
 	shaped bool
+	// covered marks a tile under a floor drawn above it, which hides whatever stands on it.
+	covered bool
 	// edges is what stands along the tile's west and north edges and diagonally across it, and
 	// sides what stands along each of its sides, north, east, south and west.
 	edges world.TileEdges
@@ -250,9 +252,9 @@ type builtArea struct {
 	roofs []roof
 }
 
-// survey records what stands on every tile from left to right and back to front, with a tile's
-// margin around them.
-func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
+// survey records what stands on every tile of a floor from left to right and back to front, with
+// a tile's margin around them.
+func (a *builtArea) survey(f *world.World, storey int, left, right, back, front float64) {
 	a.col, a.row = int(math.Floor(left/world.TileSize))-1, int(math.Floor(back/world.TileSize))-1
 	a.cols = int(math.Ceil(right/world.TileSize)) + 2 - a.col
 	a.rows = int(math.Ceil(front/world.TileSize)) + 2 - a.row
@@ -261,7 +263,7 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 	}
 	a.tiles = a.tiles[:a.cols*a.rows]
 	a.roofs = a.roofs[:0]
-	if !f.Indoors() {
+	if storey == 0 && !f.Indoors() {
 		for _, building := range f.Buildings() {
 			a.roofs = append(a.roofs, roofOver(building))
 		}
@@ -269,11 +271,11 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 	for i := range a.tiles {
 		col, row := a.col+i%a.cols, a.row+i/a.cols
 		middleX, middleZ := (float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize
-		ground, onMap := f.GroundAt(middleX, middleZ)
-		fixture, furnished := f.FixtureAt(middleX, middleZ)
-		a.tiles[i] = builtTile{ground: ground, onMap: onMap, fixture: fixture, furnished: furnished, edges: f.EdgesAt(middleX, middleZ)}
+		ground, onMap := f.GroundOn(storey, middleX, middleZ)
+		fixture, furnished := f.FixtureOn(storey, middleX, middleZ)
+		a.tiles[i] = builtTile{ground: ground, onMap: onMap, fixture: fixture, furnished: furnished, edges: f.EdgesOn(storey, middleX, middleZ)}
 	}
-	a.modelled(f.Models())
+	a.modelled(f.ModelsOn(storey))
 	for i := range a.tiles {
 		tile := &a.tiles[i]
 		col, row := a.col+i%a.cols, a.row+i/a.cols
@@ -298,6 +300,18 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 			across := a.at(col+step[0], row+step[1]).ground
 			sideways, upright := a.at(col+step[0], row).ground, a.at(col, row+step[1]).ground
 			tile.diagonal[corner] = alike(tile.ground, across) && !alike(tile.ground, sideways) && !alike(tile.ground, upright)
+		}
+	}
+}
+
+// cover marks the tiles under any of the floors surveyed above, which hide whatever stands on them.
+func (a *builtArea) cover(upstairs []builtArea) {
+	for i := range a.tiles {
+		a.tiles[i].covered = false
+		for _, above := range upstairs {
+			if above.tiles[i].onMap {
+				a.tiles[i].covered = true
+			}
 		}
 	}
 }
@@ -483,11 +497,16 @@ func (a *builtArea) shade(x, z float64) float64 {
 
 // drawStructures draws the walls, doors, fences, gates, graves and fixtures standing on the
 // surveyed tiles.
-func (r *renderer) drawStructures(c *forestCanvas) {
-	a := &r.built
+func (r *renderer) drawStructures(c *forestCanvas, a *builtArea) {
 	for i, tile := range a.tiles {
 		col, row := a.col+i%a.cols, a.row+i/a.cols
 		if !tile.onMap {
+			continue
+		}
+		if tile.covered {
+			// Only walls along the edges where a covered tile meets an uncovered one show, from
+			// outside.
+			a.drawEdges(c, col, row, float64(col)*world.TileSize, float64(row)*world.TileSize, r.world.Random(col, row, 45))
 			continue
 		}
 		x, z := float64(col)*world.TileSize, float64(row)*world.TileSize

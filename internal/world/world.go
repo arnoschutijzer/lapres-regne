@@ -26,13 +26,20 @@ type World struct {
 	destination destination
 	// doorApproach is the doorway whose door the hero opens or closes on reaching the destination.
 	doorApproach doorApproach
+	// flightApproach is the staircase or ladder the hero climbs on reaching the destination, and
+	// offeredClimb marks one reached that leads both ways, until the offer is taken.
+	flightApproach flightApproach
+	offeredClimb   bool
 	// ground holds the dropped items until they disappear.
 	ground      []GroundItem
 	message     string
 	celebration celebration
 	sounds      Sounds
-	// terrain holds the map the world is built on; nil for the endless forest.
+	// terrain holds the map the world is built on; nil for the endless forest. floors holds the
+	// map's floors above its ground floor, and storey is the floor the hero stands on.
 	terrain *terrain
+	floors  []*terrain
+	storey  int
 	mapName string
 }
 
@@ -132,6 +139,7 @@ func (w *World) walkToFor(dt time.Duration, speed float64) {
 	if len(waypoints) == 0 || !moving {
 		w.destination = destination{}
 		w.arriveAtDoor()
+		w.arriveAtFlight()
 	}
 }
 

@@ -2,15 +2,35 @@ package terminal
 
 import "lapresregne/internal/world"
 
-// toggleMenu closes an open menu, or opens the menu of actions for the tree in reach, else for
-// the doorway in reach.
+// menuFor is what the open menu offers actions for.
+type menuFor byte
+
+const (
+	menuTree menuFor = iota
+	menuDoorway
+	menuFlight
+)
+
+// The actions offered for a staircase or ladder.
+const (
+	climbUp   = "Climb-up"
+	climbDown = "Climb-down"
+)
+
+// toggleMenu closes an open menu, or opens the menu of actions for what is in reach.
 func (r *renderer) toggleMenu() {
 	if r.menu != nil {
 		r.menu = nil
 		return
 	}
+	r.openMenu()
+}
+
+// openMenu opens the menu of actions for the tree in reach, else for the doorway in reach, else
+// for the staircase or ladder in reach.
+func (r *renderer) openMenu() {
 	if tree, ok := r.world.TreeInReach(); ok {
-		r.menuTitle, r.menu, r.menuDoorway = tree.Kind.String(), []string{"Chop down"}, false
+		r.menuTitle, r.menu, r.menuFor = tree.Kind.String(), []string{"Chop down"}, menuTree
 		return
 	}
 	if doorway, ok := r.world.DoorwayInReach(); ok {
@@ -18,19 +38,37 @@ func (r *renderer) toggleMenu() {
 		if r.shut(doorway) {
 			action = "Open"
 		}
-		r.menuTitle, r.menu, r.menuDoorway = r.doorwayName(doorway), []string{action}, true
+		r.menuTitle, r.menu, r.menuFor = r.doorwayName(doorway), []string{action}, menuDoorway
+		return
+	}
+	if flight, ok := r.world.FlightInReach(); ok && (flight.Up || flight.Down) {
+		var actions []string
+		if flight.Up {
+			actions = append(actions, climbUp)
+		}
+		if flight.Down {
+			actions = append(actions, climbDown)
+		}
+		title := "Staircase"
+		if flight.Kind == world.Ladder {
+			title = "Ladder"
+		}
+		r.menuTitle, r.menu, r.menuFor = title, actions, menuFlight
 	}
 }
 
-// chooseFirst carries out the first action on the open menu and closes it.
-func (r *renderer) chooseFirst() {
-	if r.menu == nil {
+// choose carries out the action at an index on the open menu, counting from 0, and closes it.
+func (r *renderer) choose(index int) {
+	if index >= len(r.menu) {
 		return
 	}
-	if r.menuDoorway {
-		r.world.ToggleDoor()
-	} else {
+	switch r.menuFor {
+	case menuTree:
 		r.world.Chop()
+	case menuDoorway:
+		r.world.ToggleDoor()
+	case menuFlight:
+		r.world.Climb(r.menu[index] == climbUp)
 	}
 	r.menu = nil
 }

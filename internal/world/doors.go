@@ -48,7 +48,7 @@ func (w *World) DoorwayInReach() (Doorway, bool) {
 	nearestDistance, found := doorReach, false
 	for row := here.gz - 1; row <= here.gz+1; row++ {
 		for col := here.gx - 1; col <= here.gx+1; col++ {
-			edges := w.terrain.edgesOf(cell{col, row})
+			edges := w.here().edgesOf(cell{col, row})
 			for _, doorway := range [2]struct {
 				ground Ground
 				north  bool
@@ -124,14 +124,14 @@ func (w *World) toggle(doorway Doorway) bool {
 	w.Stop()
 	middle := doorway.middle()
 	w.hero.Face(FacingToward(middle.x-w.hero.x, middle.z-w.hero.z))
-	if w.terrain.shut[doorway] {
-		delete(w.terrain.shut, doorway)
+	if w.here().shut[doorway] {
+		delete(w.here().shut, doorway)
 		w.sounds.OpenDoor()
 		return true
 	}
-	w.terrain.shut[doorway] = true
-	if !w.terrain.passable(w.hero.x, w.hero.z) {
-		delete(w.terrain.shut, doorway)
+	w.here().shut[doorway] = true
+	if !w.here().passable(w.hero.x, w.hero.z) {
+		delete(w.here().shut, doorway)
 		w.message = standingInTheWay
 		return false
 	}

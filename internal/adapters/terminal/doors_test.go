@@ -49,7 +49,7 @@ func TestEOffersToCloseTheOpenDoorInReach(t *testing.T) {
 func TestChoosingCloseShutsTheDoorAndOffersToOpenIt(t *testing.T) {
 	r, _ := closeView(atTheLodgeDoor(world.Wall))
 	r.toggleMenu()
-	r.chooseFirst()
+	r.choose(0)
 	if r.menu != nil {
 		t.Fatal("choosing an action must close the menu")
 	}

@@ -32,16 +32,18 @@ type renderer struct {
 	inventoryOpen, panelShown bool
 	lastPanel                 string
 	cursor                    slotCursor
-	// built surveys a map's structures within the drawn area, each frame.
-	built builtArea
-	// menu lists the actions offered for the tree or doorway in reach, named by menuTitle; nil
-	// when closed. menuDoorway marks a menu offered for a doorway.
-	menu        []string
-	menuTitle   string
-	menuDoorway bool
-	zoom        zoom
-	turn        turning
-	gait        gait
+	// built surveys a map's structures within the drawn area, each frame, and upstairs those of
+	// each floor above the ground up to the hero's, the first floor first.
+	built    builtArea
+	upstairs []builtArea
+	// menu lists the actions offered for the tree, doorway, staircase or ladder in reach, named by
+	// menuTitle; nil when closed. menuFor is what it offers them for.
+	menu      []string
+	menuTitle string
+	menuFor   menuFor
+	zoom      zoom
+	turn      turning
+	gait      gait
 	// lastSeconds is when the last frame was rendered, so the gait can follow the time between frames.
 	lastSeconds float64
 	// palette is the color of each ink: the forest's own, then the colors of the map's models.
@@ -150,6 +152,10 @@ type forestCanvas struct {
 	// the ground from the same height wherever it goes.
 	elevation    func(x, z float64) float64
 	highest, eye float64
+	// surface is how high whatever the ground shows lies at a world position, the ground or a
+	// floor above it; nil for the ground. floor is how high the floor being drawn on lies; nil for
+	// the ground.
+	surface, floor func(x, z float64) float64
 	// lift raises whatever is being drawn onto the ground it stands on.
 	lift float64
 	// under is the world position of the ground shown at each pixel, row by row.
@@ -200,8 +206,22 @@ func (c *forestCanvas) heightAt(x, z float64) float64 {
 	return c.elevation(x, z)
 }
 
-// standOn raises whatever is drawn next onto the ground at a world position.
+// surfaceAt is how high whatever the ground shows lies at a world position: the ground, or a floor
+// above it.
+func (c *forestCanvas) surfaceAt(x, z float64) float64 {
+	if c.surface == nil {
+		return c.heightAt(x, z)
+	}
+	return c.surface(x, z)
+}
+
+// standOn raises whatever is drawn next onto the floor being drawn on at a world position, the
+// ground unless a floor above it is.
 func (c *forestCanvas) standOn(x, z float64) {
+	if c.floor != nil {
+		c.lift = c.floor(x, z)
+		return
+	}
 	c.lift = c.heightAt(x, z)
 }
 
@@ -350,12 +370,24 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	cameraX, cameraZ := f.Camera()
 	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
 	c.turnTo(r.turn.current)
-	c.elevation, c.highest, c.lift = f.Elevation, f.Highest(), 0
+	storey := f.Storey()
+	c.elevation, c.highest, c.lift = f.Elevation, f.Highest()+float64(storey)*world.StoreyHeight, 0
+	c.surface, c.floor = nil, nil
 	if !f.Mapped() {
 		// The endless forest's hills level out by the rivers, which are sampled below.
 		c.elevation = func(x, z float64) float64 { return f.ElevationAmid(r.rivers.at(z), x, z) }
 	}
-	c.eye = f.Elevation(cameraX, cameraZ)
+	if storey > 0 {
+		// The ground shows the floors up to the hero's, each over the floors below it.
+		c.surface = func(x, z float64) float64 {
+			if shown, ok := r.shownFloor(x, z); ok {
+				return f.ElevationOn(shown, x, z)
+			}
+			return c.heightAt(x, z)
+		}
+	}
+	// The camera looks down on the floor the hero stands on.
+	c.eye = f.ElevationOn(storey, cameraX, cameraZ)
 	if len(c.pixels) != c.width*c.height {
 		c.pixels = make([]forestPixel, c.width*c.height)
 		c.under = make([]groundPoint, c.width*c.height)
@@ -388,7 +420,13 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	})
 	// A map's water lies in its tiles, so only the endless forest samples its rivers.
 	if f.Mapped() {
-		r.built.survey(f, left, right, back, front)
+		r.built.survey(f, 0, left, right, back, front)
+		r.upstairs = r.upstairs[:0]
+		for floor := 1; floor <= storey; floor++ {
+			r.upstairs = append(r.upstairs, builtArea{})
+			r.upstairs[floor-1].survey(f, floor, left, right, back, front)
+		}
+		r.built.cover(r.upstairs)
 	} else {
 		r.rivers.sample(f, back, front, left, right, 1/c.scale)
 	}
@@ -409,9 +447,17 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	c.doorways = c.doorways[:0]
 	if f.Mapped() {
 		// The hero shows through the buildings and roofs in front of them.
+		c.floor = r.floorOf(storey)
 		c.clearing = c.around(f.Hero().Position())
-		r.drawStructures(c)
-		r.drawModels(c)
+		c.floor = nil
+		r.drawStructures(c, &r.built)
+		r.drawModels(c, &r.built, f.Models())
+		for i := range r.upstairs {
+			c.floor = r.floorOf(i + 1)
+			r.drawStructures(c, &r.upstairs[i])
+			r.drawModels(c, &r.upstairs[i], f.ModelsOn(i+1))
+		}
+		c.floor = nil
 		r.drawRoofs(c)
 		c.clearing = clearing{}
 	}
@@ -447,9 +493,13 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		c.standOn(item.X, item.Z)
 		drawGroundItem(c, item)
 	}
+	c.floor = r.floorOf(storey)
 	r.drawCharacter(c, seconds)
+	c.floor = nil
 	r.drawGrass(c, left, right, back, front, seconds)
+	c.floor = r.floorOf(storey)
 	c.halo(r.world.Hero().Position())
+	c.floor = nil
 	r.drawFireworks(c)
 	return c
 }
@@ -779,7 +829,7 @@ func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 	type sample struct{ x, z, height, toward, y float64 }
 	at := func(toward float64) sample {
 		wx, wz := c.fromView(across, toward)
-		height := c.heightAt(wx, wz) - c.eye
+		height := c.surfaceAt(wx, wz) - c.eye
 		return sample{wx, wz, height, toward, float64(c.height)*0.57 + (toward*0.72-height*0.69)*c.scale}
 	}
 	previous := at(near)
@@ -802,6 +852,40 @@ func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 		}
 		previous = current
 	}
+}
+
+// shownFloor is the highest floor above the ground, up to the hero's, floored at a world position,
+// or false where the ground shows.
+func (r *renderer) shownFloor(x, z float64) (int, bool) {
+	for floor := len(r.upstairs); floor > 0; floor-- {
+		if _, ok := r.world.GroundOn(floor, x, z); ok {
+			return floor, true
+		}
+	}
+	return 0, false
+}
+
+// floorOf is how high a floor lies, for whatever is drawn on it; nil for the ground.
+func (r *renderer) floorOf(storey int) func(x, z float64) float64 {
+	if storey == 0 {
+		return nil
+	}
+	return func(x, z float64) float64 { return r.world.ElevationOn(storey, x, z) }
+}
+
+// flightAt finds the staircase or ladder on the hero's floor shown under a 1-based terminal cell
+// of the last frame.
+func (r *renderer) flightAt(column, row int) (world.Flight, bool) {
+	x, z, ok := r.groundAt(column, row)
+	if !ok {
+		return world.Flight{}, false
+	}
+	fixture, stands := r.world.FixtureOn(r.world.Storey(), x, z)
+	if !stands || fixture != world.Staircase && fixture != world.Ladder {
+		return world.Flight{}, false
+	}
+	col, tileRow, _, _ := tileAt(x, z)
+	return world.Flight{Col: col, Row: tileRow, Kind: fixture}, true
 }
 
 // groundLight is the ink and light of the ground at a world position, lying at a height.
@@ -827,7 +911,12 @@ func (r *renderer) groundLight(c *forestCanvas, wx, wz, height, seconds float64)
 	water, bank := false, false
 	if f.Mapped() {
 		ground, onMap := f.GroundAt(wx, wz)
-		ground = r.built.underfoot(wx, wz, ground)
+		built := &r.built
+		if shown, ok := r.shownFloor(wx, wz); ok {
+			ground, _ = f.GroundOn(shown, wx, wz)
+			built = &r.upstairs[shown-1]
+		}
+		ground = built.underfoot(wx, wz, ground)
 		switch {
 		case !onMap:
 			ink, light = 0, 0
@@ -846,11 +935,11 @@ func (r *renderer) groundLight(c *forestCanvas, wx, wz, height, seconds float64)
 			ink, light = boardsInk, boards(wz, wx, n)
 		}
 		water = ground == world.Water
-		if ground == world.Grass && r.built.banked(wx, wz) {
+		if ground == world.Grass && built.banked(wx, wz) {
 			ink, light = bankInk, 0.26+n*0.2
 		}
 		if onMap {
-			shade := r.built.shade(wx, wz)
+			shade := built.shade(wx, wz)
 			light *= shade
 			if shade == castShadow {
 				ink = inShadow(ink)
@@ -878,7 +967,7 @@ func (c *forestCanvas) slopeLight(x, z, height float64) float64 {
 		return 1
 	}
 	const reach = 0.3
-	normal := vec{height - c.elevation(x+reach, z), reach, height - c.elevation(x, z+reach)}.unit()
+	normal := vec{height - c.surfaceAt(x+reach, z), reach, height - c.surfaceAt(x, z+reach)}.unit()
 	return max(0.2, 1+2*(sunlight(normal)/sunlight(vec{0, 1, 0})-1))
 }
 

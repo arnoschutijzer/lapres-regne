@@ -2,13 +2,15 @@ package terminal
 
 import "lapresregne/internal/world"
 
-// drawModels draws each of the map's models standing within the surveyed area, triangle by
-// triangle in their own colours, each lit as it faces the sun, on the ground at the middle of the
-// tiles it stands over.
-func (r *renderer) drawModels(c *forestCanvas) {
-	a := &r.built
-	for _, placed := range r.world.Models() {
+// drawModels draws each of a floor's models standing within its surveyed area, but those under a
+// floor drawn above it, triangle by triangle in their own colours, each lit as it faces the sun,
+// on the floor at the middle of the tiles it stands over.
+func (r *renderer) drawModels(c *forestCanvas, a *builtArea, models []world.PlacedModel) {
+	for _, placed := range models {
 		if placed.Col+placed.Cols < a.col || placed.Col > a.col+a.cols || placed.Row+placed.Rows < a.row || placed.Row > a.row+a.rows {
+			continue
+		}
+		if a.at(placed.Col+placed.Cols/2, placed.Row+placed.Rows/2).covered {
 			continue
 		}
 		middleX := (float64(placed.Col) + float64(placed.Cols)/2) * world.TileSize

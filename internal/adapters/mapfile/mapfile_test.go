@@ -323,3 +323,58 @@ func TestMistakesInAModelsFileAreReportedWithTheirLine(t *testing.T) {
 		}
 	}
 }
+
+func TestAMapFileBuildsFloorsAboveItsGround(t *testing.T) {
+	// A room of two tiles with a staircase, and a first floor of boards above it, walled to the
+	// west, with the staircase's top on it.
+	loaded, err := Load(write(t, "tower.map", `terrain
+@__
+
+objects
+..S
+
+terrain 1
+.bb
+
+walls 1
+. . .
+  # 
+
+objects 1
+..S
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, b := world.Grass, world.Boards
+	want := []world.UpperFloor{{
+		Ground: [][]world.Ground{{g, b, b}},
+		Edges: world.Edges{
+			West:    [][]world.Ground{{g, world.Wall, g}},
+			North:   [][]world.Ground{{g, g, g}},
+			Rising:  [][]world.Ground{{g, g, g}},
+			Falling: [][]world.Ground{{g, g, g}},
+		},
+		Fixtures: []world.PlacedFixture{{Col: 2, Row: 0, Kind: world.Staircase}},
+	}}
+	if !reflect.DeepEqual(loaded.Upstairs, want) {
+		t.Fatalf("upstairs = %+v, want %+v", loaded.Upstairs, want)
+	}
+	if want := []world.PlacedFixture{{Col: 2, Row: 0, Kind: world.Staircase}}; !reflect.DeepEqual(loaded.Fixtures, want) {
+		t.Fatalf("ground floor fixtures = %+v, want %+v", loaded.Fixtures, want)
+	}
+}
+
+func TestMistakesInAMapFilesFloorsAreReported(t *testing.T) {
+	for _, mistake := range []struct{ text, want string }{
+		{"terrain\n@.\n\nterrain 1\nT.\n", "line 5: no tree grows above the ground floor"},
+		{"terrain\n@.\n\nterrain 1\n@.\n", "line 5: the hero starts on the ground floor"},
+		{"terrain\n@.\n\nterrain x\n..\n", "line 4: want \"terrain <floor>\""},
+		{"terrain\n@.\n\nheights 1\n..\n", "line 4: want \"heights\""},
+	} {
+		_, err := Load(write(t, "broken.map", mistake.text))
+		if err == nil || !strings.Contains(err.Error(), mistake.want) {
+			t.Errorf("load %q = %v, want an error containing %q", mistake.text, err, mistake.want)
+		}
+	}
+}
