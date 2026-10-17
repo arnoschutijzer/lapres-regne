@@ -108,7 +108,7 @@ func TestTheGroundShowsTheRiver(t *testing.T) {
 	// Walk south along x 0 until the ground is a river.
 	for z := 0.0; z < 400; z += 0.5 {
 		if distance, width := w.River(0, z); distance < width/2 {
-			c, _, _ := groundPixel(w, 0, int(z*unit*depthSquash))
+			c, _ := groundPixel(w, 0, int(z*unit*depthSquash))
 			for _, blue := range waterTones {
 				if c == blue {
 					return
@@ -118,38 +118,6 @@ func TestTheGroundShowsTheRiver(t *testing.T) {
 		}
 	}
 	t.Skip("no river within 400 units south")
-}
-
-func TestTheGroundIsPaintedInCleanShapesWithoutStatic(t *testing.T) {
-	chunk := paintChunk(world.New(7), 0, 0)
-	lone := 0
-	for y := range chunkSize {
-		for x := 1; x < chunkSize-1; x++ {
-			c := chunk.RGBAAt(x, y)
-			if c != chunk.RGBAAt(x-1, y) && c != chunk.RGBAAt(x+1, y) {
-				lone++
-			}
-		}
-	}
-	if share := float64(lone) / (chunkSize * chunkSize); share > 0.04 {
-		t.Errorf("%.0f%% of the ground's pixels stand alone in their row; want clean shapes", share*100)
-	}
-}
-
-func TestClearingsGrowWildflowers(t *testing.T) {
-	w := world.New(7)
-	flowers := map[color.RGBA]bool{crimsonTones[1]: true, goldTones[1]: true, paleTones[1]: true}
-	for cy := -3; cy <= 3; cy++ {
-		for cx := -3; cx <= 3; cx++ {
-			chunk := paintChunk(w, cx, cy)
-			for i := 0; i < len(chunk.Pix); i += 4 {
-				if flowers[color.RGBA{chunk.Pix[i], chunk.Pix[i+1], chunk.Pix[i+2], 255}] {
-					return
-				}
-			}
-		}
-	}
-	t.Fatal("no wildflower grows anywhere near the start")
 }
 
 func TestTheSameGroundIsPaintedEveryTime(t *testing.T) {
@@ -296,5 +264,36 @@ func TestMotesDriftSlowlyInTheAir(t *testing.T) {
 		if moved := math.Hypot(after[i].x-before[i].x, after[i].y-before[i].y); moved > 4 {
 			t.Errorf("mote %d moves %v pixels in half a second; want a slow drift", i, moved)
 		}
+	}
+}
+
+func TestTheDitherMixesTwoTonesInProportion(t *testing.T) {
+	counts := map[color.RGBA]int{}
+	for y := range 4 {
+		for x := range 4 {
+			counts[floorTones.dithered(2.25, x, y)]++
+		}
+	}
+	if counts[floorTones[2]] != 12 || counts[floorTones[3]] != 4 {
+		t.Errorf("a value of 2.25 shows %v; want three quarters the third tone, a quarter the fourth", counts)
+	}
+}
+
+func TestTheFloorIsStrewnWithLitterAndRareCrimson(t *testing.T) {
+	w := world.New(7)
+	found := map[color.RGBA]bool{}
+	for cy := -3; cy <= 3; cy++ {
+		for cx := -3; cx <= 3; cx++ {
+			chunk := paintChunk(w, cx, cy)
+			for i := 0; i < len(chunk.Pix); i += 4 {
+				found[color.RGBA{chunk.Pix[i], chunk.Pix[i+1], chunk.Pix[i+2], 255}] = true
+			}
+		}
+	}
+	if !found[litterTones[1]] {
+		t.Error("no fallen leaves lie anywhere near the start")
+	}
+	if !found[crimsonTones[1]] {
+		t.Error("no crimson flower grows anywhere near the start")
 	}
 }

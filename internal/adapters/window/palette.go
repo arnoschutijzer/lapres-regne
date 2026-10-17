@@ -2,13 +2,15 @@ package window
 
 import (
 	"image/color"
+	"math"
 
 	"lapresregne/internal/world"
 )
 
-// The window's palette is picked by hand, after Hyper Light Drifter's flat fields of teal, moss
-// and violet, sunk into Blasphemous's darkness: every material runs through a few tones from a
-// blue-black shadow to one bright accent, darkest first.
+// The window's palette is picked by hand after Blasphemous: umber, olive and ochre sunk into
+// near-black, cold murky water, and crimson as the only bright accent. Every material runs through
+// a few tones, darkest first, and the step from one tone to the next is broken by an ordered
+// dither, as in the terminal's braille forest, so every surface carries grit.
 type tones []color.RGBA
 
 func rgb(hex uint32) color.RGBA {
@@ -22,38 +24,56 @@ func (t tones) at(index int) color.RGBA {
 
 var (
 	// voidColor is whatever lies beyond the world.
-	voidColor = rgb(0x07060c)
+	voidColor = rgb(0x040405)
 
-	grassTones = tones{rgb(0x081215), rgb(0x0d1d20), rgb(0x132b2a), rgb(0x1b3e36), rgb(0x285643), rgb(0x427a50)}
+	// floorTones are the bare forest floor: dark earth and rot.
+	floorTones = tones{rgb(0x060607), rgb(0x0e0d0d), rgb(0x181512), rgb(0x231e17), rgb(0x302919), rgb(0x433820)}
+	// mossTones are the moss and dying grass that patch the floor.
+	mossTones = tones{rgb(0x080b09), rgb(0x10150f), rgb(0x192014), rgb(0x242d18), rgb(0x33401c), rgb(0x4a5424)}
 	// bankTones are the trodden mud along a river.
-	bankTones  = tones{rgb(0x120f14), rgb(0x1e1a1c), rgb(0x2c2622)}
-	waterTones = tones{rgb(0x060f22), rgb(0x0b1e3a), rgb(0x123257), rgb(0x1d5379), rgb(0x6fbcc4)}
-	pathTones  = tones{rgb(0x1a1216), rgb(0x2a1e1e), rgb(0x3d2b26), rgb(0x58402f)}
-	stoneTones = tones{rgb(0x121019), rgb(0x1f1c29), rgb(0x2f2b3b), rgb(0x463f55), rgb(0x6c6280)}
-	boardTones = tones{rgb(0x150d0e), rgb(0x2a1915), rgb(0x45291d), rgb(0x643c25)}
+	bankTones  = tones{rgb(0x070708), rgb(0x0f0e0e), rgb(0x1a1715), rgb(0x26211c)}
+	waterTones = tones{rgb(0x030506), rgb(0x070c0f), rgb(0x0d161a), rgb(0x162429), rgb(0x24383a), rgb(0x5f7470)}
+	pathTones  = tones{rgb(0x0c0a0a), rgb(0x1a1512), rgb(0x2a2219), rgb(0x3c3022), rgb(0x52422c)}
+	stoneTones = tones{rgb(0x09090b), rgb(0x141417), rgb(0x222125), rgb(0x333137), rgb(0x4a4650), rgb(0x6c6670)}
+	boardTones = tones{rgb(0x0b0807), rgb(0x1c130e), rgb(0x2e1f15), rgb(0x44301e)}
 
-	// Wildflowers are the few bright accents in the grass: Blasphemous's crimson and gold, and a
-	// pale violet.
-	crimsonTones = tones{rgb(0x5c0f1e), rgb(0xa3243a), rgb(0xe0566a)}
-	goldTones    = tones{rgb(0x6b4414), rgb(0xc8902e), rgb(0xf2cf6b)}
-	paleTones    = tones{rgb(0x4a4260), rgb(0x9a90b8), rgb(0xd8d0ec)}
+	// Crimson is the forest's one bright accent: a few blood-red flowers in the dark.
+	crimsonTones = tones{rgb(0x3a0810), rgb(0x76121e), rgb(0xae2430)}
+	// litterTones are fallen leaves rotting on the floor.
+	litterTones = tones{rgb(0x24120c), rgb(0x3e1f10), rgb(0x5c3218)}
+	// ashTones and emberTones are the specks drifting in the air.
+	ashTones   = tones{rgb(0x2a2826), rgb(0x6a6660), rgb(0xa8a298)}
+	emberTones = tones{rgb(0x4a1608), rgb(0xa8481a), rgb(0xe8963a)}
 )
+
+// bayer holds the thresholds of a 4 x 4 ordered dither, the terminal forest's own.
+var bayer = [4][4]float64{
+	{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5},
+}
+
+// dithered is a material's color at a value counted in its tones, such as 2.4 for most of the way
+// from its third tone to its fourth: the fraction picks between the two through the ordered dither
+// at the pixel x, y.
+func (t tones) dithered(value float64, x, y int) color.RGBA {
+	threshold := (bayer[y&3][x&3] + 0.5) / 16
+	return t.at(int(math.Floor(value + 1 - threshold)))
+}
 
 // Each kind of tree has its own leaves, from the shadow deep in its crown to the light on its top.
 var canopyTones = map[world.TreeKind]tones{
-	world.NormalTree: {rgb(0x06111a), rgb(0x0b1d24), rgb(0x112d2e), rgb(0x184036), rgb(0x22573f), rgb(0x357449), rgb(0x62a058)},
-	world.Oak:        {rgb(0x110e0c), rgb(0x1d1a12), rgb(0x2c2915), rgb(0x423c1b), rgb(0x5c5421), rgb(0x80742b), rgb(0xbca448)},
-	world.Willow:     {rgb(0x0b1516), rgb(0x142429), rgb(0x20362e), rgb(0x314a37), rgb(0x466343), rgb(0x668654), rgb(0xa2bc76)},
-	world.Yew:        {rgb(0x040c15), rgb(0x071721), rgb(0x0c242b), rgb(0x123435), rgb(0x1a473f), rgb(0x28604a), rgb(0x4a855a)},
+	world.NormalTree: {rgb(0x040605), rgb(0x0a0e0a), rgb(0x121a10), rgb(0x1c2714), rgb(0x283618), rgb(0x3a4a1c), rgb(0x5e6a2c)},
+	world.Oak:        {rgb(0x070504), rgb(0x120d08), rgb(0x1e160c), rgb(0x2c2010), rgb(0x3e2e14), rgb(0x56421a), rgb(0x7e6428)},
+	world.Willow:     {rgb(0x060806), rgb(0x10140e), rgb(0x1a2016), rgb(0x272e1e), rgb(0x373f26), rgb(0x4c5530), rgb(0x707a48)},
+	world.Yew:        {rgb(0x020404), rgb(0x060b0a), rgb(0x0b1311), rgb(0x111c18), rgb(0x182820), rgb(0x223626), rgb(0x384e34)},
 }
 
 var (
-	barkTones     = tones{rgb(0x0d090d), rgb(0x1c1317), rgb(0x31201d), rgb(0x4a3124), rgb(0x684830)}
-	deadBarkTones = tones{rgb(0x14111a), rgb(0x28222e), rgb(0x413946), rgb(0x675d6e), rgb(0x968c9e)}
+	barkTones     = tones{rgb(0x040303), rgb(0x0d0a09), rgb(0x18120f), rgb(0x261d17), rgb(0x382a20), rgb(0x4e3c2c)}
+	deadBarkTones = tones{rgb(0x080707), rgb(0x141312), rgb(0x22201e), rgb(0x35322e), rgb(0x4e4a44), rgb(0x76706a)}
 	// woodTones are the pale wood a cut shows.
-	woodTones = tones{rgb(0x5a3e28), rgb(0x9a7046), rgb(0xd0a468)}
-	// shadowColor is the flat shade a canopy or the hero casts on the ground, laid at shadowAlpha.
-	shadowColor = rgb(0x02040e)
+	woodTones = tones{rgb(0x3e2a1a), rgb(0x6e5032), rgb(0x9c7a4c)}
+	// shadowColor is the shade a canopy or the hero casts on the ground, laid at shadowAlpha.
+	shadowColor = rgb(0x010102)
 )
 
-const shadowAlpha = 0.5
+const shadowAlpha = 0.6

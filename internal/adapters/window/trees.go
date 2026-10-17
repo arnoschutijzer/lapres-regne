@@ -134,12 +134,12 @@ func treeSprite(kind world.TreeKind, crownWidth, height int, variation float64) 
 			if math.IsInf(nearest, 1) {
 				continue
 			}
-			tone := int(math.Floor((shade+0.42+leaf(x, y)*0.16)*3.4)) + 1
+			value := (shade+0.42+leaf(x, y)*0.16)*3.4 + 0.5
 			if rim {
 				// The underside of each lobe sinks into the dark between it and the next.
-				tone = min(tone, 1)
+				value = math.Min(value, 1.2)
 			}
-			sprite.SetRGBA(x, y, leaves.at(tone))
+			sprite.SetRGBA(x, y, leaves.dithered(value, x, y))
 		}
 	}
 	if kind == world.Willow {
@@ -242,7 +242,8 @@ func shadowSprite(across, down int) *image.RGBA {
 	for y := range down {
 		for x := range across {
 			dx, dy := (float64(x)+0.5-rx)/rx, (float64(y)+0.5-ry)/ry
-			if dx*dx+dy*dy <= 1 {
+			// The shadow's edge breaks up through the dither rather than ending on a clean line.
+			if d := dx*dx + dy*dy; d <= 0.75 || d <= 1 && (bayer[y&3][x&3]+0.5)/16 > (d-0.75)/0.25 {
 				sprite.SetRGBA(x, y, shadowColor)
 			}
 		}

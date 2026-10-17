@@ -87,11 +87,11 @@ func shaftOffset(originX int, seconds float64) float64 {
 	return -math.Mod(math.Mod(float64(originX)-seconds*shaftDrift, shaftPeriod)+shaftPeriod, shaftPeriod)
 }
 
-// mote is a speck drifting in the air at a point of the screen, glowing at a strength from 0 to 1;
-// a pale mote glows violet-white rather than gold.
+// mote is a speck drifting in the air at a point of the screen, glowing at a strength from 0 to 1:
+// grey ash, or now and then an ember.
 type mote struct {
 	x, y, glow float64
-	pale       bool
+	ember      bool
 }
 
 // moteCell is the size of the world's cells, in art pixels, that each may hold one mote.
@@ -113,7 +113,7 @@ func motes(originX, originY int, seconds float64) []mote {
 			y := float64(cy*moteCell) + hash(cx, cy, 75)*moteCell - rise - float64(originY)
 			glow := 0.5 + 0.5*math.Sin(seconds*0.8+phase*1.3)
 			if x >= -2 && y >= -2 && x < screenWidth+2 && y < screenHeight+2 {
-				shown = append(shown, mote{x, y, glow, hash(cx, cy, 76) < 0.3})
+				shown = append(shown, mote{x, y, glow, hash(cx, cy, 76) < 0.15})
 			}
 		}
 	}

@@ -90,7 +90,7 @@ type game struct {
 	chunks map[image.Point]*ebiten.Image
 	// The atmosphere's pictures, sent to the graphics card once.
 	vignette, shafts   *ebiten.Image
-	goldGlow, paleGlow *ebiten.Image
+	ashGlow, emberGlow *ebiten.Image
 }
 
 func newGame(w *world.World, music soundtrack.Player) *game {
@@ -167,8 +167,8 @@ func (g *game) drawAtmosphere(screen *ebiten.Image) {
 	if g.vignette == nil {
 		g.vignette = ebiten.NewImageFromImage(vignetteImage())
 		g.shafts = ebiten.NewImageFromImage(shaftsImage())
-		g.goldGlow = ebiten.NewImageFromImage(moteImage(goldTones))
-		g.paleGlow = ebiten.NewImageFromImage(moteImage(paleTones))
+		g.ashGlow = ebiten.NewImageFromImage(moteImage(ashTones))
+		g.emberGlow = ebiten.NewImageFromImage(moteImage(emberTones))
 	}
 	originX, originY := g.view.snapped().origin()
 	for offset := shaftOffset(originX, g.seconds); offset < screenWidth; offset += shaftPeriod {
@@ -177,9 +177,9 @@ func (g *game) drawAtmosphere(screen *ebiten.Image) {
 		screen.DrawImage(g.shafts, options)
 	}
 	for _, m := range motes(originX, originY, g.seconds) {
-		glow := g.goldGlow
-		if m.pale {
-			glow = g.paleGlow
+		glow := g.ashGlow
+		if m.ember {
+			glow = g.emberGlow
 		}
 		options := &ebiten.DrawImageOptions{Blend: ebiten.BlendLighter}
 		options.GeoM.Translate(math.Round(m.x)-1, math.Round(m.y)-1)
