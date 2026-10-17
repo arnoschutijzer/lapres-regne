@@ -139,6 +139,13 @@ var forestPalette = [...][3]int{
 	{40, 66, 60},    // grass in shadow
 	{96, 80, 64},    // earth path in shadow
 	{60, 64, 78},    // flagstones in shadow
+	{232, 206, 92},  // yellow wildflowers
+	{226, 226, 214}, // white wildflowers
+	{176, 136, 214}, // violet wildflowers
+	{150, 146, 136}, // stones
+	{74, 112, 60},   // bushes
+	{110, 92, 62},   // muddy bank
+	{150, 160, 96},  // reeds
 }
 
 // foremost marks the inks of the hero, their axe, flying chips and fireworks.
@@ -263,6 +270,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	if f.Mapped() {
 		r.drawStructures(c)
 	}
+	r.drawScatter(c, left, right, back, front)
 	for _, tree := range trees {
 		if !tree.Stump {
 			c.shadow(tree)
@@ -595,6 +603,10 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 		if sun > 0.24 {
 			ink = 7
 		}
+		// Wildflowers bloom in the open, and patches of grass wear down to bare earth.
+		if speck, speckLight, ok := groundSpeck(f, wx, wz, n, c.scale); ok && (cover < 0.38 || speck == pathInk) {
+			ink, light = speck, speckLight
+		}
 		water, bank := false, false
 		if f.Mapped() {
 			ground, onMap := f.GroundAt(wx, wz)
@@ -612,6 +624,9 @@ func (r *renderer) groundRow(c *forestCanvas, y int, seconds float64) {
 				ink, light = floorInk, flagstones(wx, wz, n)
 			}
 			water = ground == world.Water
+			if ground == world.Grass && r.built.banked(wx, wz) {
+				ink, light = bankInk, 0.26+n*0.2
+			}
 			if onMap {
 				shade := r.built.shade(wx, wz)
 				light *= shade

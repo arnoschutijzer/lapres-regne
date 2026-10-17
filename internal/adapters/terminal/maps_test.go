@@ -160,13 +160,17 @@ func meadow() *world.World {
 	return world.NewOnMap(7, world.Map{Name: "Meadow", Ground: ground, StartCol: 40, StartRow: 30})
 }
 
-// groundLight is the mean light of the canvas's ground pixels, away from the hero.
+// groundLight is the mean light of the canvas's plain grass where nothing stands on it: pixels
+// still at the ground's own depth.
 func groundLight(c *forestCanvas) float64 {
 	total, count := 0.0, 0
-	for _, p := range c.pixels {
-		if !foremost(p.ink) {
-			total += p.light
-			count++
+	for y := range c.height {
+		ground := -(float64(y) - float64(c.height)*0.57) / (0.72 * c.scale) * 0.69
+		for x := range c.width {
+			if p := c.pixels[y*c.width+x]; (p.ink == 0 || p.ink == 1) && p.depth == ground {
+				total += p.light
+				count++
+			}
 		}
 	}
 	return total / float64(count)
@@ -270,5 +274,49 @@ func TestAWallsFacesTurnedFromTheSunAreDarkerStone(t *testing.T) {
 	}
 	if ink := inkAt(walledMeadow(), 80.5, wallHeight+copingHeight, 51); ink != stoneInk {
 		t.Fatalf("ink on the wall's top = %d, want the sunlit stone", ink)
+	}
+}
+
+// pondside is meadow's open grass with a pond across rows 34 to 39, just south of the hero.
+func pondside() *world.World {
+	ground := make([][]world.Ground, 60)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 80)
+	}
+	for row := 34; row < 40; row++ {
+		for col := 20; col < 60; col++ {
+			ground[row][col] = world.Water
+		}
+	}
+	return world.NewOnMap(7, world.Map{Name: "Pondside", Ground: ground, StartCol: 40, StartRow: 30})
+}
+
+func TestMeadowsBloomWithWildflowersEvenFromAfar(t *testing.T) {
+	c := newRenderer(meadow(), "L’Après-Règne").render(160, 60, 0)
+	if countInk(c, flowerInks[:]...) == 0 {
+		t.Fatal("the far view of open grass must show specks of wildflowers")
+	}
+}
+
+func TestStonesBushesAndFlowersDotTheGrassUpClose(t *testing.T) {
+	r := newRenderer(meadow(), "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	c := r.render(160, 60, 0)
+	for name, inks := range map[string][]int{"stones": {pebbleInk}, "bushes": {bushInk}, "flowers": flowerInks[:]} {
+		if countInk(c, inks...) == 0 {
+			t.Errorf("no %s drawn on the grass up close", name)
+		}
+	}
+}
+
+func TestWaterIsEdgedWithMuddyBanksAndReeds(t *testing.T) {
+	r := newRenderer(pondside(), "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	c := r.render(160, 60, 0)
+	if countInk(c, bankInk) == 0 {
+		t.Fatal("the pond must have a muddy bank")
+	}
+	if countInk(c, reedInk) == 0 {
+		t.Fatal("reeds must grow along the pond")
 	}
 }
