@@ -13,6 +13,7 @@ import (
 	"lapresregne/internal/adapters/songfiles"
 	"lapresregne/internal/adapters/speaker"
 	"lapresregne/internal/adapters/terminal"
+	"lapresregne/internal/adapters/viewfile"
 	"lapresregne/internal/soundtrack"
 	"lapresregne/internal/world"
 )
@@ -62,9 +63,14 @@ func startMusic(device *speaker.Device, directory string) (*speaker.Playback, er
 
 // run is the composition root: it builds every adapter and wires it to the domain.
 func run(seed uint64, mapPath string, mute bool, musicDir, savePath string) error {
-	progress := &progressfile.File{Path: savePath}
+	progress := progressfile.File{Path: savePath}
+	// The view is kept beside the progress, in a file of its own.
+	views := viewfile.File{Path: filepath.Join(filepath.Dir(savePath), "view.json")}
+	view, err := views.Load()
+	if err != nil {
+		return fmt.Errorf("%w (move or remove it to start afresh)", err)
+	}
 	var forest *world.World
-	var err error
 	if mapPath == "" {
 		forest, err = world.Resume(seed, progress, time.Now())
 	} else {
@@ -99,9 +105,9 @@ func run(seed uint64, mapPath string, mute bool, musicDir, savePath string) erro
 			music = playback
 		}
 	}
-	camera := terminal.NewCamera(progress.View.Zoom, progress.View.Yaw)
-	// Progress is kept however the session ends, even when it ends with an error.
+	camera := terminal.NewCamera(view.Zoom, view.Yaw)
+	// Progress and the view are kept however the session ends, even when it ends with an error.
 	played := session.Run(forest, camera, music, appTitle)
-	progress.View = progressfile.View{Zoom: camera.Zoom(), Yaw: camera.Yaw()}
-	return errors.Join(played, forest.Keep(progress, time.Now()))
+	kept := views.Save(viewfile.View{Zoom: camera.Zoom(), Yaw: camera.Yaw()})
+	return errors.Join(played, forest.Keep(progress, time.Now()), kept)
 }

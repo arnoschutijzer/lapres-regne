@@ -33,7 +33,7 @@
 - Domain: `internal/world` (terrain, maps, character, movement), `internal/soundtrack` (shuffle, history, fades)
 - Ports: `internal/soundtrack/ports.go` (`Samples`, `Decoder`, `Player`), `internal/world/ports.go` (`Sounds`, `Progress`)
 - Inbound adapters: `internal/adapters/terminal` (`session.go`, `input.go`)
-- Outbound adapters: `internal/adapters/terminal` (`render.go`, `foliage.go`), `internal/adapters/songfiles`, `internal/adapters/speaker`, `internal/adapters/progressfile`, `internal/adapters/mapfile`
+- Outbound adapters: `internal/adapters/terminal` (`render.go`, `foliage.go`), `internal/adapters/songfiles`, `internal/adapters/speaker`, `internal/adapters/progressfile`, `internal/adapters/viewfile`, `internal/adapters/mapfile`
 
 ## Commands
 - Unit tests: `go test ./internal/...`

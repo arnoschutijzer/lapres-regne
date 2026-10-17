@@ -12,18 +12,9 @@ import (
 	"lapresregne/internal/world"
 )
 
-// File keeps progress as JSON at Path, along with the View the terminal last showed it from.
+// File keeps progress as JSON at Path.
 type File struct {
 	Path string
-	// View is read by Load and written by Save.
-	View View
-}
-
-// View is the camera's zoom, in steps in from the forest view, and its yaw about the upright axis,
-// in radians.
-type View struct {
-	Zoom int
-	Yaw  float64
 }
 
 // version marks the file layout; a file of any other layout is refused.
@@ -45,7 +36,6 @@ type progressJSON struct {
 	SavedAt time.Time            `json:"savedAt"`
 	Hero    heroJSON             `json:"hero"`
 	Skills  map[string]skillJSON `json:"skills"`
-	Camera  cameraJSON           `json:"camera"`
 	// Inventory lists the inventory slot by slot, naming each item and leaving "" for an empty slot.
 	Inventory []string    `json:"inventory"`
 	Stumps    []stumpJSON `json:"stumps"`
@@ -58,11 +48,6 @@ type heroJSON struct {
 	Storey int `json:"storey,omitempty"`
 }
 
-type cameraJSON struct {
-	Zoom int     `json:"zoom"`
-	Yaw  float64 `json:"yaw"`
-}
-
 type skillJSON struct {
 	XP float64 `json:"xp"`
 }
@@ -73,7 +58,7 @@ type stumpJSON struct {
 	RegrowMillis int64 `json:"regrowMillis"`
 }
 
-func (f *File) Load() (world.Snapshot, bool, error) {
+func (f File) Load() (world.Snapshot, bool, error) {
 	data, err := os.ReadFile(f.Path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return world.Snapshot{}, false, nil
@@ -92,7 +77,6 @@ func (f *File) Load() (world.Snapshot, bool, error) {
 		Seed: saved.Seed, Map: saved.Map, X: saved.Hero.X, Z: saved.Hero.Z, Storey: saved.Hero.Storey,
 		SavedAt: saved.SavedAt,
 	}
-	f.View = View{Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw}
 	for name, skill := range saved.Skills {
 		known, ok := skillNamed(name)
 		if !ok {
@@ -122,12 +106,11 @@ func (f *File) Load() (world.Snapshot, bool, error) {
 
 // Save writes a temporary file beside the save and renames it over the old one, so an
 // interrupted save never leaves a half-written file behind.
-func (f *File) Save(snapshot world.Snapshot) error {
+func (f File) Save(snapshot world.Snapshot) error {
 	saved := progressJSON{
 		Version: version, Seed: snapshot.Seed, Map: snapshot.Map, SavedAt: snapshot.SavedAt,
 		Hero:      heroJSON{X: snapshot.X, Z: snapshot.Z, Storey: snapshot.Storey},
 		Skills:    map[string]skillJSON{},
-		Camera:    cameraJSON{Zoom: f.View.Zoom, Yaw: f.View.Yaw},
 		Inventory: []string{},
 		Stumps:    []stumpJSON{},
 	}

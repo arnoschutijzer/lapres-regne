@@ -12,7 +12,7 @@ import (
 
 func TestSavedProgressLoadsBackUnchanged(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "progress.json")
-	file := &File{Path: path, View: View{Zoom: 5, Yaw: -0.375}}
+	file := &File{Path: path}
 	snapshot := world.Snapshot{
 		Seed: 7, Map: "Lumbridge", X: 4.95, Z: -1.65, Storey: 2, Skills: map[string]float64{world.Woodcutting: 112.5},
 		Inventory: []world.Slot{{Item: world.OakLogs, Filled: true}, {}, {Item: world.WillowLogs, Filled: true}, {Item: world.YewLogs, Filled: true}},
@@ -26,9 +26,6 @@ func TestSavedProgressLoadsBackUnchanged(t *testing.T) {
 	loaded, saved, err := reopened.Load()
 	if err != nil || !saved {
 		t.Fatalf("load = %v, %v; want the saved snapshot", saved, err)
-	}
-	if reopened.View != file.View {
-		t.Fatalf("view = %+v, want the kept %+v", reopened.View, file.View)
 	}
 	if !loaded.SavedAt.Equal(snapshot.SavedAt) {
 		t.Fatalf("saved at = %v, want %v", loaded.SavedAt, snapshot.SavedAt)
