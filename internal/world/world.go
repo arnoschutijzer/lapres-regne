@@ -24,6 +24,8 @@ type World struct {
 	chop      chop
 	// destination is the point on the ground the hero walks to after a click.
 	destination destination
+	// doorApproach is the doorway whose door the hero opens or closes on reaching the destination.
+	doorApproach doorApproach
 	// ground holds the dropped items until they disappear.
 	ground      []GroundItem
 	message     string
@@ -129,6 +131,7 @@ func (w *World) walkToFor(dt time.Duration, speed float64) {
 	// A hero who cannot get any closer gives up on the destination.
 	if len(waypoints) == 0 || !moving {
 		w.destination = destination{}
+		w.arriveAtDoor()
 	}
 }
 

@@ -98,6 +98,9 @@ type forestPixel struct {
 	ink          int
 	// tree is the standing tree drawn here, counting from 1 into the frame's trees; 0 for anything else.
 	tree int
+	// doorway is the doorway drawn here, counting from 1 into the frame's doorways; 0 for anything
+	// else.
+	doorway int
 }
 
 type forestCell struct {
@@ -138,6 +141,10 @@ type forestCanvas struct {
 	// drawing is the standing tree being drawn, counting from 1 into the frame's trees; 0 for
 	// anything else.
 	drawing int
+	// doorways lists the doorways drawn this frame, and drawingDoorway is the one being drawn,
+	// counting from 1 into them; 0 for anything else.
+	doorways       []world.Doorway
+	drawingDoorway int
 	// elevation is how high the ground lies at a world position; nil for flat ground. highest is
 	// the highest it lies anywhere, and eye how high it lies under the camera, which looks down on
 	// the ground from the same height wherever it goes.
@@ -290,7 +297,7 @@ func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
 	}
 	i := y*c.width + x
 	if depth <= c.pixels[i].depth {
-		c.pixels[i] = forestPixel{depth, light, ink, c.drawing}
+		c.pixels[i] = forestPixel{depth, light, ink, c.drawing, c.drawingDoorway}
 	}
 }
 
@@ -366,6 +373,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 		}()
 	}
 	ground.Wait()
+	c.doorways = c.doorways[:0]
 	if f.Mapped() {
 		r.drawStructures(c)
 		r.drawModels(c)
@@ -449,25 +457,43 @@ func (r *renderer) groundAt(column, row int) (x, z float64, ok bool) {
 // treeAt finds the frontmost standing tree drawn under a 1-based terminal cell of the last frame.
 // Only the tree's own pixels count, so leaves cut away up close leave the trunk to be clicked.
 func (r *renderer) treeAt(column, row int) (world.Tree, bool) {
+	front := r.frontmostAt(column, row, func(p forestPixel) int { return p.tree })
+	if front == 0 {
+		return world.Tree{}, false
+	}
+	return r.trees[front-1], true
+}
+
+// doorwayAt finds the frontmost doorway drawn under a 1-based terminal cell of the last frame: its
+// door or gate, or the stone framing it.
+func (r *renderer) doorwayAt(column, row int) (world.Doorway, bool) {
+	front := r.frontmostAt(column, row, func(p forestPixel) int { return p.doorway })
+	if front == 0 {
+		return world.Doorway{}, false
+	}
+	return r.canvas.doorways[front-1], true
+}
+
+// frontmostAt finds what is drawn frontmost under a 1-based terminal cell of the last frame, as
+// one of a pixel's numbers picks it out; 0 where nothing is.
+func (r *renderer) frontmostAt(column, row int, number func(forestPixel) int) int {
 	c := &r.canvas
 	centreX, centreY, ok := r.canvasPoint(column, row)
 	if !ok {
-		return world.Tree{}, false
+		return 0
 	}
 	// The cell covers 2 x 4 braille dots around its centre.
 	left, top := int(centreX)-1, int(centreY)-2
 	front, nearest := 0, math.Inf(1)
 	for y := top; y < top+4; y++ {
 		for x := left; x < left+2; x++ {
-			if p := c.pixels[y*c.width+x]; p.tree != 0 && p.depth < nearest {
-				front, nearest = p.tree, p.depth
+			p := c.pixels[y*c.width+x]
+			if n := number(p); n != 0 && p.depth < nearest {
+				front, nearest = n, p.depth
 			}
 		}
 	}
-	if front == 0 {
-		return world.Tree{}, false
-	}
-	return r.trees[front-1], true
+	return front
 }
 
 // slotAt finds the inventory slot under a 1-based terminal cell of the open panel.
@@ -735,7 +761,7 @@ func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 				float64(y),
 			}
 			ink, light := r.groundLight(c, point.x, point.z, point.height+c.eye, seconds)
-			c.pixels[y*c.width+x] = forestPixel{-point.toward*0.69 - point.height*0.72, light * quiet, ink, 0}
+			c.pixels[y*c.width+x] = forestPixel{-point.toward*0.69 - point.height*0.72, light * quiet, ink, 0, 0}
 			c.under[y*c.width+x] = groundPoint{point.x, point.z}
 		}
 		previous = current

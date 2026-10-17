@@ -121,6 +121,7 @@ func (w *World) Approach(tree Tree) bool {
 	}
 	w.chop = chop{}
 	w.destination = destination{}
+	w.doorApproach = doorApproach{}
 	w.message = ""
 	route := w.route(standing.X, standing.Z)
 	w.approach = approach{active: true, tree: tree.cell, waypoints: route[:len(route)-1]}
@@ -130,6 +131,7 @@ func (w *World) Approach(tree Tree) bool {
 // Stop cancels walking to a point or a tree and chopping one, and clears the last message.
 func (w *World) Stop() {
 	w.destination = destination{}
+	w.doorApproach = doorApproach{}
 	w.approach = approach{}
 	w.chop = chop{}
 	w.message = ""

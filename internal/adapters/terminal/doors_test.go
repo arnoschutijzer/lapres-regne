@@ -78,3 +78,29 @@ func TestEClosesAnOpenMenu(t *testing.T) {
 		t.Fatalf("menu = %q, want it closed", r.menu)
 	}
 }
+
+// cellOf is the 1-based terminal cell a world point is drawn in, in the last frame.
+func cellOf(r *renderer, x, y, z float64) (column, row int) {
+	px, py, _ := r.canvas.project(x, y, z)
+	return int(px)/2 + 1 + (r.screenWidth-r.canvas.width/2)/2, int(py)/4 + 2
+}
+
+func TestDoorwayAtPicksTheDoorUnderAClick(t *testing.T) {
+	r := newRenderer(atTheLodgeDoor(world.Wall), "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	r.frame(160, 60, 0)
+	column, row := cellOf(r, 41, (doorHeight+wallHeight)/2, 28.36)
+	if doorway, ok := r.doorwayAt(column, row); !ok || doorway != (world.Doorway{Col: 20, Row: 14, North: true}) {
+		t.Fatalf("doorwayAt(%d, %d) = %+v, %v; want the lodge's doorway", column, row, doorway, ok)
+	}
+}
+
+func TestDoorwayAtFindsNothingOnOpenGround(t *testing.T) {
+	r := newRenderer(atTheLodgeDoor(world.Wall), "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	r.frame(160, 60, 0)
+	column, row := cellOf(r, 30, 0, 32)
+	if doorway, ok := r.doorwayAt(column, row); ok {
+		t.Fatalf("doorwayAt(%d, %d) = %+v; want open ground", column, row, doorway)
+	}
+}

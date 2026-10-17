@@ -94,11 +94,14 @@ func (a *builtArea) drawEdges(c *forestCanvas, col, row int, x, z, variety float
 			} else {
 				tileZ -= size / 2
 			}
+			c.doorways = append(c.doorways, world.Doorway{Col: col, Row: row, North: !northSouth})
+			c.drawingDoorway = len(c.doorways)
 			if a.walledDoorway(edge.startCol, edge.startRow, edge.endCol, edge.endRow) {
 				drawDoor(c, tileX, tileZ, joined, edge.shut)
 			} else {
 				drawGate(c, tileX, tileZ, joined, edge.shut)
 			}
+			c.drawingDoorway = 0
 		}
 	}
 	c.standOn(x+size/2, z+size/2)

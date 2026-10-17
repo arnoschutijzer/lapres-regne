@@ -74,6 +74,53 @@ func (w *World) ToggleDoor() bool {
 	if !ok {
 		return false
 	}
+	return w.toggle(doorway)
+}
+
+// ApproachDoor walks the hero to their side of a doorway, round whatever blocks the way, and
+// opens or closes its door on arrival.
+func (w *World) ApproachDoor(doorway Doorway) {
+	if w.terrain == nil {
+		return
+	}
+	near := doorway.side(w.hero.x, w.hero.z).middle()
+	w.WalkTo(near.x, near.z)
+	w.doorApproach = doorApproach{active: true, doorway: doorway}
+}
+
+// doorApproach is a doorway the hero walks to, to open or close its door on arrival.
+type doorApproach struct {
+	active  bool
+	doorway Doorway
+}
+
+// arriveAtDoor opens or closes the door the hero walked to, once they stop within reach of it.
+func (w *World) arriveAtDoor() {
+	if !w.doorApproach.active {
+		return
+	}
+	doorway := w.doorApproach.doorway
+	w.doorApproach = doorApproach{}
+	middle := doorway.middle()
+	if math.Hypot(middle.x-w.hero.x, middle.z-w.hero.z) <= doorReach {
+		w.toggle(doorway)
+	}
+}
+
+// side is the tile beside the doorway on the same side of it as a point.
+func (d Doorway) side(x, z float64) cell {
+	middle := d.middle()
+	switch {
+	case d.North && z < middle.z:
+		return cell{d.Col, d.Row - 1}
+	case !d.North && x < middle.x:
+		return cell{d.Col - 1, d.Row}
+	}
+	return cell{d.Col, d.Row}
+}
+
+// toggle opens a shut door or closes an open one, reporting whether it moved.
+func (w *World) toggle(doorway Doorway) bool {
 	w.Stop()
 	middle := doorway.middle()
 	w.hero.Face(FacingToward(middle.x-w.hero.x, middle.z-w.hero.z))

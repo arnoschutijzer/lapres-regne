@@ -83,3 +83,35 @@ func TestTheHeroCannotCloseADoorTheyStandIn(t *testing.T) {
 		t.Fatal("want a message saying the hero is in the way")
 	}
 }
+
+func TestApproachingADoorwayWalksThereAndClosesIt(t *testing.T) {
+	w := world.NewOnMap(7, lodge(world.Wall))
+	w.ApproachDoor(world.Doorway{Col: 3, Row: 4, North: true})
+	walkFor(w, 3*time.Second)
+	if !w.EdgesAt(3.5*world.TileSize, 4.5*world.TileSize).NorthShut {
+		t.Fatal("the door stands open after approaching it")
+	}
+	if _, z := w.Hero().Position(); z < 4*world.TileSize {
+		t.Fatalf("z = %v; want the hero still outside, on their side of the door", z)
+	}
+}
+
+func TestApproachingAShutDoorOpensIt(t *testing.T) {
+	w := atTheDoor()
+	w.ToggleDoor()
+	w.ApproachDoor(world.Doorway{Col: 3, Row: 4, North: true})
+	walkFor(w, 3*time.Second)
+	if w.EdgesAt(3.5*world.TileSize, 4.5*world.TileSize).NorthShut {
+		t.Fatal("the door stays shut after approaching it")
+	}
+}
+
+func TestWalkingElsewhereGivesUpOnTheDoor(t *testing.T) {
+	w := world.NewOnMap(7, lodge(world.Wall))
+	w.ApproachDoor(world.Doorway{Col: 3, Row: 4, North: true})
+	w.WalkTo(7.5*world.TileSize, 5.5*world.TileSize)
+	walkFor(w, 3*time.Second)
+	if w.EdgesAt(3.5*world.TileSize, 4.5*world.TileSize).NorthShut {
+		t.Fatal("the door closed after the hero walked elsewhere")
+	}
+}
