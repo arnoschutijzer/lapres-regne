@@ -23,6 +23,7 @@ const (
 	dropLog
 	previousSlot
 	nextSlot
+	toggleBank
 )
 
 type keyEvent struct {
@@ -101,6 +102,8 @@ func keyAction(key int) action {
 		return previousSlot
 	case ']':
 		return nextSlot
+	case 'b', 'B':
+		return toggleBank
 	}
 	return none
 }

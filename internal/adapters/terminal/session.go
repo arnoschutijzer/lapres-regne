@@ -132,7 +132,7 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 		}
 		if event.click {
 			if slot, ok := view.slotAt(event.column, event.row); ok {
-				view.cursor = slotCursor{active: true, slot: slot}
+				view.clickSlot(slot)
 				return false
 			}
 			// Clicking a tree walks there to chop it, clicking a door or gate walks there to open or
@@ -182,8 +182,8 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 			return false
 		}
 		if event.action == dropLog {
-			// Holding X keeps dropping, one log per repeat.
-			view.cursor.drop(world)
+			// Holding X keeps dropping, or depositing while the bank is open, one log per repeat.
+			view.removeFromSlot()
 			return false
 		}
 		if event.action == previousSlot || event.action == nextSlot {
@@ -193,6 +193,12 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 				view.cursor.move(-1)
 			} else {
 				view.cursor.move(1)
+			}
+			return false
+		}
+		if event.action == toggleBank {
+			if !event.repeat {
+				view.toggleBank()
 			}
 			return false
 		}

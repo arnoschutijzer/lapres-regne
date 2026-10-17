@@ -16,7 +16,9 @@ type World struct {
 	// taken.
 	offeredClimb bool
 	// ground holds the dropped items until they disappear.
-	ground      []GroundItem
+	ground []GroundItem
+	// bank keeps the items the hero deposits.
+	bank        Bank
 	message     string
 	celebration celebration
 	sounds      Sounds

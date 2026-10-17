@@ -34,6 +34,9 @@ type renderer struct {
 	inventoryOpen, panelShown bool
 	lastPanel                 string
 	cursor                    slotCursor
+	// bankOpen shows the bank panel; bankShown and lastBank remember the last one drawn.
+	bankOpen, bankShown bool
+	lastBank            string
 	// built surveys a map's structures within the drawn area, each frame, and upstairs those of
 	// each floor above the ground up to the hero's, the first floor first.
 	built    builtArea
@@ -671,7 +674,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 		out.WriteString("\x1b[2J\x1b[1;1H  " + r.title)
 	}
-	hint := "  arrows/WASD/IJKL · shift run · E act · Tab bag · X drop · Q quit"
+	hint := "  arrows/WASD/IJKL · shift run · E act · Tab bag · B bank · X drop · Q quit"
 	if width >= 81 {
 		hint += " · N/P tracks"
 	}
@@ -710,6 +713,15 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	if r.panelShown && !r.inventoryOpen {
 		for row := range min(panelHeight, rows) {
 			for col := panelLeft; col < cols; col++ {
+				r.cells[row*cols+col] = forestCell{bits: 0xff, ink: 0xff}
+			}
+		}
+	}
+	// The bank covers the top left corner in the same way.
+	bankRight := min(bankWidth, cols)
+	if r.bankShown && !r.bankOpen {
+		for row := range min(panelHeight, rows) {
+			for col := range bankRight {
 				r.cells[row*cols+col] = forestCell{bits: 0xff, ink: 0xff}
 			}
 		}
@@ -795,11 +807,14 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			}
 		}
 		previous := r.cells[row*cols : (row+1)*cols]
-		visible := cols
+		start, visible := 0, cols
+		if r.bankOpen && row < panelHeight {
+			start = bankRight
+		}
 		if r.inventoryOpen && row < panelHeight {
 			visible = panelLeft
 		}
-		for col := 0; col < visible; {
+		for col := start; col < visible; {
 			if !full && current[col] == previous[col] {
 				col++
 				continue
@@ -856,6 +871,17 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 	}
 	r.panelShown = r.inventoryOpen
+	if r.bankOpen {
+		lines := bankPanel(r.world.Bank())
+		panel := strings.Join(lines, "\n")
+		if full || !r.bankShown || panel != r.lastBank {
+			for i, line := range lines[:min(len(lines), rows)] {
+				fmt.Fprintf(&out, "\x1b[%d;%dH%s", i+2, margin+1, line)
+			}
+			r.lastBank = panel
+		}
+	}
+	r.bankShown = r.bankOpen
 	x, z := r.world.Hero().Position()
 	status := fmt.Sprintf("  x %.1f  z %.1f  |  steps %d  |  facing %s  |  %s", x, z, r.world.Hero().Steps(), r.world.Hero().Facing(), r.world.Region())
 	if r.world.Chopping() {

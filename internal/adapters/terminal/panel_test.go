@@ -36,7 +36,7 @@ func TestTheCursorWrapsAroundTheSlots(t *testing.T) {
 func TestXDropsTheHighlightedLogThenMovesToTheNextOne(t *testing.T) {
 	w := withLogs(t, 3)
 	cursor := slotCursor{active: true, slot: 1}
-	cursor.drop(w)
+	cursor.remove(w, w.Drop)
 	slots := w.Hero().Inventory().Slots()
 	if !slots[0].Filled || slots[1].Filled || !slots[2].Filled {
 		t.Fatalf("slots = %v, want only the highlighted second slot emptied", slots[:3])
@@ -49,13 +49,13 @@ func TestXDropsTheHighlightedLogThenMovesToTheNextOne(t *testing.T) {
 func TestXWithoutAHighlightedLogDropsTheFirstOne(t *testing.T) {
 	w := withLogs(t, 2)
 	cursor := slotCursor{active: true, slot: 9}
-	cursor.drop(w)
+	cursor.remove(w, w.Drop)
 	slots := w.Hero().Inventory().Slots()
 	if slots[0].Filled || !slots[1].Filled || cursor.slot != 1 {
 		t.Fatalf("slots = %v, cursor = %+v; want the first log dropped and the cursor on the next", slots[:2], cursor)
 	}
 	none := slotCursor{}
-	none.drop(w)
+	none.remove(w, w.Drop)
 	if w.Hero().Inventory().Len() != 0 {
 		t.Fatal("with nothing highlighted, X must drop the first log")
 	}

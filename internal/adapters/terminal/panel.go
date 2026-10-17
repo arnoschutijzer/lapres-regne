@@ -87,9 +87,9 @@ func (s *slotCursor) move(step int) {
 	s.slot = (s.slot + step + world.InventorySize) % world.InventorySize
 }
 
-// drop drops the highlighted item, or the first item when no item is highlighted, then
-// highlights the next item so repeated presses empty the inventory in order.
-func (s *slotCursor) drop(w *world.World) {
+// remove drops or deposits the highlighted item, or the first item when no item is highlighted,
+// then highlights the next item so repeated presses empty the inventory in order.
+func (s *slotCursor) remove(w *world.World, remove func(slot int) bool) {
 	slots := w.Hero().Inventory().Slots()
 	slot := s.slot
 	if !s.active || !slots[slot].Filled {
@@ -99,7 +99,7 @@ func (s *slotCursor) drop(w *world.World) {
 		}
 		slot = first
 	}
-	w.Drop(slot)
+	remove(slot)
 	s.active, s.slot = true, slot
 	slots = w.Hero().Inventory().Slots()
 	for step := 1; step < world.InventorySize; step++ {
