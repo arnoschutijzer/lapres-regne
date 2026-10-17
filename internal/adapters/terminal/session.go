@@ -147,7 +147,6 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 			// Clicking a tree walks there to chop it, clicking a door or gate walks there to open or
 			// close it, clicking a staircase or ladder walks there to climb it, clicking the ground
 			// walks there, and clicking anything else stops.
-			view.menu = nil
 			if tree, ok := view.treeAt(event.column, event.row); ok {
 				world.Approach(tree)
 			} else if doorway, ok := view.doorwayAt(event.column, event.row); ok {
