@@ -297,3 +297,24 @@ func TestTheFloorIsStrewnWithLitterAndRareCrimson(t *testing.T) {
 		t.Error("no crimson flower grows anywhere near the start")
 	}
 }
+
+func TestTheFogTileWrapsSeamlessly(t *testing.T) {
+	for y := 0; y < fogPeriod; y += 17 {
+		if a, b := fogDensity(0, y, 81), fogDensity(fogPeriod, y, 81); math.Abs(a-b) > 1e-9 {
+			t.Fatalf("the fog at the tile's left edge is %v and past its right edge %v; want the same", a, b)
+		}
+	}
+}
+
+func TestTheFogDriftsInPatches(t *testing.T) {
+	fog := fogImage(81)
+	misty := 0
+	for i := 3; i < len(fog.Pix); i += 4 {
+		if fog.Pix[i] != 0 {
+			misty++
+		}
+	}
+	if share := float64(misty) / (fogPeriod * fogPeriod); share < 0.1 || share > 0.6 {
+		t.Errorf("fog covers %.0f%% of its tile; want drifts with clear ground between", share*100)
+	}
+}

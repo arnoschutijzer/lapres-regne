@@ -91,6 +91,7 @@ type game struct {
 	// The atmosphere's pictures, sent to the graphics card once.
 	vignette, shafts   *ebiten.Image
 	ashGlow, emberGlow *ebiten.Image
+	fogs               []*ebiten.Image
 }
 
 func newGame(w *world.World, music soundtrack.Player) *game {
@@ -162,15 +163,30 @@ func (g *game) Draw(screen *ebiten.Image) {
 	g.drawAtmosphere(screen)
 }
 
-// drawAtmosphere lays the light shafts, the drifting motes and the darkening edges over the scene.
+// drawAtmosphere lays the fog, the light shafts, the drifting ash and the darkening edges over the
+// scene.
 func (g *game) drawAtmosphere(screen *ebiten.Image) {
 	if g.vignette == nil {
 		g.vignette = ebiten.NewImageFromImage(vignetteImage())
 		g.shafts = ebiten.NewImageFromImage(shaftsImage())
+		for _, layer := range fogLayers {
+			g.fogs = append(g.fogs, ebiten.NewImageFromImage(fogImage(layer.salt)))
+		}
 		g.ashGlow = ebiten.NewImageFromImage(moteImage(ashTones))
 		g.emberGlow = ebiten.NewImageFromImage(moteImage(emberTones))
 	}
 	originX, originY := g.view.snapped().origin()
+	for i, layer := range fogLayers {
+		startX, startY := fogOffset(layer, originX, originY, g.seconds)
+		for y := startY; y < screenHeight; y += fogPeriod {
+			for x := startX; x < screenWidth; x += fogPeriod {
+				options := &ebiten.DrawImageOptions{}
+				options.GeoM.Translate(math.Round(x), math.Round(y))
+				options.ColorScale.ScaleAlpha(float32(layer.strength))
+				screen.DrawImage(g.fogs[i], options)
+			}
+		}
+	}
 	for offset := shaftOffset(originX, g.seconds); offset < screenWidth; offset += shaftPeriod {
 		options := &ebiten.DrawImageOptions{Blend: ebiten.BlendLighter}
 		options.GeoM.Translate(math.Round(offset), 0)

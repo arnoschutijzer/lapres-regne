@@ -6,8 +6,9 @@ import (
 	"math"
 )
 
-// The atmosphere lies over the whole scene: the screen's edges sink into darkness, warm shafts of
-// light slant down from the upper left where the light comes from, and motes drift in the air.
+// The atmosphere lies over the whole scene: low fog rolls over the floor, pale shafts of light
+// slant down from the upper left where the light comes from, ash drifts in the air, and the
+// screen's edges sink into darkness.
 // Everything moves slowly, so the forest stays calm.
 
 // vignette is how far a pixel of the screen sinks into darkness, from 0 in the middle to
@@ -19,7 +20,7 @@ func vignette(x, y int) float64 {
 	return vignetteDepth * math.Pow(math.Min(1, math.Max(0, (d-0.45)/0.75)), 1.4)
 }
 
-const vignetteDepth = 0.75
+const vignetteDepth = 0.88
 
 // vignetteImage is the darkness laid over the screen, as premultiplied void.
 func vignetteImage() *image.RGBA {
@@ -41,13 +42,13 @@ const (
 )
 
 // shaftLightColor is the warm light of the shafts, added to whatever they fall on.
-var shaftLightColor = [3]float64{242, 196, 120}
+var shaftLightColor = [3]float64{196, 186, 150}
 
 // shaft is how strong the light of the shafts is at a point along their period: a few soft bands
 // of differing width and strength.
 func shaft(u float64) float64 {
 	bands := [...]struct{ middle, width, strength float64 }{
-		{70, 26, 0.09}, {120, 9, 0.06}, {300, 40, 0.07}, {350, 12, 0.05}, {470, 18, 0.06},
+		{70, 26, 0.07}, {120, 9, 0.045}, {300, 40, 0.055}, {350, 12, 0.04}, {470, 18, 0.045},
 	}
 	light := 0.0
 	for _, b := range bands {
@@ -130,4 +131,59 @@ func moteImage(t tones) *image.RGBA {
 	}
 	glow.SetRGBA(1, 1, t[2])
 	return glow
+}
+
+// fogPeriod is the size of the fog's tile, in art pixels; the tile repeats seamlessly.
+const fogPeriod = 256
+
+// fogColor is the cold, pale mist drifting low over the forest floor.
+var fogColor = rgb(0x5a6460)
+
+// fogDensity is how thick the fog is at a pixel of its tile, from 0 to 1: soft drifts made of
+// value noise on a grid that wraps round the tile.
+func fogDensity(x, y int, salt uint64) float64 {
+	octave := func(cell int) float64 {
+		cells := fogPeriod / cell
+		gx, gy := floorDiv(x, cell), floorDiv(y, cell)
+		fx, fy := float64(mod(x, cell))/float64(cell), float64(mod(y, cell))/float64(cell)
+		corner := func(cx, cy int) float64 { return hash(mod(cx, cells), mod(cy, cells), salt) }
+		smooth := func(t float64) float64 { return t * t * (3 - 2*t) }
+		sx, sy := smooth(fx), smooth(fy)
+		top := corner(gx, gy) + (corner(gx+1, gy)-corner(gx, gy))*sx
+		bottom := corner(gx, gy+1) + (corner(gx+1, gy+1)-corner(gx, gy+1))*sx
+		return top + (bottom-top)*sy
+	}
+	density := octave(64)*0.65 + octave(32)*0.35
+	return math.Min(1, math.Max(0, (density-0.45)*2.2))
+}
+
+// fogImage is one tile of fog, its density dithered into scattered pixels of mist.
+func fogImage(salt uint64) *image.RGBA {
+	fog := image.NewRGBA(image.Rect(0, 0, fogPeriod, fogPeriod))
+	for y := range fogPeriod {
+		for x := range fogPeriod {
+			if fogDensity(x, y, salt) > (bayer[y&3][x&3]+0.5)/16 {
+				fog.SetRGBA(x, y, fogColor)
+			}
+		}
+	}
+	return fog
+}
+
+// fogLayer is one layer of fog: how fast it drifts across the world, in art pixels a second, and
+// how strongly it shows.
+type fogLayer struct {
+	drift, strength float64
+	salt            uint64
+}
+
+// fogLayers drift at different speeds, so the mist seems to roll.
+var fogLayers = [...]fogLayer{{drift: 2, strength: 0.16, salt: 81}, {drift: -1.2, strength: 0.1, salt: 82}}
+
+// fogOffset is where a tile of a fog layer starts on the screen, across and down, for a camera
+// whose top left is the world's pixel originX, originY, some seconds in. The fog holds its place
+// on the ground as the camera moves, drifting slowly.
+func fogOffset(layer fogLayer, originX, originY int, seconds float64) (x, y float64) {
+	wrap := func(v float64) float64 { return -math.Mod(math.Mod(v, fogPeriod)+fogPeriod, fogPeriod) }
+	return wrap(float64(originX) - seconds*layer.drift), wrap(float64(originY) - seconds*layer.drift*0.3)
 }
