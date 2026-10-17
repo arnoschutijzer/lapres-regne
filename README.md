@@ -87,7 +87,7 @@ WY...
 | `#`  | wall    | `=`  | fence   |
 | `G`  | gate    | `+`  | grave   |
 | `D`  | open door | `b`  | wooden floor |
-| `B`  | battlements | | |
+| `B`  | battlements | `H`  | bridge  |
 | `@`  | where the hero starts | | |
 
 Name parts of the map with `area <letter> <name>` settings and an `areas`
