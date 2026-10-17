@@ -62,7 +62,7 @@ func TestXWithoutAHighlightedLogDropsTheFirstOne(t *testing.T) {
 }
 
 func TestAnItemIconIsItsShapeInItsColor(t *testing.T) {
-	if got, want := icon(world.OakLogs), "\x1b[38;2;178;128;74m"+logGlyph; got != want {
+	if got, want := icon(world.OakLogs), foreground([3]int{178, 128, 74})+logGlyph; got != want {
 		t.Fatalf("oak logs icon = %q, want %q", got, want)
 	}
 }

@@ -1,7 +1,6 @@
 package terminal
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -53,7 +52,7 @@ func TestAModelledFixtureIsDrawnAsItsModelInItsOwnColours(t *testing.T) {
 	if countInk(c, plankInk) != 0 {
 		t.Fatal("the table drew its box model too, want only the game's model")
 	}
-	if frame := r.frame(160, 90, 0); !strings.Contains(frame, fmt.Sprintf("38;2;%d;%d;%d", 140, 30, 40)) {
+	if frame := r.frame(160, 90, 0); !strings.Contains(frame, foreground([3]int{140, 30, 40})) {
 		t.Fatal("the model's top must show in its own colour")
 	}
 }

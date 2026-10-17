@@ -633,3 +633,12 @@ func TestADeadTreeStandsBareOfLeaves(t *testing.T) {
 		}
 	}
 }
+
+func TestEveryColourShowsBrighterWithItsHueKept(t *testing.T) {
+	if got, want := foreground([3]int{100, 60, 20}), "\x1b[38;2;140;84;28m"; got != want {
+		t.Fatalf("foreground = %q, want %q", got, want)
+	}
+	if got, want := paperOf([3]int{240, 120, 0}), "\x1b[48;2;255;128;0m"; got != want {
+		t.Fatalf("paper = %q, want %q: a bright color lifts only as far as full strength", got, want)
+	}
+}

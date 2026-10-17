@@ -134,6 +134,40 @@ type forestCell struct {
 // background is the terminal color behind the forest.
 var background = [3]int{9, 15, 14}
 
+// brightness lifts every color the terminal shows, keeping each color's hue.
+const brightness = 1.4
+
+// textInk is the color of the title, hints, status and panel text.
+var textInk = [3]int{147, 166, 130}
+
+// brighten lifts a color by brightness; a channel that would pass full strength scales the
+// others down with it, so the hue holds.
+func brighten(color [3]int) [3]int {
+	scale := brightness
+	for _, channel := range color {
+		if channel > 0 {
+			scale = min(scale, 255/float64(channel))
+		}
+	}
+	var lifted [3]int
+	for i, channel := range color {
+		lifted[i] = int(math.Round(float64(channel) * scale))
+	}
+	return lifted
+}
+
+// foreground is the escape that draws text in a color, brightened.
+func foreground(color [3]int) string {
+	lifted := brighten(color)
+	return fmt.Sprintf("\x1b[38;2;%d;%d;%dm", lifted[0], lifted[1], lifted[2])
+}
+
+// paperOf is the escape that fills cells behind text with a color, brightened.
+func paperOf(color [3]int) string {
+	lifted := brighten(color)
+	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm", lifted[0], lifted[1], lifted[2])
+}
+
 // brailleDot numbers the braille dots by their row and column in a cell.
 var brailleDot = [4][2]int{{0, 3}, {1, 4}, {2, 5}, {6, 7}}
 
@@ -606,7 +640,7 @@ func (r *renderer) slotAt(column, row int) (int, bool) {
 
 func (r *renderer) frame(width, height int, seconds float64) string {
 	var out strings.Builder
-	out.WriteString("\x1b[H\x1b[0m\x1b[48;2;9;15;14m\x1b[38;2;147;166;130m")
+	out.WriteString("\x1b[H\x1b[0m" + paperOf(background) + foreground(textInk))
 	if width < 40 || height < 14 {
 		r.screenWidth = 0
 		message := "Resize to 40 x 14. Q quits."
@@ -639,7 +673,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	}
 	if full || hint != r.lastHint {
 		controls := []rune(hint)
-		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height-1, string(controls[:min(width-1, len(controls))]))
+		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K%s%s", height-1, foreground(textInk), string(controls[:min(width-1, len(controls))]))
 		r.lastHint = hint
 	}
 	skill := ""
@@ -654,7 +688,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		titleEnd := len([]rune(r.title)) + 2
 		start := max(titleEnd+3, width-len(skillRunes))
 		if start < width {
-			fmt.Fprintf(&out, "\x1b[1;%dH\x1b[K\x1b[1;%dH\x1b[38;2;147;166;130m%s", titleEnd+1, start+1, string(skillRunes[:min(width-start, len(skillRunes))]))
+			fmt.Fprintf(&out, "\x1b[1;%dH\x1b[K\x1b[1;%dH%s%s", titleEnd+1, start+1, foreground(textInk), string(skillRunes[:min(width-start, len(skillRunes))]))
 		}
 		r.lastSkill = skill
 	}
@@ -783,18 +817,18 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 					paper = mix(paper, background, veilDepth*float64(cell.veil)/16)
 				}
 				if paper != lastPaper {
-					fmt.Fprintf(&out, "\x1b[48;2;%d;%d;%dm", paper[0], paper[1], paper[2])
+					out.WriteString(paperOf(paper))
 					lastPaper = paper
 				}
 				if color != lastColor {
-					fmt.Fprintf(&out, "\x1b[38;2;%d;%d;%dm", color[0], color[1], color[2])
+					out.WriteString(foreground(color))
 					lastColor = color
 				}
 				out.WriteRune(glyph)
 			}
 		}
 	}
-	out.WriteString("\x1b[48;2;9;15;14m")
+	out.WriteString(paperOf(background))
 	if r.inventoryOpen {
 		lines := inventoryPanel(r.world.Hero().Inventory(), r.cursor)
 		panel := strings.Join(lines, "\n")
@@ -817,7 +851,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		status += fmt.Sprintf("  |  seed %d", r.world.Seed())
 	}
 	if full || status != r.lastStatus {
-		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K\x1b[38;2;147;166;130m%s", height, status[:min(width-1, len(status))])
+		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K%s%s", height, foreground(textInk), status[:min(width-1, len(status))])
 		r.lastStatus = status
 	}
 	return out.String()

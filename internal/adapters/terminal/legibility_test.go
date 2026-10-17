@@ -70,7 +70,7 @@ func TestTheSceneryKeepsHeavyDitheringWithSolidColorUnderneath(t *testing.T) {
 	for _, p := range glyphs {
 		if p.glyph > 0x2800 && p.glyph <= 0x28ff {
 			dots++
-			if p.background != background {
+			if p.background != brighten(background) {
 				tinted++
 			}
 		}
@@ -132,7 +132,7 @@ func TestTheInterfaceRestoresItsBackgroundAfterDrawingColoredScenery(t *testing.
 	r := newRenderer(meadow(), NewCamera(0, 0), "L’Après-Règne")
 	r.inventoryOpen = true
 	for _, p := range terminalGlyphs(r.frame(100, 38, 0)) {
-		if (p.row == 37 || p.row == 38 || p.row == 2 && p.column >= 100-panelWidth+1) && p.background != background {
+		if (p.row == 37 || p.row == 38 || p.row == 2 && p.column >= 100-panelWidth+1) && p.background != brighten(background) {
 			t.Fatalf("interface glyph %q at %d,%d inherits scenery background %v", p.glyph, p.row, p.column, p.background)
 		}
 	}

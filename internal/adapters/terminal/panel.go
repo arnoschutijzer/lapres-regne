@@ -25,12 +25,12 @@ var shapeGlyphs = map[world.Shape]string{
 // icon draws an item in a slot: its shape's glyph in its color.
 func icon(item world.Item) string {
 	color := item.Color()
-	return fmt.Sprintf("\x1b[38;2;%d;%d;%dm", color.R, color.G, color.B) + shapeGlyphs[item.Shape()]
+	return foreground([3]int{int(color.R), int(color.G), int(color.B)}) + shapeGlyphs[item.Shape()]
 }
 
-const (
-	panelText = "\x1b[38;2;147;166;130m"
-	emptySlot = "\x1b[38;2;58;72;62m" + emptyGlyph
+var (
+	panelText = foreground(textInk)
+	emptySlot = foreground([3]int{58, 72, 62}) + emptyGlyph
 )
 
 // Slots sit four cells apart from slotIndent on: a bracket or space, the glyph, a bracket or space.
