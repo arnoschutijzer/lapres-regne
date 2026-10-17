@@ -21,6 +21,8 @@
 //	B  battlements      H  bridge
 //	@  where the hero starts, on grass
 //
+// A "start <col> <row>" setting starts the hero on a tile of any ground instead.
+//
 // Walls, fences, gates and graves block the way, and a bridge is railed along the water.
 //
 // An areas grid, laid over the terrain, names the parts of the map. Each letter stands for the area
@@ -242,6 +244,14 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 			switch setting {
 			case "name":
 				m.Name = strings.TrimSpace(value)
+			case "start":
+				if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d %d", &m.StartCol, &m.StartRow); err != nil {
+					return world.Map{}, fmt.Errorf("line %d: want \"start <col> <row>\"", number)
+				}
+				if hasStart {
+					return world.Map{}, fmt.Errorf("line %d: a second start", number)
+				}
+				hasStart = true
 			case "area":
 				letter, name, _ := strings.Cut(strings.TrimSpace(value), " ")
 				if len([]rune(letter)) != 1 || letter == "." || strings.TrimSpace(name) == "" {
@@ -260,7 +270,7 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 		return world.Map{}, fmt.Errorf("no terrain grid")
 	}
 	if !hasStart {
-		return world.Map{}, fmt.Errorf("no start tile '@'")
+		return world.Map{}, fmt.Errorf("no start tile '@' or start setting")
 	}
 	if err := diagonals(&m.Edges, walls); err != nil {
 		return world.Map{}, err

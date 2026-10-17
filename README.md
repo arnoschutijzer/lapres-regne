@@ -70,7 +70,8 @@ gate. You start where every adventurer does, in the castle courtyard.
 
 A map file is plain text: optional settings, then a `terrain` grid with one
 character per tile (two world units wide), rows running north to south.
-Lines starting with `//` are comments.
+Lines starting with `//` are comments. A `start <col> <row>` setting starts
+the hero on a tile of any ground, in place of `@`.
 
 ```text
 name The Pond

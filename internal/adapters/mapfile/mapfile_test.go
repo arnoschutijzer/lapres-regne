@@ -255,3 +255,13 @@ func TestAnUnknownWallIsReported(t *testing.T) {
 		t.Fatalf("error = %v, want the unknown wall reported on line 5", err)
 	}
 }
+
+func TestAStartSettingStartsTheHeroOnAnyGround(t *testing.T) {
+	loaded, err := Load(write(t, "yard.map", "start 2 1\n\nterrain\n...\n.._\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.StartCol != 2 || loaded.StartRow != 1 || loaded.Ground[1][2] != world.Floor {
+		t.Fatalf("start = %d, %d on %v; want the hero on the stone floor at 2, 1", loaded.StartCol, loaded.StartRow, loaded.Ground[1][2])
+	}
+}
