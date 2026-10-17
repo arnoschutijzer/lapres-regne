@@ -8,13 +8,22 @@
 - Create no new entry points, main functions or parallel wiring.
 - A feature is complete when unit tests cover its domain logic and adapters and the composition root wires it.
 
+## Domain design rules
+- `World` and `Character` hold and call feature types. They are not where features live.
+- A feature with its own state or rules (a skill, an activity, an interaction) gets its own domain type that owns that state. `World` holds an instance of that type, not the type's fields.
+- A feature type depends on the small view of the world it needs (a narrow interface or plain values), not on `World` itself.
+- Shared mechanics stay generic. Skills, XP, levels, level-ups and the save `Snapshot` take the skill name as data. Never add a field, method or branch named after one skill to shared code.
+- The hero does one activity at a time. Keep it in one current-activity value, not in separate "active" flags.
+- The domain holds game state only. Camera and other view state belong to the terminal adapter.
+
 ## Feature workflow (test-driven development)
-1. Define or extend the port the feature needs.
-2. Write failing unit tests for the domain logic.
-3. Implement the domain logic until unit tests pass.
-4. Write failing unit tests for the adapter, then implement or extend it until they pass.
-5. Wire the new pieces in the composition root.
-6. Run the full verification. The feature is done when it passes.
+1. Name the domain type that owns the feature's state and rules. If the answer is `World` or `Character`, create a new type instead.
+2. Define or extend the port the feature needs.
+3. Write failing unit tests for the domain logic.
+4. Implement the domain logic until unit tests pass.
+5. Write failing unit tests for the adapter, then implement or extend it until they pass.
+6. Wire the new pieces in the composition root.
+7. Run the full verification. The feature is done when it passes.
 
 ## Service: lapresregne
 - Entry point: `main.go` (`main`)

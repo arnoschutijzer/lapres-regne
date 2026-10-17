@@ -12,5 +12,9 @@ Use `git diff` against the main branch. Use the paths in `CLAUDE.md` and answer 
 3. Does the domain import anything from adapters, frameworks or infrastructure?
 4. Did the change add a new entry point, main function or wiring location?
 5. Is there new code that only unit tests call?
+6. Does the change add a feature's state or methods to `World`, `Character` or another shared type instead of giving the feature its own domain type?
+7. Does shared code (`Snapshot`, level-ups, ports) gain a field, method or branch named after one skill or activity?
+8. Does the change add a separate "active" flag for an activity instead of using the current-activity value?
+9. Does the domain gain camera or other view state?
 
 List each problem with the file, the line and the required fix.
