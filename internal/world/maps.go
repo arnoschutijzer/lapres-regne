@@ -221,15 +221,49 @@ func (t *terrain) coverAt(x, z float64) float64 {
 	return north*(1-v) + south*v
 }
 
-// elevationAt blends the heights of the four tiles around a world position, so the ground slopes
-// smoothly from tile to tile.
+// elevationAt is the height of the ground at a world position. Water and bridge decks lie flat on
+// their own level. Other ground blends the heights of the four tiles around the position, so it
+// slopes smoothly from tile to tile; its banks fall to meet the water at the water's edge, except
+// beside a bridge, whose deck holds them up on its level.
 func (t *terrain) elevationAt(x, z float64) float64 {
+	here := tileOf(x, z)
+	if ground, ok := t.tile(here.gx, here.gz); ok && (ground == Water || ground == Bridge) {
+		return t.tileHeight(here.gx, here.gz)
+	}
 	u, v := x/TileSize-0.5, z/TileSize-0.5
 	col, row := int(math.Floor(u)), int(math.Floor(v))
 	u, v = u-float64(col), v-float64(row)
-	north := t.tileHeight(col, row)*(1-u) + t.tileHeight(col+1, row)*u
-	south := t.tileHeight(col, row+1)*(1-u) + t.tileHeight(col+1, row+1)*u
+	around := [4]cell{{col, row}, {col + 1, row}, {col, row + 1}, {col + 1, row + 1}}
+	own := t.tileHeight(here.gx, here.gz)
+	deck, bridged := 0.0, false
+	for _, tile := range around {
+		if ground, _ := t.clampedTile(tile.gx, tile.gz); ground == Bridge {
+			deck, bridged = t.tileHeight(tile.gx, tile.gz), true
+		}
+	}
+	var heights [4]float64
+	for i, tile := range around {
+		heights[i] = t.tileHeight(tile.gx, tile.gz)
+		if ground, _ := t.clampedTile(tile.gx, tile.gz); ground == Water {
+			// Mirrored about the water's level, the blend reaches it halfway between the tiles.
+			heights[i] = 2*heights[i] - own
+			if bridged {
+				heights[i] = deck
+			}
+		}
+	}
+	north := heights[0]*(1-u) + heights[1]*u
+	south := heights[2]*(1-u) + heights[3]*u
 	return north*(1-v) + south*v
+}
+
+// clampedTile is the ground of a tile; beyond the map's edges, of the nearest tile on it.
+func (t *terrain) clampedTile(col, row int) (Ground, bool) {
+	row = min(max(row, 0), len(t.ground)-1)
+	if row < 0 {
+		return 0, false
+	}
+	return t.tile(min(max(col, 0), len(t.ground[row])-1), row)
 }
 
 // tileHeight is the height of a tile; beyond the map's edges the ground keeps the height of the

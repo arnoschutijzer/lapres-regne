@@ -29,6 +29,10 @@ func TestTheHillsSlopeGently(t *testing.T) {
 	const step = 0.25
 	for z := -100.0; z <= 100; z += 1.3 {
 		for x := -100.0; x <= 100; x += 1.3 {
+			// The banks of a river's gully fall steeply to the water.
+			if distance, width := w.River(x, z); distance < width+world.BankWidth+step {
+				continue
+			}
 			rise := math.Hypot(w.Elevation(x+step, z)-w.Elevation(x, z), w.Elevation(x, z+step)-w.Elevation(x, z))
 			if rise/step > 0.5 {
 				t.Fatalf("slope at x %v z %v = %v, want gentle slopes no steeper than 0.5", x, z, rise/step)
@@ -37,15 +41,22 @@ func TestTheHillsSlopeGently(t *testing.T) {
 	}
 }
 
-func TestRiversRunAlongTheValleyFloors(t *testing.T) {
+func TestRiversRunInGulliesAlongTheValleyFloors(t *testing.T) {
 	w := world.New(7)
 	found := 0
 	for z := -100.0; z <= 100; z += 0.5 {
 		for x := -100.0; x <= 100; x += 0.5 {
-			if distance, width := w.River(x, z); distance < width+1 {
+			distance, width := w.River(x, z)
+			height := w.Elevation(x, z)
+			switch {
+			case distance < width:
 				found++
-				if height := w.Elevation(x, z); height != 0 {
-					t.Fatalf("elevation of the river or its bank at x %v z %v = %v, want the valley floor", x, z, height)
+				if height != 0 {
+					t.Fatalf("elevation of the river at x %v z %v = %v, want the gully's floor", x, z, height)
+				}
+			case distance >= width+world.BankWidth && distance < width+world.BankWidth+1:
+				if height < world.GullyDepth {
+					t.Fatalf("elevation beside the gully at x %v z %v = %v, want at least the valley floor %v above the water", x, z, height, world.GullyDepth)
 				}
 			}
 		}
@@ -103,5 +114,63 @@ func TestAMapRisesAndFallsWithItsHeights(t *testing.T) {
 	}
 	if w.Highest() != 2*world.LevelHeight {
 		t.Fatalf("highest = %v, want the highest tile's %v", w.Highest(), 2*world.LevelHeight)
+	}
+}
+
+// gully is a map of grass on level 3 with a river on level 0 down column 2, crossed by a bridge on
+// level 3 along row 1.
+func gully() world.Map {
+	g, w, b := world.Grass, world.Water, world.Bridge
+	return world.Map{
+		Name: "gully",
+		Ground: [][]world.Ground{
+			{g, g, w, g, g},
+			{g, g, b, g, g},
+			{g, g, w, g, g},
+			{g, g, w, g, g},
+		},
+		Heights: [][]int{
+			{3, 3, 0, 3, 3},
+			{3, 3, 3, 3, 3},
+			{3, 3, 0, 3, 3},
+			{3, 3, 0, 3, 3},
+		},
+		StartCol: 0, StartRow: 3,
+	}
+}
+
+func TestAMapsRiverLiesFlatInItsGully(t *testing.T) {
+	w := world.NewOnMap(7, gully())
+	bank := 3 * world.LevelHeight
+	// Along the last row, away from the bridge, the banks fall from their own level to meet the
+	// water at its edge.
+	for z := 3 * world.TileSize; z < 4*world.TileSize; z += 0.25 {
+		for x := 2 * world.TileSize; x < 3*world.TileSize; x += 0.25 {
+			if height := w.Elevation(x, z); height != 0 {
+				t.Fatalf("elevation of the water at x %v z %v = %v, want it flat at level 0", x, z, height)
+			}
+		}
+		if height := w.Elevation(2*world.TileSize-0.001, z); height > 0.01 {
+			t.Fatalf("elevation of the bank at the water's edge at z %v = %v, want it down at the water", z, height)
+		}
+		if height := w.Elevation(0.5*world.TileSize, z); height != bank {
+			t.Fatalf("elevation of the field beyond the bank at z %v = %v, want %v", z, height, bank)
+		}
+	}
+}
+
+func TestABridgesDeckLiesFlatAboveTheWater(t *testing.T) {
+	w := world.NewOnMap(7, gully())
+	deck := 3 * world.LevelHeight
+	for z := world.TileSize; z < 2*world.TileSize; z += 0.25 {
+		for x := 2 * world.TileSize; x < 3*world.TileSize; x += 0.25 {
+			if height := w.Elevation(x, z); height != deck {
+				t.Fatalf("elevation of the deck at x %v z %v = %v, want it flat at %v", x, z, height, deck)
+			}
+		}
+		// The deck meets the banks at either end on their level.
+		if height := w.Elevation(2*world.TileSize-0.001, z); math.Abs(height-deck) > 0.01 {
+			t.Fatalf("elevation of the bank at the deck's west end at z %v = %v, want the deck's %v", z, height, deck)
+		}
 	}
 }
