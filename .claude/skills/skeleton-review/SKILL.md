@@ -14,7 +14,7 @@ Use `git diff` against the main branch. Use the paths in `CLAUDE.md` and answer 
 5. Is there new code that only unit tests call?
 6. Does the change add a feature's state or methods to `World`, `Character` or another shared type instead of giving the feature its own domain type?
 7. Does shared code (`Snapshot`, level-ups, ports) gain a field, method or branch named after one skill or activity?
-8. Does the change add a separate "active" flag for an activity instead of using the current-activity value?
+8. Does the change add a separate "active" flag for a player order instead of using the current-order value, or put a background effect into that value?
 9. Does the domain gain camera or other view state?
 10. Does a shared port gain a method for one feature instead of taking a generic effect value?
 11. Does domain code read the wall clock instead of using the `dt` passed to `Advance`?

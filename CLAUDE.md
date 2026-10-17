@@ -13,7 +13,7 @@
 - A feature with its own state or rules (a skill, an activity, an interaction) gets its own domain type that owns that state. `World` holds an instance of that type, not the type's fields.
 - A feature type depends on the small view of the world it needs (a narrow interface or plain values), not on `World` itself.
 - Shared mechanics stay generic. Skills, XP, levels, level-ups and the save `Snapshot` take the skill name as data. Never add a field, method or branch named after one skill to shared code.
-- The hero does one activity at a time. Keep it in one current-activity value, not in separate "active" flags.
+- The hero carries out one player order at a time (walk, chop, open a door, climb), held in one current-order value, not in separate "active" flags. Background effects that run alongside orders (level-up celebration, regrowth, stat restore, run energy) each keep their own state and advance every frame.
 - The domain holds game state only. Camera and other view state belong to the terminal adapter.
 - Ports stay stable as features grow. A feature plays sounds through a generic effect value or its own port, not through a new method on a shared port.
 - Domain code takes time only from the `dt` passed to `Advance`. It never reads the wall clock.
