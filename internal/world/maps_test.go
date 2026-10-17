@@ -475,3 +475,35 @@ func TestCropsLetTheHeroWalkAmongThem(t *testing.T) {
 		t.Fatalf("x = %v; want the hero walked among the crops to the east", x)
 	}
 }
+
+// diagonal is a meadow crossed by a barrier of a kind stepping diagonally from tile to tile,
+// with the hero beside it on the north-east of one step.
+func diagonal(barrier world.Ground) world.Map {
+	ground := make([][]world.Ground, 6)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 6)
+	}
+	for step := range 6 {
+		ground[step][step] = barrier
+	}
+	return world.Map{Name: "diagonal", Ground: ground, StartCol: 3, StartRow: 2}
+}
+
+func TestWallsAndFencesMeetingAtACornerLeaveNoGapBetweenThem(t *testing.T) {
+	for _, barrier := range []world.Ground{world.Wall, world.Battlement, world.Fence} {
+		w := world.NewOnMap(7, diagonal(barrier))
+		w.Advance(-1, 1.2, 2*time.Second, false)
+		if x, z := w.Hero().Position(); x < 3*world.TileSize || z > 3*world.TileSize {
+			t.Fatalf("hero at %v, %v; want them kept north-east of the %v stepping diagonally", x, z, barrier)
+		}
+	}
+}
+
+func TestWalkingToAPointBeyondADiagonalWallFindsNoWayThrough(t *testing.T) {
+	w := world.NewOnMap(7, diagonal(world.Wall))
+	w.WalkTo(2.5*world.TileSize, 3.5*world.TileSize)
+	walkFor(w, 10*time.Second)
+	if x, z := w.Hero().Position(); x < 3*world.TileSize && z > 3*world.TileSize {
+		t.Fatalf("hero at %v, %v; want them still north-east of the wall", x, z)
+	}
+}

@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -603,5 +604,52 @@ func TestAFountainOfFourTilesRisesOnceFromTheirMiddle(t *testing.T) {
 	}
 	if stone < 10 {
 		t.Fatalf("stone pixels where the four tiles meet = %d of 25, want the fountain's pedestal", stone)
+	}
+}
+
+// stepped is a meadow crossed by a barrier of a kind stepping diagonally from tile to tile, the
+// hero standing beside it.
+func stepped(barrier world.Ground) *world.World {
+	ground := make([][]world.Ground, 30)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 40)
+	}
+	for step := range 12 {
+		ground[8+step][14+step] = barrier
+	}
+	return world.NewOnMap(7, world.Map{Name: "Stepped", Ground: ground, StartCol: 22, StartRow: 13})
+}
+
+// inkNear counts the pixels in one of the inks within two pixels of where a point shows.
+func inkNear(c *forestCanvas, x, y, z float64, inks ...int) int {
+	px, py, _ := c.project(x, y, z)
+	found := 0
+	for dy := -2; dy <= 2; dy++ {
+		for dx := -2; dx <= 2; dx++ {
+			if slices.Contains(inks, c.pixels[(int(py)+dy)*c.width+int(px)+dx].ink) {
+				found++
+			}
+		}
+	}
+	return found
+}
+
+func TestWallsAndFencesSteppingDiagonallyJoinAcrossTheCorners(t *testing.T) {
+	for _, barrier := range []struct {
+		ground world.Ground
+		height float64
+		inks   []int
+	}{
+		{world.Wall, 1.5, []int{stoneInk, shadedStoneInk, mossInk}},
+		{world.Battlement, 1.5, []int{stoneInk, shadedStoneInk, mossInk}},
+		{world.Fence, 0.9, []int{plankInk}},
+	} {
+		r := newRenderer(stepped(barrier.ground), "L’Après-Règne")
+		r.zoom = zoom{current: 6}
+		c := r.render(160, 90, 0)
+		// The corner where the steps on tiles 20, 14 and 21, 15 meet.
+		if found := inkNear(c, 21*world.TileSize, barrier.height, 15*world.TileSize, barrier.inks...); found < 5 {
+			t.Errorf("%v: %d of 25 pixels at the corner between two steps drawn, want it joined across", barrier.ground, found)
+		}
 	}
 }

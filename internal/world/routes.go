@@ -63,15 +63,43 @@ func (t *terrain) railed(a, b cell) bool {
 	return first == Bridge && second == Water || first == Water && second == Bridge
 }
 
-// passable tells whether the hero may stand at a point: on an open tile, and not against the
-// rail along a bridge's edge over the water.
+// cornerReach is how far from a tile's corner walls or fences meeting diagonally across it keep
+// the hero: as far as the wall running between them reaches into the tile.
+const cornerReach = 0.4
+
+// barrier tells whether a wall or fence stands on a tile, joining any beside it.
+func (t *terrain) barrier(c cell) bool {
+	ground, ok := t.tile(c.gx, c.gz)
+	return ok && (ground == Wall || ground == Battlement || ground == Fence || ground == Gate)
+}
+
+// cornered tells whether a point of a tile lies in a corner closed off by walls or fences on the
+// two tiles beside it that meet there, which join diagonally across the corner.
+func (t *terrain) cornered(here cell, alongX, alongZ float64) bool {
+	for _, corner := range [4][2]int{{0, 0}, {1, 0}, {0, 1}, {1, 1}} {
+		dx, dz := alongX-float64(corner[0])*TileSize, alongZ-float64(corner[1])*TileSize
+		if math.Hypot(dx, dz) >= cornerReach {
+			continue
+		}
+		stepX, stepZ := corner[0]*2-1, corner[1]*2-1
+		if t.barrier(cell{here.gx + stepX, here.gz}) && t.barrier(cell{here.gx, here.gz + stepZ}) {
+			return true
+		}
+	}
+	return false
+}
+
+// passable tells whether the hero may stand at a point: on an open tile, out of corners closed by
+// walls meeting diagonally, and not against the rail along a bridge's edge over the water.
 func (t *terrain) passable(x, z float64) bool {
 	here := tileOf(x, z)
 	if !t.open(here) {
 		return false
 	}
-	ground, _ := t.tile(here.gx, here.gz)
-	if ground != Bridge {
+	if t.cornered(here, x-float64(here.gx)*TileSize, z-float64(here.gz)*TileSize) {
+		return false
+	}
+	if ground, _ := t.tile(here.gx, here.gz); ground != Bridge {
 		return true
 	}
 	alongX, alongZ := x-float64(here.gx)*TileSize, z-float64(here.gz)*TileSize

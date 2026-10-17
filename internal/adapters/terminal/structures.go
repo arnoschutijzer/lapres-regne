@@ -207,6 +207,10 @@ type builtTile struct {
 	fixture   world.Fixture
 	furnished bool
 	alike     [4]bool
+	// diagonal marks the corners, north-east, south-east, south-west and north-west, where a wall
+	// or fence meets another of its kind standing diagonally beside it with nothing joining them
+	// along the sides, so it runs across the corner to meet it.
+	diagonal [4]bool
 	// besideFixture is the fixture standing on the tiles to the north, east, south and west, where
 	// besideFurnished marks one.
 	besideFixture   [4]world.Fixture
@@ -276,7 +280,27 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 				tile.joined[side] = beside.Blocks() && beside != world.Grave || beside == world.Door
 			}
 		}
+		for corner, step := range corners {
+			across := a.at(col+step[0], row+step[1]).ground
+			sideways, upright := a.at(col+step[0], row).ground, a.at(col, row+step[1]).ground
+			tile.diagonal[corner] = alike(tile.ground, across) && !alike(tile.ground, sideways) && !alike(tile.ground, upright)
+		}
 	}
+}
+
+// corners are the tile steps to the north-east, south-east, south-west and north-west.
+var corners = [4][2]int{{1, -1}, {1, 1}, {-1, 1}, {-1, -1}}
+
+// alike tells whether two grounds are walls or fences of the same kind, which join one another:
+// walls with walls and the doors and gates set in them, fences with fences and gates.
+func alike(this, other world.Ground) bool {
+	if isWall(this) {
+		return isWall(other) || other == world.Door || other == world.Gate
+	}
+	if this == world.Fence || this == world.Gate {
+		return other == world.Fence || other == world.Gate
+	}
+	return false
 }
 
 // at is what stands on a tile; nothing beyond the surveyed area.
@@ -345,6 +369,12 @@ func (a *builtArea) occupied(x, y, z float64) bool {
 		if y > top {
 			return false
 		}
+		for corner, step := range corners {
+			cornerX, cornerZ := middle+float64(step[0])*middle, middle+float64(step[1])*middle
+			if tile.diagonal[corner] && fromSegment(alongX, alongZ, middle, middle, cornerX, cornerZ) <= half {
+				return true
+			}
+		}
 		if east || west || !north && !south {
 			if from, to := span(west, east); alongX >= from && alongX <= to && across(alongZ, half) {
 				return true
@@ -389,6 +419,13 @@ func (a *builtArea) occupied(x, y, z float64) bool {
 		return y <= 1.1 && across(alongX, 0.35) && math.Abs(alongZ-world.TileSize*0.4) <= 0.1
 	}
 	return false
+}
+
+// fromSegment is how far a point lies from the segment between two points, on the ground.
+func fromSegment(x, z, x0, z0, x1, z1 float64) float64 {
+	dx, dz := x1-x0, z1-z0
+	u := max(0, min(1, ((x-x0)*dx+(z-z0)*dz)/(dx*dx+dz*dz)))
+	return math.Hypot(x-x0-u*dx, z-z0-u*dz)
 }
 
 // castShadow is how much light reaches ground in a structure's shadow.
@@ -442,9 +479,11 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 		switch tile.ground {
 		case world.Wall:
 			drawWall(c, x, z, tile.joined, tile.windowed() && r.world.Random(col, row, 43) < 0.5)
+			drawDiagonalWalls(c, x, z, tile.diagonal, false)
 		case world.Battlement:
 			drawWall(c, x, z, tile.joined, false)
 			drawMerlons(c, x, z, tile.joined)
+			drawDiagonalWalls(c, x, z, tile.diagonal, true)
 		case world.Door:
 			if tile.walled {
 				drawDoor(c, x, z, tile.joined)
@@ -453,8 +492,10 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 			}
 		case world.Fence:
 			drawRailing(c, x, z, tile.joined, 1.1, []float64{0.45, 0.9}, plankInk)
+			drawDiagonalRails(c, x, z, tile.diagonal, []float64{0.45, 0.9}, plankInk)
 		case world.Gate:
 			drawRailing(c, x, z, tile.joined, 1.8, []float64{0.3, 0.9, 1.5}, ironInk)
+			drawDiagonalRails(c, x, z, tile.diagonal, []float64{0.3, 0.9, 1.5}, ironInk)
 			drawBars(c, x, z, tile.joined, 1.8)
 		case world.Grave:
 			drawGrave(c, x, z, r.world.Random(col, row, 41))
@@ -567,6 +608,69 @@ func drawWall(c *forestCanvas, x, z float64, joined [4]bool, window bool) {
 		from, to := span(north, south)
 		slab(middleX-half, z+from, middleX+half, z+to, [4]bool{north, false, south, false})
 	}
+}
+
+// toCorner is the stretch from the middle of the tile at x, z to its corner toward a step, which a
+// wall or fence runs along to meet its kind diagonally beside it.
+func toCorner(x, z float64, step [2]int) (fromX, fromZ, toX, toZ float64) {
+	middleX, middleZ := x+world.TileSize/2, z+world.TileSize/2
+	return middleX, middleZ, middleX + float64(step[0])*world.TileSize/2, middleZ + float64(step[1])*world.TileSize/2
+}
+
+// drawDiagonalWalls runs a wall from the middle of a tile across each of its diagonal corners,
+// coped like any wall and, on a castle's walls, crowned with merlons.
+func drawDiagonalWalls(c *forestCanvas, x, z float64, diagonal [4]bool, battlemented bool) {
+	half := wallThickness / 2
+	for corner, step := range corners {
+		if !diagonal[corner] {
+			continue
+		}
+		fromX, fromZ, toX, toZ := toCorner(x, z, step)
+		c.slab(fromX, fromZ, toX, toZ, half, 0, wallHeight, stoneInk, stonework)
+		c.slab(fromX, fromZ, toX, toZ, half+0.08, wallHeight, wallHeight+copingHeight, stoneInk, plain)
+		if !battlemented {
+			continue
+		}
+		// Merlons alternate with gaps every half unit along the wall, from the tile's middle.
+		length := math.Hypot(toX-fromX, toZ-fromZ)
+		for along := 0.0; along < length; along += 1 {
+			end := min(along+0.5, length)
+			u0, u1 := along/length, end/length
+			c.slab(fromX+(toX-fromX)*u0, fromZ+(toZ-fromZ)*u0, fromX+(toX-fromX)*u1, fromZ+(toZ-fromZ)*u1, half, wallHeight+copingHeight, wallHeight+copingHeight+merlonHeight, stoneInk, plain)
+		}
+	}
+}
+
+// drawDiagonalRails runs a fence's or gate's rails from its post across each of its diagonal
+// corners.
+func drawDiagonalRails(c *forestCanvas, x, z float64, diagonal [4]bool, rails []float64, ink int) {
+	rail := c.thin(0.05)
+	for corner, step := range corners {
+		if !diagonal[corner] {
+			continue
+		}
+		fromX, fromZ, toX, toZ := toCorner(x, z, step)
+		for _, y := range rails {
+			c.slab(fromX, fromZ, toX, toZ, rail, y-rail, y+rail, ink, plain)
+		}
+	}
+}
+
+// slab draws a block running straight from x0, z0 to x1, z1 at any angle, half wide either side
+// of that line, between heights y0 and y1. Its ends are left open, to meet whatever it joins.
+func (c *forestCanvas) slab(x0, z0, x1, z1, half, y0, y1 float64, ink int, pattern surface) {
+	length := math.Hypot(x1-x0, z1-z0)
+	if length == 0 {
+		return
+	}
+	// across is the unit direction square to the slab's run, along the ground.
+	across := vec{-(z1 - z0) / length, 0, (x1 - x0) / length}
+	run, height := vec{x1 - x0, 0, z1 - z0}, vec{0, y1 - y0, 0}
+	left := vec{x0 + across.x*half, y0, z0 + across.z*half}
+	right := vec{x0 - across.x*half, y0, z0 - across.z*half}
+	c.fill(face{origin: vec{right.x, y1, right.z}, u: run, v: vec{across.x * 2 * half, 0, across.z * 2 * half}, normal: vec{0, 1, 0}}, ink, pattern)
+	c.fill(face{origin: left, u: run, v: height, normal: across}, ink, pattern)
+	c.fill(face{origin: right, u: run, v: height, normal: vec{-across.x, 0, -across.z}}, ink, pattern)
 }
 
 // drawDoor sets an open wooden door in a wall: stone jambs either side of the doorway, a lintel
