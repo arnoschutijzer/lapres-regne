@@ -210,3 +210,18 @@ func TestChoppingStopsOnceTheLastSlotFills(t *testing.T) {
 		t.Fatalf("message = %q, want %q", w.Message(), inventoryFull)
 	}
 }
+
+func TestARefusedChopKeepsTheWalkUnderWay(t *testing.T) {
+	w := New(7)
+	oak := nearestOaks(w, 1)[0]
+	standBeside(w, oak, 0)
+	x, z := w.hero.Position()
+	w.WalkTo(x-20, z)
+	if w.Chop() {
+		t.Fatal("an oak must not be chopped below level 15")
+	}
+	w.Advance(0, 0, time.Second, false)
+	if movedX, _ := w.hero.Position(); movedX >= x {
+		t.Fatalf("hero at x %.2f; want them still walking left from %.2f", movedX, x)
+	}
+}

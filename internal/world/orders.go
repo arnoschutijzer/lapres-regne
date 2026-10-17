@@ -103,8 +103,12 @@ func (w *World) Chop() bool {
 	if !ok {
 		return false
 	}
-	w.order = w.woodcutting.start(tree)
-	return w.order != nil
+	chop := w.woodcutting.start(tree)
+	if chop == nil {
+		return false
+	}
+	w.order = chop
+	return true
 }
 
 // Approach walks the hero to a standing tree, round whatever blocks the way, and chops it on arrival,
