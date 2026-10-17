@@ -115,3 +115,14 @@ func TestASaveFromBeforeZoomingOpensOnTheForestView(t *testing.T) {
 		t.Fatalf("view = %+v; want the forest view facing north", file.View)
 	}
 }
+
+func TestASkillWithoutASpellingIsRefusedRatherThanSaved(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "progress.json")
+	file := &File{Path: path}
+	if err := file.Save(world.Snapshot{Seed: 7, Skills: map[string]float64{"Juggling": 10}}); err == nil {
+		t.Fatal("a skill the file cannot spell must be reported")
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Fatal("a refused save must leave no file behind")
+	}
+}

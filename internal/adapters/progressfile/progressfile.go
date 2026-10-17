@@ -148,7 +148,11 @@ func (f *File) Save(snapshot world.Snapshot) error {
 		Stumps:    []stumpJSON{},
 	}
 	for skill, xp := range snapshot.Skills {
-		saved.Skills[skillNames[skill]] = skillJSON{XP: xp}
+		name, known := skillNames[skill]
+		if !known {
+			return fmt.Errorf("save %s: no spelling for skill %q", f.Path, skill)
+		}
+		saved.Skills[name] = skillJSON{XP: xp}
 	}
 	// Empty slots are saved as "" so items keep their places; trailing empty slots are left off.
 	last := -1
