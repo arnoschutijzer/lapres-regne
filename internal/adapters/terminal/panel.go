@@ -35,15 +35,25 @@ func cutEnd(bark [3]int) [3]int { return mix(bark, endGrain, 0.6) }
 // icons keeps each item's rendered icon, since an icon never changes.
 var icons sync.Map
 
-// icon draws an item in a slot, a line at a time: its shape shaded in its color.
-func icon(item world.Item) []string {
+// iconCellsOf draws an item's icon line by line and cell by cell: its shape shaded in its color.
+func iconCellsOf(item world.Item) [][]string {
 	if drawn, ok := icons.Load(item); ok {
-		return drawn.([]string)
+		return drawn.([][]string)
 	}
 	color := item.Color()
 	drawn := renderIcon(shapeIcons[item.Shape()], [3]int{int(color.R), int(color.G), int(color.B)}, iconCells, iconLines)
 	icons.Store(item, drawn)
 	return drawn
+}
+
+// icon draws an item in a slot a line at a time, each line ending on the background paper.
+func icon(item world.Item) []string {
+	cells := iconCellsOf(item)
+	lines := make([]string, len(cells))
+	for line, drawn := range cells {
+		lines[line] = strings.Join(drawn, "") + paperOf(background)
+	}
+	return lines
 }
 
 var (

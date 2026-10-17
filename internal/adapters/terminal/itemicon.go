@@ -1,9 +1,6 @@
 package terminal
 
-import (
-	"math"
-	"strings"
-)
+import "math"
 
 // iconCells and iconLines size an item's icon in a slot: 8 cells across and 4 lines down. Each cell
 // shows two square pixels, one above the other, so an icon is 8 by 8 pixels of any colour.
@@ -29,18 +26,16 @@ const iconSamples = 3
 // iconShades is how many shades of its ink a pixel can take, from shadow to highlight.
 const iconShades = 4
 
-// renderIcon draws an icon as lines of upper half blocks, the upper pixel in the foreground and
-// the lower in the paper, each line ending on the background paper.
-func renderIcon(shade iconShader, tint [3]int, cells, lines int) []string {
+// renderIcon draws an icon line by line and cell by cell as upper half blocks, the upper pixel in
+// the foreground and the lower in the paper.
+func renderIcon(shade iconShader, tint [3]int, cells, lines int) [][]string {
 	pixels := ditherIcon(shade, tint, cells, lines*2)
-	rendered := make([]string, lines)
+	rendered := make([][]string, lines)
 	for line := range lines {
-		var out strings.Builder
+		rendered[line] = make([]string, cells)
 		for column := range cells {
-			out.WriteString(foreground(pixels[line*2][column]) + paperOf(pixels[line*2+1][column]) + "▀")
+			rendered[line][column] = foreground(pixels[line*2][column]) + paperOf(pixels[line*2+1][column]) + "▀"
 		}
-		out.WriteString(paperOf(background))
-		rendered[line] = out.String()
 	}
 	return rendered
 }

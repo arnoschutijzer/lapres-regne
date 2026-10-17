@@ -729,7 +729,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	// The bank covers the top left corner in the same way.
 	bankRight := min(bankWidth(bankColumns(cols)), cols)
 	if r.bankShown && !r.bankOpen {
-		for row := range min(panelHeight, rows) {
+		for row := range min(bankHeight, rows) {
 			for col := range bankRight {
 				r.cells[row*cols+col] = forestCell{bits: 0xff, ink: 0xff}
 			}
@@ -817,7 +817,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 		previous := r.cells[row*cols : (row+1)*cols]
 		start, visible := 0, cols
-		if r.bankOpen && row < panelHeight {
+		if r.bankOpen && row < bankHeight {
 			start = bankRight
 		}
 		if r.inventoryOpen && row < panelHeight {

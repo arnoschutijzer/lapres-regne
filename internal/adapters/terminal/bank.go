@@ -8,14 +8,14 @@ import (
 )
 
 // The bank lays its stacks out in a grid as Old School RuneScape does, 8 across, each stack's
-// count on a line above its icon. Its slots are spaced as the inventory's.
+// count over its icon's top left corner. Stacks sit a cell apart, and the highlighted stack's
+// brackets take the cells either side of it.
 const (
-	bankPitch      = slotPitch
+	bankPitch      = iconCells + 1
 	bankMaxColumns = 8
-	// bankRowLines is how many lines a row of stacks takes: its counts, then its icons.
-	bankRowLines = 1 + iconLines
-	// bankRows is how many rows of stacks the panel shows below its title.
-	bankRows = (panelHeight - slotLine) / bankRowLines
+	// bankRows is how many rows of stacks the panel shows below its title, and bankHeight its lines.
+	bankRows   = 4
+	bankHeight = slotLine + bankRows*iconLines
 )
 
 // bankColumns fits the grid beside the inventory panel: 8 across when there is room, fewer in a
@@ -62,28 +62,36 @@ func bankPanel(bank world.Bank, columns int, cursor bankCursor, top int) []strin
 		if row*columns >= len(stacks) {
 			break
 		}
-		counts := strings.Repeat(" ", slotIndent)
-		var drawn [][]string
-		highlighted := -1
-		for column := range columns {
-			index := row*columns + column
-			if index >= len(stacks) {
-				break
-			}
-			stack := stacks[index]
-			counts += " " + countTint(stack.Count) + fmt.Sprintf("%-*s", bankPitch-1, bankCount(stack.Count))
-			drawn = append(drawn, icon(stack.Item))
-			if cursor.active && cursor.stack == index {
-				highlighted = column
-			}
+		shown := stacks[row*columns : min(len(stacks), (row+1)*columns)]
+		highlighted := func(column int) bool {
+			return cursor.active && cursor.stack == row*columns+column
 		}
-		visible := slotIndent + len(drawn)*bankPitch
-		lines = append(lines, pad(counts, visible))
-		for _, line := range slotLines(drawn, highlighted) {
-			lines = append(lines, pad(line, visible))
+		for line := range iconLines {
+			text := strings.Repeat(" ", slotIndent)
+			for column, stack := range shown {
+				switch {
+				case highlighted(column):
+					text += "["
+				case column > 0 && highlighted(column-1):
+					text += "]"
+				default:
+					text += " "
+				}
+				cells := iconCellsOf(stack.Item)[line]
+				if line == 0 {
+					count := bankCount(stack.Count)
+					text += countTint(stack.Count) + count
+					cells = cells[len(count):]
+				}
+				text += strings.Join(cells, "") + paperOf(background) + panelText
+			}
+			if highlighted(len(shown) - 1) {
+				text += "]"
+			}
+			lines = append(lines, pad(text, slotIndent+len(shown)*bankPitch))
 		}
 	}
-	for len(lines) < panelHeight {
+	for len(lines) < bankHeight {
 		lines = append(lines, pad("", 0))
 	}
 	return lines
@@ -149,7 +157,7 @@ func (r *renderer) stackAt(column, row int) (int, bool) {
 	cols := r.canvas.width / 2
 	columns := r.bankColumns()
 	panelColumn := column - 1 - (r.screenWidth-cols)/2 - slotIndent
-	gridRow := (row - 2 - slotLine) / bankRowLines
+	gridRow := (row - 2 - slotLine) / iconLines
 	// A short terminal cuts the panel off at the forest's last row.
 	if row-2 >= r.canvas.height/4 {
 		return 0, false
@@ -315,7 +323,7 @@ func (r *renderer) scrollBank(column, row, rows int) bool {
 	columns := r.bankColumns()
 	panelColumn := column - 1 - (r.screenWidth-cols)/2
 	line := row - 2
-	if panelColumn < 0 || panelColumn >= bankWidth(columns) || line < 0 || line >= panelHeight {
+	if panelColumn < 0 || panelColumn >= bankWidth(columns) || line < 0 || line >= bankHeight {
 		return false
 	}
 	r.bankTop = scrolled(r.bankTop+rows, bankCursor{}, columns, len(r.world.Bank().Stacks()))
