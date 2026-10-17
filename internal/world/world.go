@@ -7,15 +7,8 @@ import (
 
 // World coordinates are sampled directly: exploration never allocates a growing map.
 type World struct {
-	seed             uint64
-	hero             Character
-	cameraX, cameraZ float64
-	// panX and panZ are how far the camera looks away from the hero, until the hero walks.
-	panX, panZ float64
-	// yaw is how far the camera has turned about the upright axis, in radians.
-	yaw float64
-	// zoom is how many steps the camera has moved in from the forest view toward a close-up.
-	zoom        int
+	seed        uint64
+	hero        Character
 	woodcutting woodcutting
 	// order is the player order the hero carries out; nil while they stand idle.
 	order order
@@ -51,9 +44,8 @@ func (w *World) Message() string { return w.message }
 
 func (w *World) say(message string) { w.message = message }
 
-func (w *World) Seed() uint64           { return w.seed }
-func (w *World) Hero() *Character       { return &w.hero }
-func (w *World) Camera() (x, z float64) { return w.cameraX, w.cameraZ }
+func (w *World) Seed() uint64     { return w.seed }
+func (w *World) Hero() *Character { return &w.hero }
 
 func (w *World) Random(x, z int, salt uint64) float64 {
 	n := uint64(int64(x))*0x9e3779b185ebca87 ^ uint64(int64(z))*0xc2b2ae3d27d4eb4f ^ w.seed ^ salt
@@ -77,14 +69,12 @@ func (w *World) Noise(x, z float64, salt uint64) float64 {
 // walkingSpeed is how far the hero walks per second.
 const walkingSpeed = 4.5
 
-// Walk takes one step in a direction on the screen, as triggered by a single key press.
+// Walk takes one step in a direction in the world, as triggered by a single key press.
 func (w *World) Walk(dx, dz float64, sprinting bool) {
 	if dx == 0 && dz == 0 {
 		return
 	}
-	dx, dz = w.fromView(dx, dz)
 	w.Stop()
-	w.panX, w.panZ = 0, 0
 	distance := stride
 	if sprinting {
 		distance *= 2
@@ -92,14 +82,12 @@ func (w *World) Walk(dx, dz float64, sprinting bool) {
 	w.hero.walk(dx, dz, w.wading(distance))
 }
 
-// Advance by elapsed time, independently of terminal key-repeat timing, walking in a direction on
-// the screen.
+// Advance by elapsed time, independently of terminal key-repeat timing, walking in a direction in
+// the world.
 func (w *World) Advance(dx, dz float64, dt time.Duration, sprinting bool) {
 	if dx != 0 || dz != 0 {
 		w.Stop()
-		w.panX, w.panZ = 0, 0
 	}
-	dx, dz = w.fromView(dx, dz)
 	speed := walkingSpeed
 	if sprinting {
 		speed *= 2
@@ -122,7 +110,6 @@ func (w *World) WalkTo(x, z float64) {
 // walkTo walks the hero to a point on the ground and acts on arrival.
 func (w *World) walkTo(x, z float64, arrive func() order) {
 	w.Stop()
-	w.panX, w.panZ = 0, 0
 	w.order = &walk{world: w, waypoints: w.route(x, z), arrive: arrive}
 }
 
@@ -133,47 +120,4 @@ func (w *World) wading(distance float64) float64 {
 		return distance * 0.5
 	}
 	return distance
-}
-
-// CloseUp is the zoom of the closest view of the hero.
-const CloseUp = 12
-
-// Zoom is how many steps the camera is in from the forest view, from 0 up to CloseUp.
-func (w *World) Zoom() int { return w.zoom }
-
-// ZoomBy moves the camera steps closer, or farther for negative steps, between the forest view
-// and the close-up.
-func (w *World) ZoomBy(steps int) {
-	w.zoom = min(CloseUp, max(0, w.zoom+steps))
-}
-
-// PanBy moves the camera away from the hero by dx, dz world units along the screen.
-func (w *World) PanBy(dx, dz float64) {
-	dx, dz = w.fromView(dx, dz)
-	w.panX += dx
-	w.panZ += dz
-}
-
-// QuarterTurn is how many of the camera's turning steps make a quarter turn.
-const QuarterTurn = 24
-
-// Yaw is how far the camera has turned about the upright axis, in radians. At 0 north is up the
-// screen; at π/2 east is.
-func (w *World) Yaw() float64 { return w.yaw }
-
-// TurnBy turns the camera by steps, each a small part of a quarter turn.
-func (w *World) TurnBy(steps int) {
-	w.yaw += float64(steps) * math.Pi / 2 / QuarterTurn
-}
-
-// fromView turns a direction on the screen, with dz pointing down it, into the world.
-func (w *World) fromView(dx, dz float64) (float64, float64) {
-	sin, cos := math.Sincos(w.yaw)
-	return dx*cos - dz*sin, dx*sin + dz*cos
-}
-
-func (w *World) Follow(dt time.Duration) {
-	blend := 1 - math.Exp(-32*dt.Seconds())
-	w.cameraX += (w.hero.x + w.panX - w.cameraX) * blend
-	w.cameraZ += (w.hero.z + w.panZ - w.cameraZ) * blend
 }

@@ -72,7 +72,7 @@ func terminalSize() (int, int, error) {
 const frameRate = 120
 
 // Run lets the traveler explore the world until they quit. Music is nil when muted.
-func (s *Session) Run(world *world.World, music soundtrack.Player, title string) error {
+func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Player, title string) error {
 	if _, err := stty("raw", "-echo"); err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 	frames := time.NewTicker(time.Second / frameRate)
 	defer frames.Stop()
 	started := time.Now()
-	view := newRenderer(world, title)
+	view := newRenderer(world, camera, title)
 	width, height := s.width, s.height
 	dirty := true
 	var decoder keyDecoder
@@ -118,16 +118,16 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			return false
 		}
 		if event.zoom != 0 {
-			world.ZoomBy(event.zoom)
+			camera.zoomBy(event.zoom)
 			return false
 		}
 		if event.turn != 0 {
-			world.TurnBy(event.turn)
+			camera.turnBy(event.turn)
 			return false
 		}
 		if event.panRight != 0 || event.panDown != 0 {
 			distance := view.zoom.panDistance()
-			world.PanBy(float64(event.panRight)*distance, float64(event.panDown)*distance)
+			camera.panBy(float64(event.panRight)*distance, float64(event.panDown)*distance)
 			return false
 		}
 		if event.click {
@@ -142,10 +142,13 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			if tree, ok := view.treeAt(event.column, event.row); ok {
 				world.Approach(tree)
 			} else if doorway, ok := view.doorwayAt(event.column, event.row); ok {
+				camera.stopPanning()
 				world.ApproachDoor(doorway)
 			} else if flight, ok := view.flightAt(event.column, event.row); ok {
+				camera.stopPanning()
 				world.ApproachFlight(flight)
 			} else if x, z, ok := view.groundAt(event.column, event.row); ok {
+				camera.stopPanning()
 				world.WalkTo(x, z)
 			} else {
 				world.Stop()
@@ -209,7 +212,7 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			view.menu = nil
 		}
 		if !event.enhanced {
-			dx, dz := event.action.vector()
+			dx, dz := camera.walk(event.action.vector())
 			world.Walk(dx, dz, event.shift)
 		}
 		return false
@@ -254,15 +257,15 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 			now := time.Now()
 			dt := min(now.Sub(lastFrame), 100*time.Millisecond)
 			lastFrame = now
-			dx, dz := held.direction()
+			dx, dz := camera.walk(held.direction())
 			world.Advance(dx, dz, dt, held.sprinting())
 			// Arriving at a staircase leading both up and down asks which way to climb.
 			if world.OfferedClimb() && view.menu == nil {
 				view.openMenu()
 			}
-			world.Follow(dt)
-			view.zoom.step(world.Zoom(), dt)
-			view.turn.step(world.Yaw(), dt)
+			view.follow(dt)
+			view.zoom.step(camera.Zoom(), dt)
+			view.turn.step(camera.Yaw(), dt)
 			if x, z, ok := view.groundAt(cursorColumn, cursorRow); ok {
 				world.AimAt(x, z)
 			}

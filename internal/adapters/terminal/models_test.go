@@ -43,7 +43,7 @@ func modelledHall() *world.World {
 }
 
 func TestAModelledFixtureIsDrawnAsItsModelInItsOwnColours(t *testing.T) {
-	r := newRenderer(modelledHall(), "L’Après-Règne")
+	r := newRenderer(modelledHall(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 90, 0)
 	top := r.inkOf(world.Color{R: 140, G: 30, B: 40})

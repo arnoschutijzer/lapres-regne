@@ -36,7 +36,7 @@ func edgedLodge(barrier world.Ground) *world.World {
 
 // closeView renders a world zoomed in.
 func closeView(w *world.World) (*renderer, *forestCanvas) {
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	return r, r.render(160, 90, 0)
 }

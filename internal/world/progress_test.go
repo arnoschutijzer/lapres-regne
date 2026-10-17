@@ -53,9 +53,6 @@ func TestResumingRestoresTheHeroWhereTheyStood(t *testing.T) {
 	if x != keptX || z != keptZ {
 		t.Fatalf("position = %v, %v; want %v, %v", x, z, keptX, keptZ)
 	}
-	if cameraX, cameraZ := w.Camera(); cameraX != x || cameraZ != z {
-		t.Fatalf("camera = %v, %v; want it on the hero", cameraX, cameraZ)
-	}
 	if w.Hero().Inventory().Len() != 1 || w.Hero().Skill(world.Woodcutting).XP() != 25 {
 		t.Fatalf("logs = %d, xp = %v; want the kept log and its 25 xp", w.Hero().Inventory().Len(), w.Hero().Skill(world.Woodcutting).XP())
 	}

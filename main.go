@@ -62,7 +62,7 @@ func startMusic(device *speaker.Device, directory string) (*speaker.Playback, er
 
 // run is the composition root: it builds every adapter and wires it to the domain.
 func run(seed uint64, mapPath string, mute bool, musicDir, savePath string) error {
-	progress := progressfile.File{Path: savePath}
+	progress := &progressfile.File{Path: savePath}
 	var forest *world.World
 	var err error
 	if mapPath == "" {
@@ -99,7 +99,9 @@ func run(seed uint64, mapPath string, mute bool, musicDir, savePath string) erro
 			music = playback
 		}
 	}
+	camera := terminal.NewCamera(progress.View.Zoom, progress.View.Yaw)
 	// Progress is kept however the session ends, even when it ends with an error.
-	played := session.Run(forest, music, appTitle)
+	played := session.Run(forest, camera, music, appTitle)
+	progress.View = progressfile.View{Zoom: camera.Zoom(), Yaw: camera.Yaw()}
 	return errors.Join(played, forest.Keep(progress, time.Now()))
 }

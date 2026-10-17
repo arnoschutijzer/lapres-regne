@@ -86,7 +86,7 @@ func cellOf(r *renderer, x, y, z float64) (column, row int) {
 }
 
 func TestDoorwayAtPicksTheDoorUnderAClick(t *testing.T) {
-	r := newRenderer(atTheLodgeDoor(world.Wall), "L’Après-Règne")
+	r := newRenderer(atTheLodgeDoor(world.Wall), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	r.frame(160, 60, 0)
 	column, row := cellOf(r, 41, (doorHeight+wallHeight)/2, 28.36)
@@ -96,7 +96,7 @@ func TestDoorwayAtPicksTheDoorUnderAClick(t *testing.T) {
 }
 
 func TestDoorwayAtFindsNothingOnOpenGround(t *testing.T) {
-	r := newRenderer(atTheLodgeDoor(world.Wall), "L’Après-Règne")
+	r := newRenderer(atTheLodgeDoor(world.Wall), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	r.frame(160, 60, 0)
 	column, row := cellOf(r, 30, 0, 32)

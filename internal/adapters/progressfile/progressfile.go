@@ -12,9 +12,18 @@ import (
 	"lapresregne/internal/world"
 )
 
-// File keeps progress as JSON at Path.
+// File keeps progress as JSON at Path, along with the View the terminal last showed it from.
 type File struct {
 	Path string
+	// View is read by Load and written by Save.
+	View View
+}
+
+// View is the camera's zoom, in steps in from the forest view, and its yaw about the upright axis,
+// in radians.
+type View struct {
+	Zoom int
+	Yaw  float64
 }
 
 // version marks the file layout so later layouts can still read older saves. Version 1
@@ -72,7 +81,7 @@ type stumpJSON struct {
 	RegrowMillis int64 `json:"regrowMillis"`
 }
 
-func (f File) Load() (world.Snapshot, bool, error) {
+func (f *File) Load() (world.Snapshot, bool, error) {
 	data, err := os.ReadFile(f.Path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return world.Snapshot{}, false, nil
@@ -89,8 +98,9 @@ func (f File) Load() (world.Snapshot, bool, error) {
 	}
 	snapshot := world.Snapshot{
 		Seed: saved.Seed, Map: saved.Map, X: saved.Hero.X, Z: saved.Hero.Z, Storey: saved.Hero.Storey,
-		Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw, SavedAt: saved.SavedAt,
+		SavedAt: saved.SavedAt,
 	}
+	f.View = View{Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw}
 	// Versions 1 and 2 kept woodcutting, the only skill then, on its own.
 	if saved.Woodcutting != nil {
 		snapshot.Skills = map[string]float64{world.Woodcutting: saved.Woodcutting.XP}
@@ -128,12 +138,12 @@ func (f File) Load() (world.Snapshot, bool, error) {
 
 // Save writes a temporary file beside the save and renames it over the old one, so an
 // interrupted save never leaves a half-written file behind.
-func (f File) Save(snapshot world.Snapshot) error {
+func (f *File) Save(snapshot world.Snapshot) error {
 	saved := progressJSON{
 		Version: version, Seed: snapshot.Seed, Map: snapshot.Map, SavedAt: snapshot.SavedAt,
 		Hero:      heroJSON{X: snapshot.X, Z: snapshot.Z, Storey: snapshot.Storey},
 		Skills:    map[string]skillJSON{},
-		Camera:    cameraJSON{Zoom: snapshot.Zoom, Yaw: snapshot.Yaw},
+		Camera:    cameraJSON{Zoom: f.View.Zoom, Yaw: f.View.Yaw},
 		Inventory: []string{},
 		Stumps:    []stumpJSON{},
 	}

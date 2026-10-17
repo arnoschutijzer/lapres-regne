@@ -14,8 +14,6 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 		Z:         w.hero.z,
 		Storey:    w.storey,
 		Skills:    w.hero.experience(),
-		Zoom:      w.zoom,
-		Yaw:       w.yaw,
 		Inventory: w.hero.inventory.Slots(),
 		Stumps:    w.woodcutting.stumps(),
 		SavedAt:   now,
@@ -26,8 +24,8 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 	return nil
 }
 
-// Resume builds a world from a seed and the saved progress. The hero's skills and inventory, and
-// the camera's zoom and yaw, travel to any world; their position and stumps return only to the world they were saved in, with the
+// Resume builds a world from a seed and the saved progress. The hero's skills and inventory travel
+// to any world; their position and stumps return only to the world they were saved in, with the
 // time away since saving counted toward regrowth.
 func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 	return resume(New(seed), progress, now)
@@ -44,8 +42,6 @@ func resume(w *World, progress Progress, now time.Time) (*World, error) {
 	for skill, xp := range snapshot.Skills {
 		w.hero.train(skill, xp)
 	}
-	w.ZoomBy(snapshot.Zoom)
-	w.yaw = snapshot.Yaw
 	for index, slot := range snapshot.Inventory[:min(len(snapshot.Inventory), InventorySize)] {
 		w.hero.inventory.slots[index] = slot
 	}
@@ -58,7 +54,6 @@ func resume(w *World, progress Progress, now time.Time) (*World, error) {
 		w.storey = snapshot.Storey
 		if w.passable(snapshot.X, snapshot.Z) {
 			w.hero.x, w.hero.z = snapshot.X, snapshot.Z
-			w.cameraX, w.cameraZ = snapshot.X, snapshot.Z
 		} else {
 			w.storey = 0
 		}

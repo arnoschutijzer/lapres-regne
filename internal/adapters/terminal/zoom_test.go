@@ -29,16 +29,14 @@ func TestTheViewEasesTowardTheCameraZoom(t *testing.T) {
 }
 
 func TestAResumedViewOpensAtTheKeptZoom(t *testing.T) {
-	w := world.New(7)
-	w.ZoomBy(world.CloseUp)
-	if c := newRenderer(w, "L’Après-Règne").render(100, 27, 0); c.scale != closeUpScale {
+	if c := newRenderer(world.New(7), NewCamera(closeUpZoom, 0), "L’Après-Règne").render(100, 27, 0); c.scale != closeUpScale {
 		t.Fatalf("scale = %v on the first frame, want the close-up %v without easing in", c.scale, closeUpScale)
 	}
 }
 
 func TestAPanStepCrossesTheSameColumnsAtAnyZoom(t *testing.T) {
 	forest := zoom{current: 0}
-	closeUp := zoom{current: world.CloseUp}
+	closeUp := zoom{current: closeUpZoom}
 	forestColumns := forest.panDistance() * forest.scale() / 2
 	closeUpColumns := closeUp.panDistance() * closeUp.scale() / 2
 	if forestColumns != panColumns || math.Abs(closeUpColumns-panColumns) > 1e-9 {

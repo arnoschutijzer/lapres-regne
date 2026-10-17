@@ -80,7 +80,7 @@ func TestTheHighlightedSlotIsBracketed(t *testing.T) {
 }
 
 func TestSlotAtFindsTheClickedSlotInTheOpenPanel(t *testing.T) {
-	r := newRenderer(besideTree(), "L’Après-Règne")
+	r := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne")
 	r.inventoryOpen = true
 	r.frame(100, 30, 0)
 	// The panel's slots start four columns into the panel, on its fourth line.

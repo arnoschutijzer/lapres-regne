@@ -22,7 +22,7 @@ func fireworkPixels(c *forestCanvas) (xs, ys []int) {
 }
 
 func TestNoFireworksGoOffWithoutALevelUp(t *testing.T) {
-	c := newRenderer(besideTree(), "L’Après-Règne").render(100, 27, 0)
+	c := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne").render(100, 27, 0)
 	if xs, _ := fireworkPixels(c); len(xs) != 0 {
 		t.Fatalf("%d firework pixels without a level-up, want none", len(xs))
 	}
@@ -30,7 +30,7 @@ func TestNoFireworksGoOffWithoutALevelUp(t *testing.T) {
 
 func TestALevelUpSetsOffFireworksAroundTheHero(t *testing.T) {
 	w := levelledUp(t, 75, 400*time.Millisecond)
-	c := newRenderer(w, "L’Après-Règne").render(100, 27, 0)
+	c := newRenderer(w, NewCamera(0, 0), "L’Après-Règne").render(100, 27, 0)
 	xs, ys := fireworkPixels(c)
 	if len(xs) == 0 {
 		t.Fatal("a level-up must set off fireworks")
@@ -48,7 +48,7 @@ func TestALevelUpSetsOffFireworksAroundTheHero(t *testing.T) {
 func TestTheFireworksBurstOneColourAfterAnother(t *testing.T) {
 	colours := map[int]bool{}
 	for after := 100 * time.Millisecond; after < time.Duration(displayFor(world.NoMilestone).duration()*float64(time.Second)); after += 150 * time.Millisecond {
-		c := newRenderer(levelledUp(t, 75, after), "L’Après-Règne").render(100, 27, 0)
+		c := newRenderer(levelledUp(t, 75, after), NewCamera(0, 0), "L’Après-Règne").render(100, 27, 0)
 		for _, p := range c.pixels {
 			for _, ink := range fireworkInks {
 				if p.ink == ink {
@@ -65,7 +65,7 @@ func TestTheFireworksBurstOneColourAfterAnother(t *testing.T) {
 func TestTheFireworksDieDownWhileTheBannerStillShows(t *testing.T) {
 	ordinary := displayFor(world.NoMilestone)
 	after := time.Duration((ordinary.duration() + 0.1) * float64(time.Second))
-	c := newRenderer(levelledUp(t, 75, after), "L’Après-Règne").render(100, 27, 0)
+	c := newRenderer(levelledUp(t, 75, after), NewCamera(0, 0), "L’Après-Règne").render(100, 27, 0)
 	if xs, _ := fireworkPixels(c); len(xs) != 0 {
 		t.Fatalf("%d firework pixels after the display, want none", len(xs))
 	}
@@ -125,7 +125,7 @@ func TestTheMaxTotalLevelSetsOffRedAndGoldFireworksForLonger(t *testing.T) {
 	}
 	// Level 99 in the only skill is the max total level.
 	for _, after := range []time.Duration{500 * time.Millisecond, 3 * time.Second, 6500 * time.Millisecond} {
-		c := newRenderer(levelledUp(t, 13034420, after), "L’Après-Règne").render(100, 27, 0)
+		c := newRenderer(levelledUp(t, 13034420, after), NewCamera(0, 0), "L’Après-Règne").render(100, 27, 0)
 		xs, _ := fireworkPixels(c)
 		if len(xs) == 0 {
 			t.Fatalf("no fireworks %v after reaching the max total level", after)
@@ -140,8 +140,7 @@ func TestTheMaxTotalLevelSetsOffRedAndGoldFireworksForLonger(t *testing.T) {
 
 func TestTheBurstsFitAboveTheHerosHead(t *testing.T) {
 	w := levelledUp(t, 13034420, 0)
-	w.ZoomBy(7)
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(7, 0), "L’Après-Règne")
 	sparks := 0
 	for range 28 {
 		w.Advance(0, 0, 250*time.Millisecond, false)

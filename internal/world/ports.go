@@ -49,10 +49,6 @@ type Snapshot struct {
 	Storey int
 	// Skills holds the experience gained in each skill trained, by name.
 	Skills map[string]float64
-	// Zoom is the camera's zoom, in steps in from the forest view.
-	Zoom int
-	// Yaw is how far the camera has turned about the upright axis, in radians.
-	Yaw float64
 	// Inventory lists the inventory slot by slot, gaps included.
 	Inventory []Slot
 	Stumps    []Stump

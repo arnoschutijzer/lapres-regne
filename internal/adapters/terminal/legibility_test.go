@@ -65,7 +65,7 @@ func isSolid(glyph rune) bool {
 }
 
 func TestTheSceneryKeepsHeavyDitheringWithSolidColorUnderneath(t *testing.T) {
-	glyphs := terminalGlyphs(newRenderer(world.New(7), "L’Après-Règne").frame(100, 38, 0))
+	glyphs := terminalGlyphs(newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne").frame(100, 38, 0))
 	dots, solid, tinted := 0, 0, 0
 	for _, p := range glyphs {
 		if p.glyph > 0x2800 && p.glyph <= 0x28ff {
@@ -84,12 +84,11 @@ func TestTheSceneryKeepsHeavyDitheringWithSolidColorUnderneath(t *testing.T) {
 }
 
 func TestTheHeroKeepsTheirWorldScaleWhenZoomingOut(t *testing.T) {
-	heights := make([]int, world.CloseUp+1)
+	heights := make([]int, closeUpZoom+1)
 	for step := range heights {
 		w := meadow()
-		w.ZoomBy(step)
 		top, bottom := 100, 0
-		for _, p := range terminalGlyphs(newRenderer(w, "L’Après-Règne").frame(100, 38, 0)) {
+		for _, p := range terminalGlyphs(newRenderer(w, NewCamera(step, 0), "L’Après-Règne").frame(100, 38, 0)) {
 			if isSolid(p.glyph) {
 				top, bottom = min(top, p.row), max(bottom, p.row)
 			}
@@ -99,17 +98,16 @@ func TestTheHeroKeepsTheirWorldScaleWhenZoomingOut(t *testing.T) {
 			t.Fatalf("zoom %d shows no hero", step)
 		}
 	}
-	if heights[0] > 2 || heights[world.CloseUp] < heights[0]*6 {
+	if heights[0] > 2 || heights[closeUpZoom] < heights[0]*6 {
 		t.Fatalf("hero heights %v; want the distant hero at natural scale and growing with the world", heights)
 	}
 }
 
 func TestClothingKeepsDistinctColorsInTheRenderedView(t *testing.T) {
-	for _, step := range []int{3, 6, world.CloseUp} {
+	for _, step := range []int{3, 6, closeUpZoom} {
 		w := meadow()
-		w.ZoomBy(step)
 		shirt, shorts, skin := false, false, false
-		for _, p := range terminalGlyphs(newRenderer(w, "L’Après-Règne").frame(100, 38, 0)) {
+		for _, p := range terminalGlyphs(newRenderer(w, NewCamera(step, 0), "L’Après-Règne").frame(100, 38, 0)) {
 			if !isSolid(p.glyph) {
 				continue
 			}
@@ -131,7 +129,7 @@ func TestClothingKeepsDistinctColorsInTheRenderedView(t *testing.T) {
 }
 
 func TestTheInterfaceRestoresItsBackgroundAfterDrawingColoredScenery(t *testing.T) {
-	r := newRenderer(meadow(), "L’Après-Règne")
+	r := newRenderer(meadow(), NewCamera(0, 0), "L’Après-Règne")
 	r.inventoryOpen = true
 	for _, p := range terminalGlyphs(r.frame(100, 38, 0)) {
 		if (p.row == 37 || p.row == 38 || p.row == 2 && p.column >= 100-panelWidth+1) && p.background != background {
@@ -143,8 +141,8 @@ func TestTheInterfaceRestoresItsBackgroundAfterDrawingColoredScenery(t *testing.
 func TestTheAxeKeepsItsSteelColorWhenZoomedOut(t *testing.T) {
 	w := besideTree()
 	w.Chop()
-	for _, step := range []int{0, 3, 6, world.CloseUp} {
-		r := newRenderer(w, "L’Après-Règne")
+	for _, step := range []int{0, 3, 6, closeUpZoom} {
+		r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 		r.zoom.current = float64(step)
 		metal := false
 		for _, p := range terminalGlyphs(r.frame(100, 38, 0)) {
@@ -164,12 +162,11 @@ func TestTheAxeKeepsItsSteelColorWhenZoomedOut(t *testing.T) {
 
 func TestTheHeroRemainsVisibleWhileTurningTheDistantView(t *testing.T) {
 	for _, facing := range []world.Facing{world.FacingDown, world.FacingUp, world.FacingLeft, world.FacingRight} {
-		for _, turn := range []int{0, world.QuarterTurn / 2, world.QuarterTurn} {
+		for _, turn := range []int{0, quarterTurn / 2, quarterTurn} {
 			w := meadow()
 			w.Hero().Face(facing)
-			w.TurnBy(turn)
 			visible := false
-			for _, p := range terminalGlyphs(newRenderer(w, "L’Après-Règne").frame(100, 38, 0)) {
+			for _, p := range terminalGlyphs(newRenderer(w, cameraAt(0, turn), "L’Après-Règne").frame(100, 38, 0)) {
 				visible = visible || isSolid(p.glyph)
 			}
 			if !visible {

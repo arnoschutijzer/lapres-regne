@@ -3,8 +3,6 @@ package terminal
 import (
 	"math"
 	"time"
-
-	"lapresregne/internal/world"
 )
 
 // forestScale is the canvas pixels per world unit of the normal view.
@@ -13,7 +11,7 @@ const forestScale = 3.6
 // zoomStep is how much closer each of the camera's zoom steps brings the view.
 const zoomStep = 1.25
 
-var closeUpScale = forestScale * math.Pow(zoomStep, world.CloseUp)
+var closeUpScale = forestScale * math.Pow(zoomStep, closeUpZoom)
 
 // zoom eases the view toward the camera's zoom, one step at a time.
 type zoom struct {

@@ -15,7 +15,7 @@ import (
 func BenchmarkForestFrame(b *testing.B) {
 	for _, size := range [][2]int{{100, 30}, {180, 50}, {220, 90}} {
 		b.Run(fmt.Sprintf("%dx%d", size[0], size[1]), func(b *testing.B) {
-			r := newRenderer(world.New(7), "L’Après-Règne")
+			r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				r.frame(size[0], size[1], float64(i%120)/30)
@@ -33,26 +33,26 @@ func BenchmarkScenes(b *testing.B) {
 	forest := func() *world.World { return world.New(7) }
 	castle := func() *world.World { return world.NewOnMap(7, lumbridge) }
 	scenes := []struct {
-		name  string
-		place func() *world.World
-		setUp func(w *world.World)
+		name   string
+		place  func() *world.World
+		walk   time.Duration
+		camera func() *Camera
 	}{
-		{"forest", forest, func(*world.World) {}},
-		{"midway", forest, func(w *world.World) { w.ZoomBy(world.CloseUp / 2) }},
-		{"close-up", forest, func(w *world.World) { w.ZoomBy(world.CloseUp) }},
-		{"turned", forest, func(w *world.World) { w.TurnBy(world.QuarterTurn / 2) }},
-		{"river", forest, func(w *world.World) { w.Advance(1, 0, 6*time.Second, false) }},
-		{"lumbridge", castle, func(*world.World) {}},
-		{"lumbridge-midway", castle, func(w *world.World) { w.ZoomBy(world.CloseUp / 2) }},
-		{"lumbridge-close-up", castle, func(w *world.World) { w.ZoomBy(world.CloseUp) }},
-		{"lumbridge-turned", castle, func(w *world.World) { w.TurnBy(world.QuarterTurn / 2) }},
+		{"forest", forest, 0, func() *Camera { return cameraAt(0, 0) }},
+		{"midway", forest, 0, func() *Camera { return cameraAt(closeUpZoom/2, 0) }},
+		{"close-up", forest, 0, func() *Camera { return cameraAt(closeUpZoom, 0) }},
+		{"turned", forest, 0, func() *Camera { return cameraAt(0, quarterTurn/2) }},
+		{"river", forest, 6 * time.Second, func() *Camera { return cameraAt(0, 0) }},
+		{"lumbridge", castle, 0, func() *Camera { return cameraAt(0, 0) }},
+		{"lumbridge-midway", castle, 0, func() *Camera { return cameraAt(closeUpZoom/2, 0) }},
+		{"lumbridge-close-up", castle, 0, func() *Camera { return cameraAt(closeUpZoom, 0) }},
+		{"lumbridge-turned", castle, 0, func() *Camera { return cameraAt(0, quarterTurn/2) }},
 	}
 	for _, scene := range scenes {
 		b.Run(scene.name, func(b *testing.B) {
 			w := scene.place()
-			scene.setUp(w)
-			w.Follow(time.Second)
-			r := newRenderer(w, "L’Après-Règne")
+			w.Advance(1, 0, scene.walk, false)
+			r := newRenderer(w, scene.camera(), "L’Après-Règne")
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				r.frame(220, 93, float64(i%120)/30)
@@ -62,7 +62,7 @@ func BenchmarkScenes(b *testing.B) {
 }
 
 func TestGroundAtFollowsTheScreenAroundTheHero(t *testing.T) {
-	r := newRenderer(world.New(7), "L’Après-Règne")
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	r.frame(100, 30, 0)
 	// The hero stands at the canvas point (width/2, height*0.57): column 51, row 17 on screen.
 	leftX, _, ok := r.groundAt(10, 17)
@@ -87,7 +87,6 @@ func besideTree() *world.World {
 	for range 9 {
 		w.Walk(1, 0, false)
 	}
-	w.Follow(time.Second)
 	return w
 }
 
@@ -117,7 +116,7 @@ func countInk(c *forestCanvas, inks ...int) int {
 
 func TestAFelledTreeDrawsAStumpWithoutACrown(t *testing.T) {
 	w := besideTree()
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	leaves := countInk(r.render(100, 27, 0), 2, 3)
 	w.Chop()
 	chopUntilFelled(t, w)
@@ -141,8 +140,7 @@ func TestAFelledTreeDrawsAStumpWithoutACrown(t *testing.T) {
 func TestChoppingSwingsAnAxe(t *testing.T) {
 	w := besideTree()
 	// Up close the axe head spans several pixels, so its swing shows wherever the hero stands.
-	w.ZoomBy(4)
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(4, 0), "L’Après-Règne")
 	w.Chop()
 	raised := countInk(r.render(100, 27, 0), 9)
 	if raised == 0 {
@@ -165,7 +163,7 @@ func TestChoppingSwingsAnAxe(t *testing.T) {
 
 func TestTheActionMenuShowsOnScreen(t *testing.T) {
 	w := besideTree()
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	if frame := r.frame(100, 30, 0); strings.Contains(frame, "Chop down") {
 		t.Fatal("the menu must start closed")
 	}
@@ -198,7 +196,7 @@ func leavesMovedAcross(r *renderer, w *world.World, elapsed time.Duration) bool 
 
 func TestTheChoppedTreeJoltsWhenTheAxeLandsThenSettles(t *testing.T) {
 	w := besideTree()
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	if leavesMovedAcross(r, w, 80*time.Millisecond) {
 		t.Fatal("crowns must stand still while nobody chops")
 	}
@@ -214,7 +212,7 @@ func TestTheChoppedTreeJoltsWhenTheAxeLandsThenSettles(t *testing.T) {
 
 func TestWoodChipsFlyOnlyRightAfterAStrike(t *testing.T) {
 	w := besideTree()
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	w.Chop()
 	w.Advance(0, 0, 80*time.Millisecond, false)
 	if countInk(r.render(100, 27, 0), 10) == 0 {
@@ -227,7 +225,7 @@ func TestWoodChipsFlyOnlyRightAfterAStrike(t *testing.T) {
 }
 
 func TestTreeAtPicksTheTreeUnderAClick(t *testing.T) {
-	r := newRenderer(world.New(7), "L’Après-Règne")
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	r.frame(100, 30, 0)
 	// The crown of the tree at x 6.0, z 1.7 fills column 61, row 15 seen from the spawn point.
 	if tree, ok := r.treeAt(61, 15); !ok || tree.X < 6 || tree.X > 6.1 {
@@ -242,7 +240,7 @@ func TestTreeAtPicksTheTreeUnderAClick(t *testing.T) {
 }
 
 func TestTreeAtNeedsAClickOnTheTreeItself(t *testing.T) {
-	r := newRenderer(world.New(7), "L’Après-Règne")
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	r.frame(100, 30, 0)
 	// Column 58, row 18 is open ground below the crown of the tree at x 6.0, z 1.7.
 	if tree, ok := r.treeAt(58, 18); ok {
@@ -252,8 +250,7 @@ func TestTreeAtNeedsAClickOnTheTreeItself(t *testing.T) {
 
 func TestUpCloseOnlyTheTrunkOfACutAwayCanopyIsClickable(t *testing.T) {
 	w := besideTree()
-	w.ZoomBy(world.CloseUp)
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(closeUpZoom, 0), "L’Après-Règne")
 	r.frame(100, 30, 0)
 	// The trunk of the tree at x 6.0, z 1.7 fills column 80, row 10, right of the hero.
 	if tree, ok := r.treeAt(80, 10); !ok || tree.X < 6 || tree.X > 6.1 {
@@ -267,7 +264,7 @@ func TestUpCloseOnlyTheTrunkOfACutAwayCanopyIsClickable(t *testing.T) {
 
 func TestTheWoodcuttingSkillShowsOnTheTitleRow(t *testing.T) {
 	w := besideTree()
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "\x1b[1;") || !strings.Contains(frame, "woodcutting 1 · 0 xp") {
 		t.Fatal("the title row must show the woodcutting level and xp")
 	}
@@ -327,7 +324,7 @@ func TestAShorterSkillLeavesNothingOfTheLastOneOnTheTitleRow(t *testing.T) {
 		}
 		return w
 	}
-	r := newRenderer(resumed(2462.5), "L’Après-Règne")
+	r := newRenderer(resumed(2462.5), NewCamera(0, 0), "L’Après-Règne")
 	before := r.frame(100, 30, 0)
 	// An oak's 37.5 xp makes the right-aligned skill one character shorter.
 	r.world = resumed(2500)
@@ -346,7 +343,6 @@ func besideWillow() *world.World {
 	for range 18 {
 		w.Walk(1, 0, false)
 	}
-	w.Follow(time.Second)
 	return w
 }
 
@@ -361,7 +357,6 @@ func nearFirst(t *testing.T, kind world.TreeKind) *world.World {
 					// Walking speed is 4.5 per second, so one long frame carries the hero there.
 					distance := math.Hypot(tree.X-1, tree.Z)
 					w.Advance(tree.X-1, tree.Z, time.Duration(distance/4.5*float64(time.Second)), false)
-					w.Follow(time.Second)
 					return w
 				}
 			}
@@ -372,11 +367,11 @@ func nearFirst(t *testing.T, kind world.TreeKind) *world.World {
 }
 
 func TestWillowsAndYewsHaveTheirOwnLeaves(t *testing.T) {
-	willow := newRenderer(besideWillow(), "L’Après-Règne")
+	willow := newRenderer(besideWillow(), NewCamera(0, 0), "L’Après-Règne")
 	if countInk(willow.render(100, 27, 0), 11, 12) == 0 {
 		t.Fatal("a willow must draw pale willow leaves")
 	}
-	yew := newRenderer(nearFirst(t, world.Yew), "L’Après-Règne")
+	yew := newRenderer(nearFirst(t, world.Yew), NewCamera(0, 0), "L’Après-Règne")
 	if countInk(yew.render(100, 27, 0), 13, 14) == 0 {
 		t.Fatal("a yew must draw dark yew needles")
 	}
@@ -384,7 +379,7 @@ func TestWillowsAndYewsHaveTheirOwnLeaves(t *testing.T) {
 
 func TestTheMenuNamesTheTreeAndMessagesShowOnTheHintLine(t *testing.T) {
 	w := besideWillow()
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.menuTitle, r.menu = "willow", []string{"Chop down"}
 	if frame := r.frame(100, 30, 0); !strings.Contains(frame, "willow:  1 Chop down") {
 		t.Fatal("the menu must name the tree it acts on")
@@ -397,7 +392,7 @@ func TestTheMenuNamesTheTreeAndMessagesShowOnTheHintLine(t *testing.T) {
 }
 
 func TestTheStatusLineNoLongerCountsLogs(t *testing.T) {
-	r := newRenderer(besideTree(), "L’Après-Règne")
+	r := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne")
 	if frame := r.frame(100, 30, 0); strings.Contains(frame, "logs") {
 		t.Fatal("the status line must not mention logs")
 	}
@@ -407,7 +402,7 @@ func TestTheInventoryPanelOpensWithTintedLogsAndClosesCleanly(t *testing.T) {
 	w := besideTree()
 	w.Chop()
 	chopUntilFelled(t, w)
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	if frame := r.frame(100, 30, 0); strings.Contains(frame, "inventory") {
 		t.Fatal("the inventory panel must start closed")
 	}
@@ -435,7 +430,7 @@ func TestADroppedLogLiesOnTheGround(t *testing.T) {
 	w.Chop()
 	chopUntilFelled(t, w)
 	x, z := w.Hero().Position()
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	before := r.render(100, 27, 0)
 	px, py, _ := before.project(x, 0.1, z+3*0.55)
 	inkBefore := before.pixels[int(py)*before.width+int(px)].ink
@@ -455,7 +450,7 @@ func TestADroppedLogLiesOnTheGround(t *testing.T) {
 
 // leafBounds draws one tree of a kind alone and measures the canvas box its leaves cover.
 func leafBounds(kind world.TreeKind) (width, height, lowest int) {
-	r := newRenderer(world.New(7), "L’Après-Règne")
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	c := &forestCanvas{width: 120, height: 120, x: 1000, scale: 3.6}
 	c.turnTo(0)
 	c.pixels = make([]forestPixel, c.width*c.height)
@@ -491,26 +486,30 @@ func TestEachKindOfTreeHasItsOwnSilhouette(t *testing.T) {
 }
 
 func TestZoomingInDrawsTheHeroLarger(t *testing.T) {
-	r := newRenderer(world.New(7), "L’Après-Règne")
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	hero := []int{8, defaultLook.skin, defaultLook.hair, defaultLook.undershirt, defaultLook.shorts}
 	far := countInk(r.render(100, 27, 0), hero...)
-	r.world.ZoomBy(world.CloseUp)
-	r.zoom.step(r.world.Zoom(), 5*time.Second)
+	r.camera.zoomBy(closeUpZoom)
+	r.zoom.step(r.camera.Zoom(), 5*time.Second)
 	if near := countInk(r.render(100, 27, 0), hero...); near <= far*4 {
 		t.Fatalf("hero pixels = %d zoomed in, want far more than %d in the forest view", near, far)
 	}
 }
 
-// closeUp renders the hero at full zoom.
-func closeUp(w *world.World) *forestCanvas {
-	r := newRenderer(w, "L’Après-Règne")
-	w.ZoomBy(world.CloseUp)
-	r.zoom.step(w.Zoom(), 5*time.Second)
-	return r.render(100, 27, 0)
+// closeUp renders the hero at full zoom, with the camera turned by steps.
+func closeUp(w *world.World, turn int) *forestCanvas {
+	return newRenderer(w, cameraAt(closeUpZoom, turn), "L’Après-Règne").render(100, 27, 0)
+}
+
+// cameraAt is a camera zoomed in and turned by steps.
+func cameraAt(zoom, turn int) *Camera {
+	c := NewCamera(zoom, 0)
+	c.turnBy(turn)
+	return c
 }
 
 func TestUpCloseTheHeroIsDrawnInDetail(t *testing.T) {
-	near := closeUp(world.New(7))
+	near := closeUp(world.New(7), 0)
 	for part, ink := range map[string]int{"skin": defaultLook.skin, "hair": defaultLook.hair, "undershirt": defaultLook.undershirt, "shorts": defaultLook.shorts} {
 		if countInk(near, ink) == 0 {
 			t.Errorf("the close-up draws no %s", part)
@@ -521,11 +520,11 @@ func TestUpCloseTheHeroIsDrawnInDetail(t *testing.T) {
 func TestTheHeroShowsTheirFaceOnlyWhenFacingTheViewer(t *testing.T) {
 	w := world.New(7)
 	w.Hero().Face(world.FacingDown)
-	if countInk(closeUp(w), eyeInk) == 0 {
+	if countInk(closeUp(w, 0), eyeInk) == 0 {
 		t.Error("a hero facing down must show their eyes")
 	}
 	w.Hero().Face(world.FacingUp)
-	if countInk(closeUp(w), eyeInk) != 0 {
+	if countInk(closeUp(w, 0), eyeInk) != 0 {
 		t.Error("a hero facing away must show only the back of their head")
 	}
 }
@@ -555,7 +554,7 @@ func TestAnEllipsoidTurnsAboutItsUprightAxis(t *testing.T) {
 // barkAcross draws one tree of a kind alone at a scale and counts the bark pixels across its trunk
 // just above the ground.
 func barkAcross(kind world.TreeKind, scale float64) int {
-	r := newRenderer(world.New(7), "L’Après-Règne")
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	c := &forestCanvas{width: 400, height: 400, x: 1000, scale: scale}
 	c.turnTo(0)
 	c.pixels = make([]forestPixel, c.width*c.height)
@@ -585,9 +584,9 @@ func TestUpCloseTrunksAreSolidWood(t *testing.T) {
 }
 
 func TestTheDetailedHeroStaysAFewStepsFromTheForestView(t *testing.T) {
-	r := newRenderer(world.New(7), "L’Après-Règne")
-	r.world.ZoomBy(3)
-	r.zoom.step(r.world.Zoom(), 5*time.Second)
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
+	r.camera.zoomBy(3)
+	r.zoom.step(r.camera.Zoom(), 5*time.Second)
 	if countInk(r.render(100, 27, 0), defaultLook.skin) == 0 {
 		t.Fatal("three wheel steps in, the hero must already be drawn in detail")
 	}
@@ -620,7 +619,7 @@ func TestADeadTreeStandsBareOfLeaves(t *testing.T) {
 	leaves := leavesOf(world.NormalTree)
 	for _, scale := range []float64{0, 6} {
 		render := func(w *world.World) *forestCanvas {
-			r := newRenderer(w, "L’Après-Règne")
+			r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 			r.zoom = zoom{current: scale}
 			return r.render(160, 90, 0)
 		}

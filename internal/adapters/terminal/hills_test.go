@@ -10,7 +10,7 @@ import (
 
 func TestTheGroundShownAtEachPixelLiesUnderIt(t *testing.T) {
 	w := world.New(7)
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	c := r.render(100, 27, 0)
 	lowest, highest := math.Inf(1), math.Inf(-1)
 	for y := range c.height {
@@ -31,7 +31,7 @@ func TestTheGroundShownAtEachPixelLiesUnderIt(t *testing.T) {
 }
 
 func TestNearerHillsHideTheGroundBehindThem(t *testing.T) {
-	r := newRenderer(world.New(7), "L’Après-Règne")
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	c := r.render(100, 27, 0)
 	// A ridge 6 high runs across the view 2 to 4 north of the camera, on otherwise flat ground.
 	c.elevation = func(_, z float64) float64 {
@@ -76,7 +76,7 @@ func TestSlopesFacingTheSunAreLit(t *testing.T) {
 
 func TestATreeOnAHillStandsOnItsTop(t *testing.T) {
 	_, _, valley := leafBounds(world.Oak)
-	r := newRenderer(world.New(7), "L’Après-Règne")
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	c := &forestCanvas{width: 120, height: 120, x: 1000, scale: 3.6, elevation: func(float64, float64) float64 { return 3 }}
 	c.turnTo(0)
 	c.pixels = make([]forestPixel, c.width*c.height)
@@ -102,12 +102,11 @@ func TestTheViewRisesAndFallsWithTheHero(t *testing.T) {
 	w := world.New(7)
 	// Walk up the hill west of the start, then follow the hero there.
 	w.Advance(-1, 0, 2*time.Second, false)
-	w.Follow(time.Second)
 	x, z := w.Hero().Position()
 	if w.Elevation(x, z) < 2 {
 		t.Fatalf("the hero stands %.2f high at x %.1f z %.1f, want them up a hill", w.Elevation(x, z), x, z)
 	}
-	c := newRenderer(w, "L’Après-Règne").render(100, 27, 0)
+	c := newRenderer(w, NewCamera(0, 0), "L’Après-Règne").render(100, 27, 0)
 	c.standOn(x, z)
 	_, feet, _ := c.project(x, 0, z)
 	if want := float64(c.height) * 0.57; math.Abs(feet-want) > 1 {
@@ -139,7 +138,7 @@ func hillsideCottage() *world.World {
 }
 
 func TestAWallOnARiseStandsOnTopOfIt(t *testing.T) {
-	r := newRenderer(hillsideCottage(), "L’Après-Règne")
+	r := newRenderer(hillsideCottage(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 3}
 	c := r.render(160, 60, 0)
 	// The south wall's face rises from its foot at z 55.35, on ground 4 levels up.
@@ -158,7 +157,7 @@ func TestAWallOnARiseStandsOnTopOfIt(t *testing.T) {
 }
 
 func TestARoofOnARiseCrownsItsWalls(t *testing.T) {
-	r := newRenderer(hillsideCottage(), "L’Après-Règne")
+	r := newRenderer(hillsideCottage(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 3}
 	c := r.render(160, 60, 0)
 	highest := c.height

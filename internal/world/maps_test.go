@@ -32,9 +32,6 @@ func TestTheHeroStartsOnTheMapsStartTile(t *testing.T) {
 	if x != 1.5*world.TileSize || z != 2.5*world.TileSize {
 		t.Fatalf("position = %v, %v; want the centre of tile 1, 2", x, z)
 	}
-	if cameraX, cameraZ := w.Camera(); cameraX != x || cameraZ != z {
-		t.Fatalf("camera = %v, %v; want it on the hero", cameraX, cameraZ)
-	}
 }
 
 func TestTreesGrowOnlyWhereTheyArePlanted(t *testing.T) {

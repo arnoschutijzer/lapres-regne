@@ -29,7 +29,7 @@ func lakeside() *world.World {
 }
 
 func TestAMapDrawsItsWaterAndTreesAndNothingBeyondItsEdge(t *testing.T) {
-	r := newRenderer(lakeside(), "L’Après-Règne")
+	r := newRenderer(lakeside(), NewCamera(0, 0), "L’Après-Règne")
 	c := r.render(100, 27, 0)
 	if countInk(c, 5, 6) == 0 {
 		t.Fatal("the lake must be drawn as water")
@@ -48,7 +48,7 @@ func TestAMapDrawsItsWaterAndTreesAndNothingBeyondItsEdge(t *testing.T) {
 }
 
 func TestTheStatusLineNamesTheMap(t *testing.T) {
-	r := newRenderer(lakeside(), "L’Après-Règne")
+	r := newRenderer(lakeside(), NewCamera(0, 0), "L’Après-Règne")
 	if frame := r.frame(120, 30, 0); !strings.Contains(frame, "Lakeside") || strings.Contains(frame, "seed") {
 		t.Fatal("the status line must name the map instead of the seed")
 	}
@@ -75,7 +75,7 @@ func gatehouse() *world.World {
 }
 
 func TestAMapDrawsItsBuiltGroundAndStructures(t *testing.T) {
-	r := newRenderer(gatehouse(), "L’Après-Règne")
+	r := newRenderer(gatehouse(), NewCamera(0, 0), "L’Après-Règne")
 	c := r.render(100, 27, 0)
 	for _, ink := range []struct {
 		name string
@@ -88,7 +88,7 @@ func TestAMapDrawsItsBuiltGroundAndStructures(t *testing.T) {
 }
 
 func TestAWallStandsAboveTheGroundItIsBuiltOn(t *testing.T) {
-	r := newRenderer(gatehouse(), "L’Après-Règne")
+	r := newRenderer(gatehouse(), NewCamera(0, 0), "L’Après-Règne")
 	c := r.render(100, 27, 0)
 	// The wall's south face rises from its foot at z 21.35 up to its top.
 	x, foot, _ := c.project(45, 0, 21.35)
@@ -113,13 +113,13 @@ func TestStructureInksNeverOutrankTheHeroInACell(t *testing.T) {
 func TestTheStatusLineNamesTheAreaTheHeroStandsIn(t *testing.T) {
 	ground := [][]world.Ground{{world.Grass, world.Grass}}
 	w := world.NewOnMap(7, world.Map{Name: "Lumbridge", Ground: ground, Areas: [][]string{{"Lumbridge Castle"}}})
-	if frame := newRenderer(w, "L’Après-Règne").frame(120, 30, 0); !strings.Contains(frame, "Lumbridge Castle") {
+	if frame := newRenderer(w, NewCamera(0, 0), "L’Après-Règne").frame(120, 30, 0); !strings.Contains(frame, "Lumbridge Castle") {
 		t.Fatal("the status line must name the area the hero stands in")
 	}
 }
 
 func TestADoorwayOpensUnderAStoneLintelWithItsDoorSwungBack(t *testing.T) {
-	r := newRenderer(gatehouse(), "L’Après-Règne")
+	r := newRenderer(gatehouse(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 90, 0)
 	// The doorway's tile spans x 40 to 42 along the wall's south face at z 21.35.
@@ -141,7 +141,7 @@ func TestADoorwayOpensUnderAStoneLintelWithItsDoorSwungBack(t *testing.T) {
 }
 
 func TestFencesKeepTheirColorWhenZoomedOut(t *testing.T) {
-	r := newRenderer(gatehouse(), "L’Après-Règne")
+	r := newRenderer(gatehouse(), NewCamera(0, 0), "L’Après-Règne")
 	r.frame(100, 30, 0)
 	fence := 0
 	for _, cell := range r.cells {
@@ -180,7 +180,7 @@ func groundLight(c *forestCanvas) float64 {
 }
 
 func TestTheGroundQuietsWhenZoomedOut(t *testing.T) {
-	r := newRenderer(meadow(), "L’Après-Règne")
+	r := newRenderer(meadow(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	near := groundLight(r.render(100, 27, 0))
 	r.zoom = zoom{current: 0}
@@ -191,7 +191,7 @@ func TestTheGroundQuietsWhenZoomedOut(t *testing.T) {
 }
 
 func TestADarkHaloSetsTheHeroApartFromTheGround(t *testing.T) {
-	r := newRenderer(meadow(), "L’Après-Règne")
+	r := newRenderer(meadow(), NewCamera(0, 0), "L’Après-Règne")
 	c := r.render(100, 27, 0)
 	hero := 0
 	for y := 1; y < c.height-1; y++ {
@@ -231,7 +231,7 @@ func walledMeadow() *world.World {
 
 // lightAt is the light of the canvas pixel showing the ground at x, z, rendered up close.
 func lightAt(w *world.World, x, z float64) float64 {
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 60, 0)
 	px, py, _ := c.project(x, 0, z)
@@ -257,7 +257,7 @@ func TestTheGroundDarkensAtTheFootOfAWall(t *testing.T) {
 
 // inkAt is the ink of the canvas pixel showing the point x, y, z, rendered up close.
 func inkAt(w *world.World, x, y, z float64) int {
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 60, 0)
 	px, py, _ := c.project(x, y, z)
@@ -295,14 +295,14 @@ func pondside() *world.World {
 }
 
 func TestMeadowsBloomWithWildflowersEvenFromAfar(t *testing.T) {
-	c := newRenderer(meadow(), "L’Après-Règne").render(160, 60, 0)
+	c := newRenderer(meadow(), NewCamera(0, 0), "L’Après-Règne").render(160, 60, 0)
 	if countInk(c, flowerInks[:]...) == 0 {
 		t.Fatal("the far view of open grass must show specks of wildflowers")
 	}
 }
 
 func TestStonesBushesAndFlowersDotTheGrassUpClose(t *testing.T) {
-	r := newRenderer(meadow(), "L’Après-Règne")
+	r := newRenderer(meadow(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 60, 0)
 	for name, inks := range map[string][]int{"stones": {pebbleInk}, "bushes": {bushInk}, "flowers": flowerInks[:]} {
@@ -313,7 +313,7 @@ func TestStonesBushesAndFlowersDotTheGrassUpClose(t *testing.T) {
 }
 
 func TestWaterIsEdgedWithMuddyBanksAndReeds(t *testing.T) {
-	r := newRenderer(pondside(), "L’Après-Règne")
+	r := newRenderer(pondside(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 60, 0)
 	if countInk(c, bankInk) == 0 {
@@ -352,7 +352,7 @@ func roofedCottage(roofing world.Roofing) *world.World {
 }
 
 func TestMossCreepsUpTheFootOfWalls(t *testing.T) {
-	r := newRenderer(walledMeadow(), "L’Après-Règne")
+	r := newRenderer(walledMeadow(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	if countInk(r.render(160, 60, 0), mossInk) == 0 {
 		t.Fatal("walls must weather with moss near the ground")
@@ -361,7 +361,7 @@ func TestMossCreepsUpTheFootOfWalls(t *testing.T) {
 
 func TestOnlyTheWallsOfBuildingsHaveWindows(t *testing.T) {
 	render := func(w *world.World) *forestCanvas {
-		r := newRenderer(w, "L’Après-Règne")
+		r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 		r.zoom = zoom{current: 6}
 		return r.render(160, 60, 0)
 	}
@@ -390,7 +390,7 @@ func keep() *world.World {
 }
 
 func TestBattlementsRiseInMerlonsAboveTheWall(t *testing.T) {
-	r := newRenderer(keep(), "L’Après-Règne")
+	r := newRenderer(keep(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 60, 0)
 	// The wall's skyline steps up over each merlon and down between them.
@@ -411,7 +411,7 @@ func TestBattlementsRiseInMerlonsAboveTheWall(t *testing.T) {
 }
 
 func TestBoardedFloorsAreDrawnInWood(t *testing.T) {
-	r := newRenderer(keep(), "L’Après-Règne")
+	r := newRenderer(keep(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 4}
 	if countInk(r.render(160, 60, 0), boardsInk) == 0 {
 		t.Fatal("the boarded floor must be drawn in wood")
@@ -422,7 +422,7 @@ func TestBoardedFloorsAreDrawnInWood(t *testing.T) {
 var roofInks = []int{thatchInk, shadedThatchInk, slateInk, shadedSlateInk, clayInk, shadedClayInk}
 
 func TestBuildingsAreRoofedFromOutside(t *testing.T) {
-	r := newRenderer(cottage(), "L’Après-Règne")
+	r := newRenderer(cottage(), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 3}
 	c := r.render(160, 60, 0)
 	if countInk(c, slateInk, shadedSlateInk) == 0 {
@@ -444,7 +444,7 @@ func TestEachRoofingIsDrawnInItsOwnColour(t *testing.T) {
 		{world.Thatch, []int{thatchInk, shadedThatchInk}},
 		{world.ClayTiles, []int{clayInk, shadedClayInk}},
 	} {
-		r := newRenderer(roofedCottage(roofing.kind), "L’Après-Règne")
+		r := newRenderer(roofedCottage(roofing.kind), NewCamera(0, 0), "L’Après-Règne")
 		r.zoom = zoom{current: 3}
 		c := r.render(160, 60, 0)
 		if countInk(c, roofing.inks...) == 0 {
@@ -459,7 +459,7 @@ func TestRoofsHideWhileTheHeroIsIndoors(t *testing.T) {
 	for range 200 {
 		w.Advance(0, 0, 50*time.Millisecond, false)
 	}
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 3}
 	if !w.Indoors() || countInk(r.render(160, 60, 0), roofInks...) != 0 {
 		t.Fatal("no roof must hide the hero inside the cottage")
@@ -492,7 +492,7 @@ func heroPixels(c *forestCanvas) int {
 }
 
 func TestTheHeroShowsThroughABuildingInFrontOfThem(t *testing.T) {
-	r := newRenderer(behindCottage(t), "L’Après-Règne")
+	r := newRenderer(behindCottage(t), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 3}
 	c := r.render(160, 60, 0)
 	if heroPixels(c) == 0 {
@@ -506,11 +506,11 @@ func TestTheHeroShowsThroughABuildingInFrontOfThem(t *testing.T) {
 func TestTheBuildingInFrontOfTheHeroEasesOpenAroundThem(t *testing.T) {
 	w := behindCottage(t)
 	building := append([]int{stoneInk, shadedStoneInk}, roofInks...)
-	settled := newRenderer(w, "L’Après-Règne")
+	settled := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	settled.zoom = zoom{current: 3}
 	open := countInk(settled.render(160, 60, 2.1), building...)
 	// A renderer that last showed the hero in the open has the clearing shut as they step behind.
-	easing := newRenderer(w, "L’Après-Règne")
+	easing := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	easing.zoom = zoom{current: 3}
 	easing.revealing = true
 	easing.lastSeconds = 1
@@ -578,7 +578,7 @@ func riverCrossing() *world.World {
 }
 
 func TestABridgeIsDeckedInBoardsAndRailedOverTheWater(t *testing.T) {
-	r := newRenderer(riverCrossing(), "L’Après-Règne")
+	r := newRenderer(riverCrossing(), NewCamera(0, 0), "L’Après-Règne")
 	c := r.render(100, 27, 0)
 	if countInk(c, boardsInk) == 0 {
 		t.Error("the bridge's deck must be drawn in boards")
@@ -612,7 +612,7 @@ func inkAbove(c *forestCanvas, y float64) int {
 }
 
 func TestATableStandsOnItsTileInWood(t *testing.T) {
-	r := newRenderer(hall(world.Table), "L’Après-Règne")
+	r := newRenderer(hall(world.Table), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 90, 0)
 	if ink := inkAbove(c, tableHeight); ink != plankInk {
@@ -655,7 +655,7 @@ func TestEachFixtureShowsItsTellingColour(t *testing.T) {
 		{world.Counter, []int{plankInk}},
 		{world.Bed, []int{redClothInk}},
 	} {
-		r := newRenderer(hall(fixture.kind), "L’Après-Règne")
+		r := newRenderer(hall(fixture.kind), NewCamera(0, 0), "L’Après-Règne")
 		r.zoom = zoom{current: 6}
 		c := r.render(160, 90, 0)
 		if drawn := countInk(c, fixture.inks...); drawn < 15 {
@@ -669,7 +669,7 @@ func TestAPewFacesAlongTheChurchAcrossItsRow(t *testing.T) {
 	w := world.NewOnMap(7, world.Map{Name: "Nave", Ground: ground, Fixtures: []world.PlacedFixture{
 		{Col: 1, Row: 0, Kind: world.Pew}, {Col: 2, Row: 0, Kind: world.Pew},
 	}})
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.render(100, 27, 0)
 	if back := backOf(r.built.at(1, 0)); back != 0 {
 		t.Fatalf("pew beside the west wall backs onto side %d, want north, facing along the nave", back)
@@ -686,7 +686,7 @@ func TestAFountainOfFourTilesRisesOnceFromTheirMiddle(t *testing.T) {
 		fountain = append(fountain, world.PlacedFixture{Col: tile[0], Row: tile[1], Kind: world.Fountain})
 	}
 	w := world.NewOnMap(7, world.Map{Name: "Courtyard", Ground: ground, StartCol: 20, StartRow: 16, Fixtures: fountain})
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	c := r.render(160, 90, 0)
 	// The pedestal stands where the four tiles meet, its front showing below the bowl it lifts.
@@ -741,7 +741,7 @@ func TestWallsAndFencesSteppingDiagonallyJoinAcrossTheCorners(t *testing.T) {
 		{world.Battlement, 1.5, []int{stoneInk, shadedStoneInk, mossInk}},
 		{world.Fence, 0.9, []int{plankInk}},
 	} {
-		r := newRenderer(stepped(barrier.ground), "L’Après-Règne")
+		r := newRenderer(stepped(barrier.ground), NewCamera(0, 0), "L’Après-Règne")
 		r.zoom = zoom{current: 6}
 		c := r.render(160, 90, 0)
 		// The corner where the steps on tiles 20, 14 and 21, 15 meet.

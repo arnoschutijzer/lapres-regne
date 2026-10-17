@@ -21,6 +21,7 @@ var bayer = [4][4]float64{
 // renderer draws the forest as braille cells and sends only changed cells.
 type renderer struct {
 	world                     *world.World
+	camera                    *Camera
 	title                     string
 	canvas                    forestCanvas
 	trees                     []world.Tree
@@ -59,9 +60,11 @@ type renderer struct {
 	revealing bool
 }
 
-// newRenderer opens the view at the camera's zoom and yaw, so a resumed session starts where it was left.
-func newRenderer(forest *world.World, title string) *renderer {
-	r := &renderer{world: forest, title: title, zoom: zoom{current: float64(forest.Zoom())}, turn: turning{current: forest.Yaw()}}
+// newRenderer opens the view on the hero at the camera's zoom and yaw, so a resumed session starts
+// where it was left.
+func newRenderer(forest *world.World, camera *Camera, title string) *renderer {
+	camera.lookAt(forest.Hero().Position())
+	r := &renderer{world: forest, camera: camera, title: title, zoom: zoom{current: float64(camera.Zoom())}, turn: turning{current: camera.Yaw()}}
 	r.palette = append([][3]int(nil), forestPalette[:]...)
 	r.modelInks = make(map[*world.Model][]int)
 	for storey := range forest.Storeys() {
@@ -385,7 +388,7 @@ func (c *forestCanvas) line(x1, y1, z1, x2, y2, z2, light float64, ink int) {
 func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	f := r.world
 	c := &r.canvas
-	cameraX, cameraZ := f.Camera()
+	cameraX, cameraZ := r.camera.x, r.camera.z
 	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
 	c.turnTo(r.turn.current)
 	storey, shown := f.Storey(), r.shownStoreys()

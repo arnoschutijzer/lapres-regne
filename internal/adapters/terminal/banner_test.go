@@ -28,7 +28,6 @@ func levelledUp(t *testing.T, xp float64, after time.Duration) *world.World {
 	for range 9 {
 		w.Walk(1, 0, false)
 	}
-	w.Follow(time.Second)
 	w.Chop()
 	chopUntilFelled(t, w)
 	w.Advance(0, 0, after, false)
@@ -55,12 +54,12 @@ func TestTheBannerEasesInRestsAndEasesOutWithTheJingle(t *testing.T) {
 }
 
 func TestALevelUpShowsABannerOverTheTopOfTheForest(t *testing.T) {
-	r := newRenderer(besideTree(), "L’Après-Règne")
+	r := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne")
 	if frame := r.frame(100, 30, 0); strings.Contains(frame, "Congratulations") {
 		t.Fatal("no banner must show without a level-up")
 	}
 	w := levelledUp(t, 75, 2*time.Second)
-	r = newRenderer(w, "L’Après-Règne")
+	r = newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	frame := r.frame(100, 30, 0)
 	if !strings.Contains(frame, "Congratulations!") || !strings.Contains(frame, "Woodcutting level 2") {
 		t.Fatal("a level-up must announce the skill and its new level")
@@ -91,7 +90,7 @@ func TestALevelUpShowsABannerOverTheTopOfTheForest(t *testing.T) {
 }
 
 func TestTheBannerNamesTheTreesANewLevelUnlocks(t *testing.T) {
-	r := newRenderer(levelledUp(t, 2400, 2*time.Second), "L’Après-Règne")
+	r := newRenderer(levelledUp(t, 2400, 2*time.Second), NewCamera(0, 0), "L’Après-Règne")
 	frame := r.frame(100, 30, 0)
 	if !strings.Contains(frame, "Woodcutting level 15") || !strings.Contains(frame, "You can now chop oaks.") {
 		t.Fatal("level 15 must announce that oaks can now be chopped")
@@ -99,7 +98,7 @@ func TestTheBannerNamesTheTreesANewLevelUnlocks(t *testing.T) {
 }
 
 func TestTheBannerFitsTheSmallestTerminal(t *testing.T) {
-	r := newRenderer(levelledUp(t, 2400, 2*time.Second), "L’Après-Règne")
+	r := newRenderer(levelledUp(t, 2400, 2*time.Second), NewCamera(0, 0), "L’Après-Règne")
 	if frame := r.frame(40, 14, 0); !strings.Contains(frame, "You can now chop oaks.") {
 		t.Fatal("the whole banner must fit 40 columns")
 	}
@@ -107,7 +106,7 @@ func TestTheBannerFitsTheSmallestTerminal(t *testing.T) {
 
 func TestTheForestReturnsOnceTheBannerFades(t *testing.T) {
 	w := levelledUp(t, 75, 2*time.Second)
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.frame(100, 30, 0)
 	w.Advance(0, 0, 5*time.Second, false)
 	if frame := r.frame(100, 30, 0); strings.Contains(frame, "Congratulations") {

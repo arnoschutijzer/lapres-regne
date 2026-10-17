@@ -21,17 +21,15 @@ func TestTheViewEasesTowardTheCameraYaw(t *testing.T) {
 }
 
 func TestAResumedViewOpensAtTheCameraYaw(t *testing.T) {
-	w := world.New(7)
-	w.TurnBy(world.QuarterTurn)
-	if got := newRenderer(w, "L’Après-Règne").turn.current; got != w.Yaw() {
-		t.Fatalf("yaw = %v on the first frame, want the camera's %v without easing in", got, w.Yaw())
+	camera := cameraAt(0, quarterTurn)
+	if got := newRenderer(world.New(7), camera, "L’Après-Règne").turn.current; got != camera.Yaw() {
+		t.Fatalf("yaw = %v on the first frame, want the camera's %v without easing in", got, camera.Yaw())
 	}
 }
 
 func TestGroundAtFollowsTheTurnedView(t *testing.T) {
 	w := world.New(7)
-	w.TurnBy(world.QuarterTurn)
-	r := newRenderer(w, "L’Après-Règne")
+	r := newRenderer(w, cameraAt(0, quarterTurn), "L’Après-Règne")
 	r.frame(100, 30, 0)
 	// A quarter turn shows the world's north on the screen's left and its east up the screen. The
 	// hills shift the ground a little nearer or farther than on flat ground.
@@ -67,13 +65,12 @@ func TestTheSunStaysPutAsTheCameraTurns(t *testing.T) {
 
 func TestTheHeroShowsTheirFaceToTheTurnedCamera(t *testing.T) {
 	w := world.New(7)
-	w.TurnBy(world.QuarterTurn)
 	w.Hero().Face(world.FacingLeft)
-	if countInk(closeUp(w), eyeInk) == 0 {
+	if countInk(closeUp(w, quarterTurn), eyeInk) == 0 {
 		t.Error("a hero facing the turned camera must show their eyes")
 	}
 	w.Hero().Face(world.FacingRight)
-	if countInk(closeUp(w), eyeInk) != 0 {
+	if countInk(closeUp(w, quarterTurn), eyeInk) != 0 {
 		t.Error("a hero facing away from the turned camera must show only the back of their head")
 	}
 }

@@ -385,7 +385,6 @@ func NewOnMap(seed uint64, m Map) *World {
 	}
 	w.hero.passable = w.passable
 	w.hero.x, w.hero.z = (float64(m.StartCol)+0.5)*TileSize, (float64(m.StartRow)+0.5)*TileSize
-	w.cameraX, w.cameraZ = w.hero.x, w.hero.z
 	return w
 }
 

@@ -101,7 +101,7 @@ func TestAMiddleFloorsStaircaseOffersToClimbUpOrDown(t *testing.T) {
 }
 
 func TestFlightAtPicksTheStaircaseUnderAClick(t *testing.T) {
-	r := newRenderer(tower(1), "L’Après-Règne")
+	r := newRenderer(tower(1), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 6}
 	r.frame(160, 60, 0)
 	r.canvas.lift = 0
@@ -154,7 +154,7 @@ func TestAFloorAboveShowsItsWallsFromOutside(t *testing.T) {
 func TestARoofRestsOnTheHighestFloorOfItsBuilding(t *testing.T) {
 	m := towerMap(1)
 	m.StartCol, m.StartRow = 20, 18
-	r := newRenderer(world.NewOnMap(7, m), "L’Après-Règne")
+	r := newRenderer(world.NewOnMap(7, m), NewCamera(0, 0), "L’Après-Règne")
 	r.zoom = zoom{current: 3}
 	c := r.render(160, 60, 0)
 	c.lift = 0
