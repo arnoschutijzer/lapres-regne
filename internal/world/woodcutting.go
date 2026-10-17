@@ -98,6 +98,22 @@ func (wc *woodcutting) treeInReach() (Tree, bool) {
 	return nearest, found
 }
 
+// chopInReach returns the order to chop the tree in reach, or nil where none is or it cannot be
+// chopped.
+func (wc *woodcutting) chopInReach() order {
+	tree, ok := wc.treeInReach()
+	if !ok {
+		return nil
+	}
+	return wc.start(tree)
+}
+
+// standing is a tree as it stands now, or false where it is felled.
+func (wc *woodcutting) standing(tree Tree) (Tree, bool) {
+	standing, exists := wc.woods.TreeAt(tree.cell.gx, tree.cell.gz)
+	return standing, exists && !standing.Stump
+}
+
 // start turns the hero toward a tree and returns the order to chop it, or nil with a message
 // where the tree is above the hero's level or the inventory is full.
 func (wc *woodcutting) start(tree Tree) order {
@@ -116,6 +132,12 @@ func (wc *woodcutting) start(tree Tree) order {
 	wc.woods.play(AxeStrike)
 	return &chop{woodcutting: wc, tree: tree.cell, kind: tree.Kind}
 }
+
+// holdsAim keeps the hero facing the tree while chopping it.
+func (c *chop) holdsAim() {}
+
+// chopped is the tree being chopped.
+func (c *chop) chopped() (Tree, bool) { return c.woodcutting.woods.TreeAt(c.tree.gx, c.tree.gz) }
 
 // lastStrike tells which strike of the chop landed last, counting from zero, and how long ago.
 func (c *chop) lastStrike() (index int, since time.Duration) {
@@ -231,4 +253,60 @@ func (wc *woodcutting) respawns() []Respawn {
 // deplete fells a tree until it regrows.
 func (wc *woodcutting) deplete(respawn Respawn) {
 	wc.fell(cell{respawn.GX, respawn.GZ}, respawn.In)
+}
+
+// TreeInReach finds the standing tree the hero acts on: the nearest one in front within reach,
+// else the nearest one within reach in any direction, so overshooting a tree still reaches it.
+func (w *World) TreeInReach() (Tree, bool) { return w.woodcutting.treeInReach() }
+
+// Chop orders the hero to chop the tree in reach, reporting whether chopping started. A tree above
+// the hero's level leaves a message instead.
+func (w *World) Chop() bool {
+	chop := w.woodcutting.chopInReach()
+	if chop == nil {
+		return false
+	}
+	w.order = chop
+	return true
+}
+
+// Approach walks the hero to a standing tree, round whatever blocks the way, and chops it on arrival,
+// reporting whether the tree still stands.
+func (w *World) Approach(tree Tree) bool {
+	standing, ok := w.woodcutting.standing(tree)
+	if !ok {
+		return false
+	}
+	w.closeInOn(point{standing.X, standing.Z}, arrival, func() order { return w.woodcutting.start(standing) })
+	return true
+}
+
+// chopping is the chop in progress, if any.
+func (w *World) chopping() (*chop, bool) {
+	chop, ok := w.order.(*chop)
+	return chop, ok
+}
+
+func (w *World) Chopping() bool {
+	_, chopping := w.chopping()
+	return chopping
+}
+
+// LastStrike tells which strike of the chop landed last, counting from zero, and how long ago.
+func (w *World) LastStrike() (index int, since time.Duration, ok bool) {
+	chop, chopping := w.chopping()
+	if !chopping {
+		return 0, 0, false
+	}
+	index, since = chop.lastStrike()
+	return index, since, true
+}
+
+// ChoppedTree is the tree being chopped, if any.
+func (w *World) ChoppedTree() (Tree, bool) {
+	chop, chopping := w.chopping()
+	if !chopping {
+		return Tree{}, false
+	}
+	return chop.chopped()
 }
