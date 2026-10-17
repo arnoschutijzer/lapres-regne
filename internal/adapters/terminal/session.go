@@ -136,7 +136,7 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 				return false
 			}
 			if stack, ok := view.stackAt(event.column, event.row); ok {
-				world.Withdraw(stack)
+				view.clickStack(stack)
 				return false
 			}
 			// Clicking a tree walks there to chop it, clicking a door or gate walks there to open or
@@ -198,6 +198,19 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 			} else {
 				view.cursor.move(1)
 			}
+			return false
+		}
+		if event.action == previousStack || event.action == nextStack {
+			if event.action == previousStack {
+				view.moveBankCursor(-1)
+			} else {
+				view.moveBankCursor(1)
+			}
+			return false
+		}
+		if event.action == withdrawStack {
+			// Holding Shift-X keeps withdrawing, one item per repeat.
+			view.withdraw()
 			return false
 		}
 		if event.action == toggleBank {

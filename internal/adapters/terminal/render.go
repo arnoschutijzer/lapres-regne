@@ -37,6 +37,9 @@ type renderer struct {
 	// bankOpen shows the bank panel; bankShown and lastBank remember the last one drawn.
 	bankOpen, bankShown bool
 	lastBank            string
+	bankCursor          bankCursor
+	// bankTop is the first row of stacks the bank panel shows.
+	bankTop int
 	// built surveys a map's structures within the drawn area, each frame, and upstairs those of
 	// each floor above the ground up to the hero's, the first floor first.
 	built    builtArea
@@ -872,7 +875,9 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	}
 	r.panelShown = r.inventoryOpen
 	if r.bankOpen {
-		lines := bankPanel(r.world.Bank(), bankColumns(cols))
+		columns := bankColumns(cols)
+		r.bankTop = scrolled(r.bankTop, r.bankCursor, columns, len(r.world.Bank().Stacks()))
+		lines := bankPanel(r.world.Bank(), columns, r.bankCursor, r.bankTop)
 		panel := strings.Join(lines, "\n")
 		if full || !r.bankShown || panel != r.lastBank {
 			for i, line := range lines[:min(len(lines), rows)] {

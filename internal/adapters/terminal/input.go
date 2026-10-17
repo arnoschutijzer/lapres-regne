@@ -24,6 +24,9 @@ const (
 	previousSlot
 	nextSlot
 	toggleBank
+	previousStack
+	nextStack
+	withdrawStack
 )
 
 type keyEvent struct {
@@ -104,8 +107,29 @@ func keyAction(key int) action {
 		return nextSlot
 	case 'b', 'B':
 		return toggleBank
+	case '{':
+		return previousStack
+	case '}':
+		return nextStack
 	}
 	return none
+}
+
+// withShift turns the inventory's keys into the bank's while Shift is held: Shift-[ and Shift-]
+// move the bank highlight, and Shift-X withdraws.
+func (a action) withShift(shift bool) action {
+	if !shift {
+		return a
+	}
+	switch a {
+	case previousSlot:
+		return previousStack
+	case nextSlot:
+		return nextStack
+	case dropLog:
+		return withdrawStack
+	}
+	return a
 }
 
 func (d *keyDecoder) feed(key byte) keyEvent {
@@ -137,7 +161,8 @@ func (d *keyDecoder) feed(key byte) keyEvent {
 		d.params = append(d.params, key)
 		return keyEvent{}
 	}
-	return keyEvent{key: int(key), action: keyAction(int(key)), shift: key >= 'A' && key <= 'Z'}
+	shift := key >= 'A' && key <= 'Z'
+	return keyEvent{key: int(key), action: keyAction(int(key)).withShift(shift), shift: shift}
 }
 
 func (d *keyDecoder) sequence(final byte) keyEvent {
@@ -194,6 +219,7 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 	}
 	event.action = keyAction(event.key)
 	event.shift = (modifiers-1)&1 != 0
+	event.action = event.action.withShift(event.shift)
 	if (event.key == 'c' || event.key == 'd') && (modifiers-1)&4 != 0 {
 		event.action = quit
 	}

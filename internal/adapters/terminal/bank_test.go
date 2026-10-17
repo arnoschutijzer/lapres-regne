@@ -29,7 +29,7 @@ func TestOpeningTheBankShowsTheInventoryToDepositFrom(t *testing.T) {
 }
 
 func TestAnEmptyBankSaysSo(t *testing.T) {
-	if lines := bankPanel(world.Bank{}, bankMaxColumns); !strings.Contains(strings.Join(lines, ""), "empty") || len(lines) != panelHeight {
+	if lines := bankPanel(world.Bank{}, bankMaxColumns, bankCursor{}, 0); !strings.Contains(strings.Join(lines, ""), "empty") || len(lines) != panelHeight {
 		t.Fatalf("lines = %q, want %d lines saying the bank is empty", lines, panelHeight)
 	}
 }
@@ -46,7 +46,7 @@ func banking(t *testing.T, logs int) *world.World {
 
 func TestTheBankShowsEachStackAsAnIconUnderItsCount(t *testing.T) {
 	w := banking(t, 3)
-	lines := bankPanel(w.Bank(), bankMaxColumns)
+	lines := bankPanel(w.Bank(), bankMaxColumns, bankCursor{}, 0)
 	// The first slot's count sits above its icon, both a cell into the slot.
 	if want := strings.Repeat(" ", slotIndent+1) + countTint(3) + "3   "; !strings.HasPrefix(lines[slotLine], want) {
 		t.Fatalf("count line = %q, want it to start %q", lines[slotLine], want)
@@ -148,5 +148,95 @@ func TestStackAtFindsTheClickedStackInTheOpenBank(t *testing.T) {
 	r.toggleBank()
 	if _, ok := r.stackAt(slotIndent+1, 5); ok {
 		t.Error("a closed bank has no stacks to click")
+	}
+}
+
+func TestShiftTurnsTheInventoryKeysIntoTheBankKeys(t *testing.T) {
+	cases := map[string]action{
+		"{": previousStack, "}": nextStack, "X": withdrawStack, "x": dropLog, "[": previousSlot,
+		// Kitty's protocol reports the unshifted key with Shift among the modifiers.
+		"\x1b[91;2u": previousStack, "\x1b[93;2u": nextStack, "\x1b[120;2u": withdrawStack, "\x1b[120u": dropLog,
+	}
+	for input, want := range cases {
+		var d keyDecoder
+		events := feed(&d, input)
+		if got := events[len(events)-1].action; got != want {
+			t.Errorf("%q gives %v, want %v", input, got, want)
+		}
+	}
+}
+
+func TestTheBankCursorWrapsAroundTheStacks(t *testing.T) {
+	cursor := bankCursor{}
+	cursor.move(1, 0)
+	if cursor.active {
+		t.Fatal("an empty bank has nothing to highlight")
+	}
+	cursor.move(-1, 3)
+	if !cursor.active || cursor.stack != 2 {
+		t.Fatalf("cursor = %+v, want Shift-[ from nothing to highlight the last stack", cursor)
+	}
+	cursor.move(1, 3)
+	if cursor.stack != 0 {
+		t.Fatalf("cursor = %+v, want Shift-] past the last stack to wrap to the first", cursor)
+	}
+}
+
+func TestMovingTheBankHighlightOpensTheBank(t *testing.T) {
+	r := newRenderer(banking(t, 1), NewCamera(0, 0), "L’Après-Règne")
+	r.moveBankCursor(1)
+	if !r.bankOpen || r.bankCursor != (bankCursor{active: true, stack: 0}) {
+		t.Fatalf("bank open = %v, cursor = %+v; want the bank open on the first stack", r.bankOpen, r.bankCursor)
+	}
+}
+
+func TestShiftXWithdrawsFromTheHighlightedStackAndDropsWhileTheBankIsClosed(t *testing.T) {
+	w := banking(t, 2)
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
+	r.toggleBank()
+	r.withdraw()
+	if w.Hero().Inventory().Len() != 1 || w.Bank().Stacks()[0].Count != 1 {
+		t.Fatal("with nothing highlighted, Shift-X must withdraw from the first stack")
+	}
+	r.withdraw()
+	if w.Hero().Inventory().Len() != 2 || len(w.Bank().Stacks()) != 0 || r.bankCursor.active {
+		t.Fatalf("bank = %v, cursor = %+v; want the last log withdrawn and nothing left to highlight", w.Bank().Stacks(), r.bankCursor)
+	}
+	r.toggleBank()
+	r.withdraw()
+	if len(w.GroundItems()) != 1 {
+		t.Fatal("with the bank closed, Shift-X must drop like X")
+	}
+}
+
+func TestClickingAStackHighlightsItAndWithdrawsOne(t *testing.T) {
+	w := banking(t, 2)
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
+	r.toggleBank()
+	r.clickStack(0)
+	if w.Hero().Inventory().Len() != 1 || r.bankCursor != (bankCursor{active: true, stack: 0}) {
+		t.Fatalf("logs = %d, cursor = %+v; want one log withdrawn from the highlighted stack", w.Hero().Inventory().Len(), r.bankCursor)
+	}
+}
+
+func TestTheHighlightedStackIsBracketed(t *testing.T) {
+	lines := bankPanel(banking(t, 1).Bank(), bankMaxColumns, bankCursor{active: true, stack: 0}, 0)
+	if want := strings.Repeat(" ", slotIndent) + "[" + icon(world.Logs) + panelText + "]"; !strings.HasPrefix(lines[slotLine+1], want) {
+		t.Fatalf("icon line = %q, want it to start %q", lines[slotLine+1], want)
+	}
+}
+
+func TestTheBankScrollsToKeepTheHighlightInView(t *testing.T) {
+	// 50 stacks fill 7 rows of 8; 4 rows show at once.
+	cases := []struct{ top, stack, want int }{
+		{0, 31, 0}, {0, 32, 1}, {0, 49, 3}, {3, 8, 1}, {2, 20, 2},
+	}
+	for _, c := range cases {
+		if got := scrolled(c.top, bankCursor{active: true, stack: c.stack}, 8, 50); got != c.want {
+			t.Errorf("scrolled(top %d, stack %d) = %d, want %d", c.top, c.stack, got, c.want)
+		}
+	}
+	if got := scrolled(5, bankCursor{}, 8, 9); got != 0 {
+		t.Errorf("a bank that fits must show from the top, got row %d", got)
 	}
 }

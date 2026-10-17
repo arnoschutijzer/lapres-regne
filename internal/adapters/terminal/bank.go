@@ -43,8 +43,9 @@ func countTint(count int) string {
 	return countGreen
 }
 
-// bankPanel lays out the bank panel's lines, each padded to the panel's width in visible cells.
-func bankPanel(bank world.Bank, columns int) []string {
+// bankPanel lays out the bank panel's lines from a first row of stacks on, each padded to the
+// panel's width in visible cells, with the highlighted stack bracketed.
+func bankPanel(bank world.Bank, columns int, cursor bankCursor, top int) []string {
 	width := bankWidth(columns)
 	pad := func(text string, visible int) string {
 		return text + strings.Repeat(" ", max(0, width-visible))
@@ -56,7 +57,7 @@ func bankPanel(bank world.Bank, columns int) []string {
 		empty := "   empty"
 		lines = append(lines, pad(foreground([3]int{58, 72, 62})+empty, len(empty)))
 	}
-	for row := range bankRows {
+	for row := top; row < top+bankRows; row++ {
 		if row*columns >= len(stacks) {
 			break
 		}
@@ -69,7 +70,11 @@ func bankPanel(bank world.Bank, columns int) []string {
 			}
 			stack := stacks[index]
 			counts += " " + countTint(stack.Count) + fmt.Sprintf("%-4s", bankCount(stack.Count))
-			icons += " " + icon(stack.Item) + panelText + "  "
+			if cursor.active && cursor.stack == index {
+				icons += "[" + icon(stack.Item) + panelText + "] "
+			} else {
+				icons += " " + icon(stack.Item) + panelText + "  "
+			}
 			visible += bankPitch
 		}
 		lines = append(lines, pad(counts, visible), pad(icons, visible))
@@ -129,9 +134,84 @@ func (r *renderer) stackAt(column, row int) (int, bool) {
 	if panelColumn < 0 || panelColumn >= columns*bankPitch || row-2-slotLine < 0 || gridRow >= bankRows {
 		return 0, false
 	}
-	stack := gridRow*columns + panelColumn/bankPitch
+	stack := (r.bankTop+gridRow)*columns + panelColumn/bankPitch
 	if stack >= len(r.world.Bank().Stacks()) {
 		return 0, false
 	}
 	return stack, true
+}
+
+// bankCursor is the highlighted bank stack, chosen with Shift-[ and Shift-] or a click.
+type bankCursor struct {
+	active bool
+	stack  int
+}
+
+// move steps the highlight through a number of stacks in reading order, wrapping at the ends.
+func (c *bankCursor) move(step, stacks int) {
+	if stacks == 0 {
+		return
+	}
+	if !c.active {
+		c.active, c.stack = true, 0
+		if step < 0 {
+			c.stack = stacks - 1
+		}
+		return
+	}
+	c.stack = (c.stack + step + stacks) % stacks
+}
+
+// keep holds the highlight on a stack that is still there after the bank shrinks.
+func (c *bankCursor) keep(stacks int) {
+	if stacks == 0 {
+		*c = bankCursor{}
+		return
+	}
+	c.stack = min(c.stack, stacks-1)
+}
+
+// scrolled is the first row of stacks to show so the highlighted stack stays in view, moving as
+// little as it can from the row shown before.
+func scrolled(top int, cursor bankCursor, columns, stacks int) int {
+	rows := (stacks + columns - 1) / columns
+	if cursor.active {
+		row := cursor.stack / columns
+		top = min(top, row)
+		top = max(top, row-bankRows+1)
+	}
+	return max(0, min(top, rows-bankRows))
+}
+
+// moveBankCursor steps the bank highlight, opening the bank so the highlight is never hidden.
+func (r *renderer) moveBankCursor(step int) {
+	if !r.bankOpen {
+		r.toggleBank()
+	}
+	r.bankCursor.move(step, len(r.world.Bank().Stacks()))
+}
+
+// clickStack highlights a clicked bank stack and withdraws one item from it.
+func (r *renderer) clickStack(stack int) {
+	r.bankCursor = bankCursor{active: true, stack: stack}
+	r.world.Withdraw(stack)
+	r.bankCursor.keep(len(r.world.Bank().Stacks()))
+}
+
+// withdraw withdraws one item from the highlighted stack, or the first, while the bank is open,
+// and drops the highlighted inventory item otherwise.
+func (r *renderer) withdraw() {
+	if !r.bankOpen {
+		r.removeFromSlot()
+		return
+	}
+	stacks := len(r.world.Bank().Stacks())
+	if stacks == 0 {
+		return
+	}
+	if !r.bankCursor.active {
+		r.bankCursor = bankCursor{active: true}
+	}
+	r.bankCursor.keep(stacks)
+	r.clickStack(r.bankCursor.stack)
 }
