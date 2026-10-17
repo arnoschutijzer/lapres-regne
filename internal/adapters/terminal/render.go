@@ -877,7 +877,8 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	r.panelShown = r.inventoryOpen
 	if r.bankOpen {
 		columns := bankColumns(cols)
-		r.bankTop = scrolled(r.bankTop, r.bankCursor, columns, len(r.world.Bank().Stacks()))
+		// A narrower forest or a smaller bank may leave fewer rows to scroll through.
+		r.bankTop = scrolled(r.bankTop, bankCursor{}, columns, len(r.world.Bank().Stacks()))
 		lines := bankPanel(r.world.Bank(), columns, r.bankCursor, r.bankTop)
 		panel := strings.Join(lines, "\n")
 		if full || !r.bankShown || panel != r.lastBank {

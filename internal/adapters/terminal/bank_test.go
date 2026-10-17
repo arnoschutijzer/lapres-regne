@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"lapresregne/internal/world"
 )
@@ -296,5 +297,91 @@ func TestRightClickingElsewhereOffersNothing(t *testing.T) {
 	r.frame(100, 30, 0)
 	if r.rightClick(50, 20) || r.menu != nil {
 		t.Fatal("a right-click on the forest must not open a menu")
+	}
+}
+
+func TestTheWheelReportsTheCellItScrollsOver(t *testing.T) {
+	var d keyDecoder
+	events := feed(&d, "\x1b[<65;12;7M")
+	if last := events[len(events)-1]; last.zoom != -1 || last.column != 12 || last.row != 7 {
+		t.Fatalf("event = %+v, want the wheel scrolling down over column 12, row 7", last)
+	}
+}
+
+// bankOfFour opens a renderer on a bank of every kind of log in a forest 40 columns wide: 3 stacks
+// a row, so 2 rows, which fit.
+func bankOfFour(t *testing.T) *renderer {
+	t.Helper()
+	carried := []world.Item{world.Logs, world.OakLogs, world.WillowLogs, world.YewLogs}
+	slots := make([]world.Slot, len(carried))
+	for index, item := range carried {
+		slots[index] = world.Slot{Item: item, Filled: true}
+	}
+	w, err := world.Resume(7, &fixedProgress{world.Snapshot{Seed: 1, Inventory: slots}}, time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for slot := range carried {
+		w.Deposit(slot)
+	}
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
+	r.toggleBank()
+	r.frame(40, 30, 0)
+	return r
+}
+
+type fixedProgress struct{ snapshot world.Snapshot }
+
+func (p *fixedProgress) Load() (world.Snapshot, bool, error) { return p.snapshot, true, nil }
+func (p *fixedProgress) Save(world.Snapshot) error           { return nil }
+
+func TestTheWheelScrollsTheBankUnderThePointer(t *testing.T) {
+	r := bankOfFour(t)
+	// Two rows fit in four, so nothing scrolls.
+	if !r.scrollBank(slotIndent+1, 5, 1) || r.bankTop != 0 {
+		t.Fatalf("top = %d, want a bank that fits to stay at its first row", r.bankTop)
+	}
+	r.bankTop = 0
+	if r.scrollBank(30, 20, 1) {
+		t.Fatal("the wheel away from the bank must not scroll it")
+	}
+	r.toggleBank()
+	if r.scrollBank(slotIndent+1, 5, 1) {
+		t.Fatal("a closed bank must not scroll")
+	}
+}
+
+func TestTheBankScrollsByRowsWithinItsStacks(t *testing.T) {
+	// 50 stacks fill 7 rows of 8; 4 rows show at once.
+	cases := []struct{ top, by, want int }{{0, 1, 1}, {0, -1, 0}, {2, 5, 3}, {3, -2, 1}}
+	for _, c := range cases {
+		if got := scrolled(c.top+c.by, bankCursor{}, 8, 50); got != c.want {
+			t.Errorf("scrolling %d rows from row %d = %d, want %d", c.by, c.top, got, c.want)
+		}
+	}
+}
+
+func TestTheBankTitleShowsWhichWaysItScrolls(t *testing.T) {
+	bank := banking(t, 1).Bank()
+	cases := []struct {
+		top, rows int
+		want      string
+	}{{0, 4, "bank"}, {0, 7, "bank ↓"}, {2, 7, "bank ↑↓"}, {3, 7, "bank ↑"}}
+	for _, c := range cases {
+		if got := strings.TrimSpace(bankTitle(c.top, c.rows)); got != c.want {
+			t.Errorf("bankTitle(%d, %d) = %q, want %q", c.top, c.rows, got, c.want)
+		}
+	}
+	if !strings.Contains(bankPanel(bank, bankMaxColumns, bankCursor{}, 0)[1], "bank") {
+		t.Fatal("the panel must carry the title")
+	}
+}
+
+func TestMovingTheHighlightScrollsItBackIntoView(t *testing.T) {
+	r := bankOfFour(t)
+	r.bankTop = 5
+	r.moveBankCursor(1)
+	if r.bankTop != 0 {
+		t.Fatalf("top = %d, want the highlighted first stack's row shown", r.bankTop)
 	}
 }

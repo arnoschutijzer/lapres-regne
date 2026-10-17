@@ -50,9 +50,9 @@ func bankPanel(bank world.Bank, columns int, cursor bankCursor, top int) []strin
 	pad := func(text string, visible int) string {
 		return text + strings.Repeat(" ", max(0, width-visible))
 	}
-	title := "   bank"
-	lines := []string{pad("", 0), pad(panelText+title, len(title)), pad("", 0)}
 	stacks := bank.Stacks()
+	title := bankTitle(top, (len(stacks)+columns-1)/columns)
+	lines := []string{pad("", 0), pad(panelText+title, len([]rune(title))), pad("", 0)}
 	if len(stacks) == 0 {
 		empty := "   empty"
 		lines = append(lines, pad(foreground([3]int{58, 72, 62})+empty, len(empty)))
@@ -83,6 +83,21 @@ func bankPanel(bank world.Bank, columns int, cursor bankCursor, top int) []strin
 		lines = append(lines, pad("", 0))
 	}
 	return lines
+}
+
+// bankTitle names the bank, with arrows for the rows of stacks hidden above and below the shown rows.
+func bankTitle(top, rows int) string {
+	title := "   bank"
+	if top > 0 || top+bankRows < rows {
+		title += " "
+	}
+	if top > 0 {
+		title += "↑"
+	}
+	if top+bankRows < rows {
+		title += "↓"
+	}
+	return title
 }
 
 // bankCount shortens a stack's count to four characters, in thousands or millions when large.
@@ -128,7 +143,7 @@ func (r *renderer) stackAt(column, row int) (int, bool) {
 		return 0, false
 	}
 	cols := r.canvas.width / 2
-	columns := bankColumns(cols)
+	columns := r.bankColumns()
 	panelColumn := column - 1 - (r.screenWidth-cols)/2 - slotIndent
 	gridRow := (row - 2 - slotLine) / 2
 	if panelColumn < 0 || panelColumn >= columns*bankPitch || row-2-slotLine < 0 || gridRow >= bankRows {
@@ -189,6 +204,7 @@ func (r *renderer) moveBankCursor(step int) {
 		r.toggleBank()
 	}
 	r.bankCursor.move(step, len(r.world.Bank().Stacks()))
+	r.revealStack()
 }
 
 // clickStack highlights a clicked bank stack and withdraws one item from it.
@@ -205,6 +221,7 @@ func (r *renderer) withdrawFrom(stack int, all bool) {
 		r.world.Withdraw(stack)
 	}
 	r.bankCursor.keep(len(r.world.Bank().Stacks()))
+	r.revealStack()
 }
 
 // deposit highlights an inventory slot and deposits its item, or every item of its kind.
@@ -264,4 +281,35 @@ func (r *renderer) withdraw() {
 	}
 	r.bankCursor.keep(stacks)
 	r.clickStack(r.bankCursor.stack)
+}
+
+// bankColumns is how many stacks a row the bank shows in the forest last drawn, or the most
+// before the first frame.
+func (r *renderer) bankColumns() int {
+	if r.canvas.width == 0 {
+		return bankMaxColumns
+	}
+	return bankColumns(r.canvas.width / 2)
+}
+
+// revealStack scrolls the bank so the highlighted stack's row shows.
+func (r *renderer) revealStack() {
+	r.bankTop = scrolled(r.bankTop, r.bankCursor, r.bankColumns(), len(r.world.Bank().Stacks()))
+}
+
+// scrollBank scrolls the open bank by a number of rows, up when negative, while the pointer is
+// over its panel at a 1-based terminal cell. It reports whether the bank took the wheel.
+func (r *renderer) scrollBank(column, row, rows int) bool {
+	if !r.bankOpen || r.screenWidth == 0 || r.canvas.width == 0 {
+		return false
+	}
+	cols := r.canvas.width / 2
+	columns := r.bankColumns()
+	panelColumn := column - 1 - (r.screenWidth-cols)/2
+	line := row - 2
+	if panelColumn < 0 || panelColumn >= bankWidth(columns) || line < 0 || line >= panelHeight {
+		return false
+	}
+	r.bankTop = scrolled(r.bankTop+rows, bankCursor{}, columns, len(r.world.Bank().Stacks()))
+	return true
 }

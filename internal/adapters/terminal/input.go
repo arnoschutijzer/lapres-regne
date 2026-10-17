@@ -255,9 +255,9 @@ func mouseEvent(params string, final byte) keyEvent {
 	if button&64 != 0 {
 		switch button & 3 {
 		case 0:
-			return keyEvent{zoom: 1}
+			return keyEvent{zoom: 1, column: column, row: row}
 		case 1:
-			return keyEvent{zoom: -1}
+			return keyEvent{zoom: -1, column: column, row: row}
 		case 2:
 			return keyEvent{turn: -1}
 		case 3:

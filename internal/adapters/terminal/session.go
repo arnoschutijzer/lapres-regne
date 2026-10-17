@@ -118,7 +118,10 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 			return false
 		}
 		if event.zoom != 0 {
-			camera.zoomBy(event.zoom)
+			// The wheel scrolls the bank under the pointer, and zooms anywhere else.
+			if !view.scrollBank(event.column, event.row, -event.zoom) {
+				camera.zoomBy(event.zoom)
+			}
 			return false
 		}
 		if event.turn != 0 {
