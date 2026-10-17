@@ -117,6 +117,21 @@ heights
 00122
 ```
 
+Stand walls along the edges between tiles, as Old School RuneScape does, with a
+`walls` grid at twice the terrain's resolution: even lines run along the north
+edges of a row of tiles, odd lines along their west edges with each tile's
+middle between. Along an edge, `#` is a wall, `B` battlements, `=` a fence and
+`D` a doorway, or an open gate in a fence. A tile's middle may hold `/` or `\`
+for a wall running diagonally across it, battlements or a fence when both
+corners it joins are marked `B` or `=`; corners are otherwise free to mark.
+
+```text
+walls
++#D#+
+#   #
++###+
+```
+
 A room closed in by walls and doors is roofed while the hero is outside it.
 Lay each building's roof with a `roofs` grid over the terrain: `s` for slate,
 `t` for thatch or `c` for red clay tiles; a building takes whichever most of its

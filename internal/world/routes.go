@@ -44,13 +44,20 @@ func (c cell) middle() point {
 	return point{(float64(c.gx) + 0.5) * TileSize, (float64(c.gz) + 0.5) * TileSize}
 }
 
-// open tells whether the hero may stand on a tile: nothing blocking is built or stands on it.
+// open tells whether the hero may stand on a tile: nothing blocking is built or stands on it, and
+// no wall or fence runs diagonally across it.
 func (t *terrain) open(c cell) bool {
 	ground, ok := t.tile(c.gx, c.gz)
 	if fixture, stands := t.fixtures[c]; stands && fixture.Blocks() {
 		return false
 	}
-	return ok && !ground.Blocks()
+	return ok && !ground.Blocks() && !t.crossed(c)
+}
+
+// crossable tells whether the hero may step straight from a tile to the one beside it: no rail,
+// wall or fence stands in the edge between them.
+func (t *terrain) crossable(from, to cell) bool {
+	return !t.railed(from, to) && !bars(t.between(from, to))
 }
 
 // railReach is how far in from a bridge's edge over the water its rail keeps the hero.
@@ -90,13 +97,14 @@ func (t *terrain) cornered(here cell, alongX, alongZ float64) bool {
 }
 
 // passable tells whether the hero may stand at a point: on an open tile, out of corners closed by
-// walls meeting diagonally, and not against the rail along a bridge's edge over the water.
+// walls meeting diagonally, clear of walls and fences along the tiles' edges, and not against the
+// rail along a bridge's edge over the water.
 func (t *terrain) passable(x, z float64) bool {
 	here := tileOf(x, z)
 	if !t.open(here) {
 		return false
 	}
-	if t.cornered(here, x-float64(here.gx)*TileSize, z-float64(here.gz)*TileSize) {
+	if t.cornered(here, x-float64(here.gx)*TileSize, z-float64(here.gz)*TileSize) || t.barred(x, z) {
 		return false
 	}
 	if ground, _ := t.tile(here.gx, here.gz); ground != Bridge {
@@ -121,16 +129,17 @@ func (t *terrain) passable(x, z float64) bool {
 }
 
 // steppable tells whether the hero may step from a tile to the open tile beside it, straight
-// without crossing a rail, or diagonally without cutting the corner of a blocked or railed tile.
+// without crossing a rail, wall or fence, or diagonally without cutting the corner of a blocked
+// tile or crossing a rail, wall or fence round it.
 func (t *terrain) steppable(from, to cell) bool {
 	if !t.open(to) {
 		return false
 	}
 	if from.gx == to.gx || from.gz == to.gz {
-		return !t.railed(from, to)
+		return t.crossable(from, to)
 	}
 	for _, corner := range [2]cell{{to.gx, from.gz}, {from.gx, to.gz}} {
-		if !t.open(corner) || t.railed(from, corner) || t.railed(corner, to) {
+		if !t.open(corner) || !t.crossable(from, corner) || !t.crossable(corner, to) {
 			return false
 		}
 	}

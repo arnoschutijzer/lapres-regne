@@ -207,6 +207,10 @@ type builtTile struct {
 	fixture   world.Fixture
 	furnished bool
 	alike     [4]bool
+	// edges is what stands along the tile's west and north edges and diagonally across it, and
+	// sides what stands along each of its sides, north, east, south and west.
+	edges world.TileEdges
+	sides [4]world.Ground
 	// diagonal marks the corners, north-east, south-east, south-west and north-west, where a wall
 	// or fence meets another of its kind standing diagonally beside it with nothing joining them
 	// along the sides, so it runs across the corner to meet it.
@@ -261,7 +265,7 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 		middleX, middleZ := (float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize
 		ground, onMap := f.GroundAt(middleX, middleZ)
 		fixture, furnished := f.FixtureAt(middleX, middleZ)
-		a.tiles[i] = builtTile{ground: ground, onMap: onMap, fixture: fixture, furnished: furnished}
+		a.tiles[i] = builtTile{ground: ground, onMap: onMap, fixture: fixture, furnished: furnished, edges: f.EdgesAt(middleX, middleZ)}
 	}
 	for i := range a.tiles {
 		tile := &a.tiles[i]
@@ -279,6 +283,9 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 			default:
 				tile.joined[side] = beside.Blocks() && beside != world.Grave || beside == world.Door
 			}
+		}
+		for side := range tile.sides {
+			tile.sides[side] = a.side(col, row, side)
 		}
 		for corner, step := range corners {
 			across := a.at(col+step[0], row+step[1]).ground
@@ -357,6 +364,9 @@ func (a *builtArea) underfoot(x, z float64, ground world.Ground) world.Ground {
 func (a *builtArea) occupied(x, y, z float64) bool {
 	col, row, alongX, alongZ := tileAt(x, z)
 	tile := a.at(col, row)
+	if a.edgeOccupied(col, row, alongX, alongZ, y) {
+		return true
+	}
 	half, middle := wallThickness/2, world.TileSize/2
 	across := func(along float64, width float64) bool { return math.Abs(along-middle) <= width }
 	north, east, south, west := tile.joined[0], tile.joined[1], tile.joined[2], tile.joined[3]
@@ -502,7 +512,9 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 		case world.Bridge:
 			drawBridgeRails(c, x, z, tile.beside)
 		}
+		a.drawEdges(c, col, row, x, z, r.world.Random(col, row, 45))
 		if tile.furnished {
+			c.standOn(x+world.TileSize/2, z+world.TileSize/2)
 			drawFixture(c, x, z, tile, r.world.Random(col, row, 44))
 		}
 	}

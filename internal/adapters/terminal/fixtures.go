@@ -130,7 +130,7 @@ func backOf(tile builtTile) int {
 		if alongX && side%2 == 1 || alongZ && side%2 == 0 {
 			continue
 		}
-		if isWall(tile.beside[side]) {
+		if isWall(tile.beside[side]) || walling(tile.sides[side]) {
 			return side
 		}
 	}

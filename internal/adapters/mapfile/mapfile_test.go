@@ -222,3 +222,36 @@ func TestAnUnknownRoofingIsReported(t *testing.T) {
 		t.Fatalf("error = %v, want the unknown roofing reported on line 5", err)
 	}
 }
+
+func TestAMapFileStandsWallsAlongTheEdgesOfItsTiles(t *testing.T) {
+	// Two tiles side by side: a wall along the first's west edge and a doorway along its north
+	// edge, a fence between the two, and battlements running diagonally across the second.
+	loaded, err := Load(write(t, "edges.map", `terrain
+@_
+
+walls
+.D. B
+# =/.
+. B .
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := world.Grass
+	want := world.Edges{
+		West:    [][]world.Ground{{world.Wall, world.Fence}},
+		North:   [][]world.Ground{{world.Door, g}},
+		Rising:  [][]world.Ground{{g, world.Battlement}},
+		Falling: [][]world.Ground{{g, g}},
+	}
+	if !reflect.DeepEqual(loaded.Edges, want) {
+		t.Fatalf("edges = %+v, want %+v", loaded.Edges, want)
+	}
+}
+
+func TestAnUnknownWallIsReported(t *testing.T) {
+	_, err := Load(write(t, "edges.map", "terrain\n@.\n\nwalls\n.x...\n"))
+	if err == nil || !strings.Contains(err.Error(), "line 5") {
+		t.Fatalf("error = %v, want the unknown wall reported on line 5", err)
+	}
+}

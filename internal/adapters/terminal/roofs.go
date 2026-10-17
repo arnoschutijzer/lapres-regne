@@ -41,7 +41,12 @@ type roof struct {
 // roofOver shapes the roof of a building, reaching from the outer faces of its walls with an
 // overhang.
 func roofOver(b world.Building) roof {
+	// The outer faces of the walls stand half a wall's thickness out from the middle of a wall's
+	// own tile, or from the edges of the rooms' tiles when walled along them.
 	outside := world.TileSize/2 - wallThickness/2 - overhang
+	if b.Edged {
+		outside = -wallThickness/2 - overhang
+	}
 	x0, z0 := float64(b.Col)*world.TileSize+outside, float64(b.Row)*world.TileSize+outside
 	x1 := float64(b.Col+b.Cols)*world.TileSize - outside
 	z1 := float64(b.Row+b.Rows)*world.TileSize - outside

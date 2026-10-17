@@ -56,6 +56,8 @@ type Map struct {
 	// Roofs is the roofing over each tile, row by row as Ground; a building takes the roofing most
 	// of its rooms lie under, and tiles left out lie under slate.
 	Roofs [][]Roofing
+	// Edges are the walls, fences and doorways standing along the edges between tiles.
+	Edges Edges
 }
 
 // LevelHeight is how much higher each level of a map's heights lies than the last, in world units.
@@ -79,6 +81,9 @@ const (
 type Building struct {
 	Col, Row, Cols, Rows int
 	Roof                 Roofing
+	// Edged marks a building walled along the edges of its rooms' tiles: it spans just those
+	// tiles, its walls standing along their outer edges.
+	Edged bool
 }
 
 // Roofing is what a building's roof is laid with.
@@ -106,10 +111,11 @@ type terrain struct {
 	heights [][]int
 	highest int
 	roofs   [][]Roofing
+	edges   Edges
 }
 
 func newTerrain(m Map) *terrain {
-	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, roofs: m.Roofs, trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
+	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, roofs: m.Roofs, edges: m.Edges, trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
 	for _, levels := range m.Heights {
 		for _, level := range levels {
 			t.highest = max(t.highest, level)
@@ -146,8 +152,8 @@ func newTerrain(m Map) *terrain {
 // indoor tells whether a tile is floored inside, as rooms are.
 func indoor(g Ground) bool { return g == Floor || g == Boards }
 
-// findBuildings finds every room of flagstones or boards closed in by walls and doors alone, and
-// roofs it as a building.
+// findBuildings finds every room of flagstones or boards closed in by walls and doors alone,
+// whether standing on tiles of their own or along the tiles' edges, and roofs it as a building.
 func (t *terrain) findBuildings() {
 	t.rooms = make(map[cell]int)
 	seen := make(map[cell]bool)
@@ -159,7 +165,7 @@ func (t *terrain) findBuildings() {
 				continue
 			}
 			// Gather the room, noting whether it opens onto anything but its walls and doors.
-			room, open := []cell{start}, false
+			room, open, edged := []cell{start}, false, false
 			// The room's doorways count as indoors too, so its roof stays lifted while the hero
 			// stands in one.
 			var doorways []cell
@@ -168,9 +174,19 @@ func (t *terrain) findBuildings() {
 				here := room[i]
 				for _, step := range steps {
 					next := cell{here.gx + step.gx, here.gz + step.gz}
+					switch edge := t.between(here, next); edge {
+					case Wall, Battlement, Door:
+						edged = true
+						continue
+					case Fence:
+						open = true
+						continue
+					}
 					ground, ok := t.tile(next.gx, next.gz)
 					switch {
 					case !ok:
+						open = true
+					case t.crossed(next):
 						open = true
 					case indoor(ground):
 						if !seen[next] {
@@ -196,10 +212,11 @@ func (t *terrain) findBuildings() {
 			for _, doorway := range doorways {
 				t.rooms[doorway] = len(t.buildings)
 			}
-			t.buildings = append(t.buildings, Building{
-				Col: left - 1, Row: top - 1, Cols: right - left + 3, Rows: bottom - top + 3,
-				Roof: t.roofing(room),
-			})
+			building := Building{Col: left - 1, Row: top - 1, Cols: right - left + 3, Rows: bottom - top + 3, Roof: t.roofing(room)}
+			if edged {
+				building = Building{Col: left, Row: top, Cols: right - left + 1, Rows: bottom - top + 1, Roof: t.roofing(room), Edged: true}
+			}
+			t.buildings = append(t.buildings, building)
 		}
 	}
 }

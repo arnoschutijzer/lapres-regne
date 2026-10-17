@@ -37,6 +37,19 @@
 //	heights
 //	00122
 //
+// A walls grid stands walls, battlements, fences and doorways along the edges between tiles, at
+// twice the terrain's resolution: even lines run along the north edges of a row of tiles, odd
+// lines along their west edges with each tile's middle between. Along an edge, # is a wall, B
+// battlements, = a fence and D a doorway, or an open gate in a fence; anything else is nothing.
+// A tile's middle may hold / for a wall rising from its south-west corner to its north-east, or \
+// falling from its north-west corner to its south-east, battlements or a fence when both corners
+// it joins are marked B or =. Corners are free to mark, for the grid to read as a plan:
+//
+//	walls
+//	+#D#+
+//	#   #
+//	+###+
+//
 // A roofs grid, laid over the terrain, lays each building's roof: s slate, t thatch or c clay
 // tiles, whichever most of its rooms lie under. Tiles the grid leaves out, or marks ., lie under
 // slate:
@@ -118,6 +131,12 @@ var fixtures = map[rune]world.Fixture{
 // roofings are what the characters of the roofs grid stand for.
 var roofings = map[rune]world.Roofing{'.': world.Slate, 's': world.Slate, 't': world.Thatch, 'c': world.ClayTiles}
 
+// barriers are what the characters along the edges of the walls grid stand for.
+var barriers = map[rune]world.Ground{
+	' ': world.Grass, '.': world.Grass, '+': world.Grass,
+	'#': world.Wall, 'B': world.Battlement, '=': world.Fence, 'D': world.Door,
+}
+
 // Load reads the map in the file at path. A map without a name is named after its file.
 func Load(path string) (world.Map, error) {
 	file, err := os.Open(path)
@@ -140,6 +159,8 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 	areas := map[rune]string{}
 	// objectRows counts the rows of the objects grid read so far.
 	objectRows := 0
+	// walls are the lines of the walls grid read so far.
+	var walls []string
 	for number := 1; lines.Scan(); number++ {
 		line := strings.TrimRight(lines.Text(), " \t\r")
 		switch {
@@ -197,6 +218,11 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 				row = append(row, roofing)
 			}
 			m.Roofs = append(m.Roofs, row)
+		case grid == "walls":
+			if err := readWalls(&m.Edges, len(walls), line); err != nil {
+				return world.Map{}, fmt.Errorf("line %d: %w", number, err)
+			}
+			walls = append(walls, line)
 		case grid == "areas":
 			row := make([]string, 0, len(line))
 			for _, char := range []rune(line) {
@@ -209,7 +235,7 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 			m.Areas = append(m.Areas, row)
 		case line == "terrain":
 			grid, hasTerrain = line, true
-		case line == "areas" || line == "heights" || line == "objects" || line == "roofs":
+		case line == "areas" || line == "heights" || line == "objects" || line == "roofs" || line == "walls":
 			grid = line
 		default:
 			setting, value, _ := strings.Cut(line, " ")
@@ -236,5 +262,96 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 	if !hasStart {
 		return world.Map{}, fmt.Errorf("no start tile '@'")
 	}
+	if err := diagonals(&m.Edges, walls); err != nil {
+		return world.Map{}, err
+	}
+	trim(&m.Edges, m.Ground)
 	return m, nil
+}
+
+// readWalls reads the edges along one line of the walls grid, the index-th: an even line runs
+// along the north edges of a row of tiles, and an odd line along their west edges, the tiles'
+// middles between them.
+func readWalls(edges *world.Edges, index int, line string) error {
+	row := index / 2
+	grid := &edges.North
+	if index%2 == 1 {
+		grid = &edges.West
+	}
+	for len(*grid) <= row {
+		*grid = append(*grid, nil)
+	}
+	for i, char := range []rune(line) {
+		if i%2 == index%2 {
+			// A corner on a north line, or a tile's middle on a west line.
+			if index%2 == 1 && char != '/' && char != '\\' && char != ' ' && char != '.' {
+				return fmt.Errorf("unknown wall %q across a tile", char)
+			}
+			continue
+		}
+		barrier, known := barriers[char]
+		if !known {
+			return fmt.Errorf("unknown wall %q", char)
+		}
+		col := i / 2
+		for len((*grid)[row]) <= col {
+			(*grid)[row] = append((*grid)[row], world.Grass)
+		}
+		(*grid)[row][col] = barrier
+	}
+	return nil
+}
+
+// diagonals reads the walls running diagonally across tiles: / rising from a tile's south-west
+// corner to its north-east, \ falling from its north-west corner to its south-east, each a wall,
+// battlements or a fence as the corners it joins are marked.
+func diagonals(edges *world.Edges, walls []string) error {
+	corner := func(line, i int) world.Ground {
+		if line < 0 || line >= len(walls) || i >= len([]rune(walls[line])) {
+			return world.Grass
+		}
+		return barriers[[]rune(walls[line])[i]]
+	}
+	for index := 1; index < len(walls); index += 2 {
+		row := index / 2
+		edges.Rising = append(edges.Rising, make([]world.Ground, len([]rune(walls[index]))/2+1))
+		edges.Falling = append(edges.Falling, make([]world.Ground, len([]rune(walls[index]))/2+1))
+		for i, char := range []rune(walls[index]) {
+			if i%2 == 0 || char != '/' && char != '\\' {
+				continue
+			}
+			col := i / 2
+			// The kind of wall is marked at both corners the diagonal joins.
+			from, to := corner(index+1, i-1), corner(index-1, i+1)
+			grid := edges.Rising
+			if char == '\\' {
+				from, to = corner(index-1, i-1), corner(index+1, i+1)
+				grid = edges.Falling
+			}
+			kind := world.Wall
+			if from == to && (from == world.Battlement || from == world.Fence) {
+				kind = from
+			}
+			grid[row][col] = kind
+		}
+	}
+	return nil
+}
+
+// trim fits each grid of edges to the terrain's tiles, dropping what lies beyond them and filling
+// what the grid leaves out with nothing.
+func trim(edges *world.Edges, ground [][]world.Ground) {
+	for _, grid := range []*[][]world.Ground{&edges.West, &edges.North, &edges.Rising, &edges.Falling} {
+		if len(*grid) == 0 {
+			continue
+		}
+		fitted := make([][]world.Ground, len(ground))
+		for row := range ground {
+			fitted[row] = make([]world.Ground, len(ground[row]))
+			if row < len(*grid) {
+				copy(fitted[row], (*grid)[row])
+			}
+		}
+		*grid = fitted
+	}
 }
