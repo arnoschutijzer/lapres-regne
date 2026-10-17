@@ -3,6 +3,7 @@ package world
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -37,8 +38,8 @@ type woods interface {
 	// say gives the game's reply to the hero's latest action.
 	say(message string)
 	effects() Sounds
-	// train gives the hero experience in a skill.
-	train(skill string, xp float64)
+	// train gives the hero experience in a skill, celebrating a new level with what it unlocks.
+	train(skill string, xp float64, unlocked unlocks)
 }
 
 // woodcutting is the woodcutting skill at work in the woods: the trees it felled and wore down,
@@ -182,7 +183,7 @@ func (wc *woodcutting) cutLog(chop *chop) bool {
 	kind := species[chop.kind]
 	hero := wc.woods.Hero()
 	hero.inventory.add(kind.logs)
-	wc.woods.train(Woodcutting, kind.xp)
+	wc.woods.train(Woodcutting, kind.xp, unlockedTrees)
 	if !kind.fallsWithFirstLog && wc.depletion[chop.tree] < kind.lifetime {
 		if hero.inventory.Full() {
 			wc.woods.say(inventoryFullMessage)
@@ -202,6 +203,20 @@ func (wc *woodcutting) fell(tree cell, regrow time.Duration) {
 		wc.felled = make(map[cell]time.Duration)
 	}
 	wc.felled[tree] = regrow
+}
+
+// unlockedTrees names the trees going from one woodcutting level to another lets the hero chop.
+func unlockedTrees(from, to int) string {
+	var names []string
+	for kind, tree := range species {
+		if tree.level > from && tree.level <= to {
+			names = append(names, TreeKind(kind).String()+"s")
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return "You can now chop " + strings.Join(names, " and ") + "."
 }
 
 // stumps lists the felled trees and how long each still takes to regrow.

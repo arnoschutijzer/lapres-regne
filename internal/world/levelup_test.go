@@ -44,7 +44,7 @@ func TestALogThatReachesTheNextLevelIsCelebrated(t *testing.T) {
 	w.Chop()
 	chopUntilFelled(t, w)
 	levelUp, since, ok := w.LatestLevelUp()
-	if !ok || levelUp.Skill != "Woodcutting" || levelUp.Level != 2 || len(levelUp.Unlocked) != 0 {
+	if !ok || levelUp.Skill != world.Woodcutting || levelUp.Level != 2 || levelUp.Unlocked != "" {
 		t.Fatalf("level up = %+v, %v; want woodcutting level 2 unlocking nothing", levelUp, ok)
 	}
 	if since != 0 {
@@ -62,7 +62,7 @@ func TestALevelThatOpensANewTreeNamesIt(t *testing.T) {
 	w.Chop()
 	chopUntilFelled(t, w)
 	levelUp, _, ok := w.LatestLevelUp()
-	if !ok || levelUp.Level != 15 || !reflect.DeepEqual(levelUp.Unlocked, []world.TreeKind{world.Oak}) {
+	if !ok || levelUp.Level != 15 || levelUp.Unlocked != "You can now chop oaks." {
 		t.Fatalf("level up = %+v, %v; want level 15 unlocking oaks", levelUp, ok)
 	}
 }

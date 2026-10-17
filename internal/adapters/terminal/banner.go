@@ -3,7 +3,6 @@ package terminal
 import (
 	"math"
 	"strconv"
-	"strings"
 
 	"lapresregne/internal/world"
 )
@@ -101,12 +100,8 @@ func levelUpBanner(f *world.World, cols int) *overlay {
 		{"Congratulations!", titleInk},
 		{levelUp.Skill + " level " + strconv.Itoa(levelUp.Level), levelInk},
 	}
-	if len(levelUp.Unlocked) > 0 {
-		names := make([]string, len(levelUp.Unlocked))
-		for i, kind := range levelUp.Unlocked {
-			names[i] = kind.String() + "s"
-		}
-		lines = append(lines, line{"You can now chop " + strings.Join(names, " and ") + ".", unlockInk})
+	if levelUp.Unlocked != "" {
+		lines = append(lines, line{levelUp.Unlocked, unlockInk})
 	}
 	icon := brailleArt(woodcuttingIcon, iconInk)
 	iconWidth := len(woodcuttingIcon[0]) / 2

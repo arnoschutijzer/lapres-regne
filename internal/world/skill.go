@@ -30,7 +30,7 @@ func LevelAt(xp float64) int {
 const Woodcutting = "Woodcutting"
 
 // skillNames lists every skill the hero trains.
-var skillNames = []string{Woodcutting}
+var skillNames = [...]string{Woodcutting}
 
 // Skill is the experience gained in one skill, kept in tenths so half points add up exactly.
 type Skill struct {

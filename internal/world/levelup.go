@@ -6,8 +6,8 @@ import "time"
 type LevelUp struct {
 	Skill string
 	Level int
-	// Unlocked lists the trees the new level lets the hero chop for the first time.
-	Unlocked []TreeKind
+	// Unlocked tells what the new level lets the hero do for the first time; empty for nothing.
+	Unlocked string
 	// Milestone marks the levels Old School RuneScape celebrates with fireworks of their own.
 	Milestone Milestone
 }
@@ -23,11 +23,8 @@ const (
 	TotalMaxed
 )
 
-// skillCount is how many skills the hero trains; woodcutting is the only one so far.
-const skillCount = 1
-
 // maxTotalLevel is the total level with every skill at the highest level.
-const maxTotalLevel = skillCount * maxLevel
+const maxTotalLevel = len(skillNames) * maxLevel
 
 // milestoneOf tells which milestone, if any, reaching a level in a skill is, given the total level
 // across all skills it brings.
@@ -52,28 +49,30 @@ func (w *World) LatestLevelUp() (LevelUp, time.Duration, bool) {
 	return w.celebration.levelUp, w.celebration.since, w.celebration.active
 }
 
-// train gives the hero experience in a skill, celebrating any level it brings.
-func (w *World) train(skill string, xp float64) {
+// unlocks tells what going from one level of a skill to another lets the hero do for the first
+// time, or empty for nothing.
+type unlocks func(from, to int) string
+
+// train gives the hero experience in a skill, celebrating any level it brings with what it unlocks.
+func (w *World) train(skill string, xp float64, unlocked unlocks) {
 	if from, to := w.hero.train(skill, xp); to > from {
-		w.celebrate(from, to)
+		w.celebrate(LevelUp{Skill: skill, Level: to, Unlocked: unlocked(from, to), Milestone: milestoneOf(to, w.totalLevel())})
 	}
 }
 
-// celebrate notes a woodcutting level reached by going from one level to another.
-func (w *World) celebrate(from, to int) {
-	levelUp := LevelUp{Skill: "Woodcutting", Level: to, Milestone: milestoneOf(to, w.totalLevel())}
-	for kind, tree := range species {
-		if tree.level > from && tree.level <= to {
-			levelUp.Unlocked = append(levelUp.Unlocked, TreeKind(kind))
-		}
-	}
+// celebrate notes a level reached.
+func (w *World) celebrate(levelUp LevelUp) {
 	w.celebration = celebration{active: true, levelUp: levelUp}
-	w.sounds.LevelUp(len(levelUp.Unlocked) > 0)
+	w.sounds.LevelUp(levelUp.Unlocked != "")
 }
 
 // totalLevel adds up the hero's levels across all skills.
 func (w *World) totalLevel() int {
-	return w.hero.Skill(Woodcutting).Level()
+	total := 0
+	for _, skill := range skillNames {
+		total += w.hero.Skill(skill).Level()
+	}
+	return total
 }
 
 // ageCelebration lets time pass since the last level-up.
