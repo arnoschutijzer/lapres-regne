@@ -653,3 +653,18 @@ func TestWallsAndFencesSteppingDiagonallyJoinAcrossTheCorners(t *testing.T) {
 		}
 	}
 }
+
+func TestASignpostOfFourTilesStandsOnceWhereTheyMeet(t *testing.T) {
+	var signpost []world.PlacedFixture
+	for _, tile := range [4][2]int{{20, 12}, {21, 12}, {20, 13}, {21, 13}} {
+		signpost = append(signpost, world.PlacedFixture{Col: tile[0], Row: tile[1], Kind: world.Signpost})
+	}
+	w := world.NewOnMap(7, world.Map{Name: "Crossroads", Ground: make2D(30, 40), StartCol: 20, StartRow: 16, Fixtures: signpost})
+	_, c := closeView(w)
+	if found := inkNear(c, 21*world.TileSize, 1.0, 13*world.TileSize, plankInk); found < 5 {
+		t.Fatalf("%d of 25 pixels of the post where the four tiles meet, want the signpost standing there", found)
+	}
+	if found := inkNear(c, 20.5*world.TileSize, 1.0, 13.5*world.TileSize, plankInk); found > 0 {
+		t.Fatalf("%d pixels of a post in the middle of one of its tiles, want one signpost, not four", found)
+	}
+}

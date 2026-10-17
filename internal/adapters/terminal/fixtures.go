@@ -91,7 +91,9 @@ func drawFixture(c *forestCanvas, x, z float64, tile builtTile, variety float64)
 	case world.Statue:
 		drawStatue(p)
 	case world.Signpost:
-		drawSignpost(p)
+		if middleX, middleZ, _, ok := gathered(x, z, tile.alike); ok {
+			drawSignpost(placer{c: c, x: middleX - world.TileSize/2, z: middleZ - world.TileSize/2, back: back})
+		}
 	case world.Cart:
 		drawCart(p)
 	case world.Trough:
@@ -475,9 +477,9 @@ func drawCoffin(p placer) {
 	p.box(0.6, 0.3, 1.4, 1.7, 0.5, 0.6, plankInk, plain)
 }
 
-// gathered finds the middle of a round fixture and how many tiles it spans: alone it stands in the
-// middle of its tile; four of a kind in a square stand as one where their tiles meet, drawn by the
-// north-west tile and by no other.
+// gathered finds the middle of a fixture standing as one over the tiles it spans, and how many
+// tiles it spans: alone it stands in the middle of its tile; four of a kind in a square stand as
+// one where their tiles meet, drawn by the north-west tile and by no other.
 func gathered(x, z float64, alike [4]bool) (middleX, middleZ, size float64, ok bool) {
 	north, east, south, west := alike[0], alike[1], alike[2], alike[3]
 	switch {
