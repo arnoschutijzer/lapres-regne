@@ -154,6 +154,39 @@ type forestCanvas struct {
 	lift float64
 	// under is the world position of the ground shown at each pixel, row by row.
 	under []groundPoint
+	// clearing is the space around the hero that faces in front of them leave open.
+	clearing clearing
+}
+
+// clearing is an ellipse on the canvas around the hero, through which they show past whatever
+// stands in front of them, as through a tree's leaves.
+type clearing struct {
+	active bool
+	// x, y is the ellipse's centre and across, up its radii, in pixels; toward is how far toward
+	// the viewer the hero stands.
+	x, y, across, up, toward float64
+}
+
+// around clears the ellipse around the hero standing at x, z.
+func (c *forestCanvas) around(x, z float64) clearing {
+	c.standOn(x, z)
+	centreX, centreY, _ := c.project(x, 0.9, z)
+	_, toward := c.toView(x, z)
+	return clearing{active: true, x: centreX, y: centreY, across: 7 * c.scale / forestScale, up: 9 * c.scale / forestScale, toward: toward}
+}
+
+// hides tells whether the clearing leaves open a pixel showing a point of the world: inside it,
+// and standing between the viewer and the hero.
+func (c *forestCanvas) hides(px, py int, at vec) bool {
+	k := c.clearing
+	if !k.active {
+		return false
+	}
+	if _, toward := c.toView(at.x, at.z); toward <= k.toward {
+		return false
+	}
+	dx, dy := (float64(px)-k.x)/k.across, (float64(py)-k.y)/k.up
+	return dx*dx+dy*dy < 1
 }
 
 // groundPoint is a position on the ground.
@@ -375,9 +408,12 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	ground.Wait()
 	c.doorways = c.doorways[:0]
 	if f.Mapped() {
+		// The hero shows through the buildings and roofs in front of them.
+		c.clearing = c.around(f.Hero().Position())
 		r.drawStructures(c)
 		r.drawModels(c)
 		r.drawRoofs(c)
+		c.clearing = clearing{}
 	}
 	r.drawScatter(c, left, right, back, front)
 	for _, tree := range trees {

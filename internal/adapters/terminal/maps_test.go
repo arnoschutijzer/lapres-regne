@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -462,6 +463,33 @@ func TestRoofsHideWhileTheHeroIsIndoors(t *testing.T) {
 	r.zoom = zoom{current: 3}
 	if !w.Indoors() || countInk(r.render(160, 60, 0), roofInks...) != 0 {
 		t.Fatal("no roof must hide the hero inside the cottage")
+	}
+}
+
+func TestTheHeroShowsThroughABuildingInFrontOfThem(t *testing.T) {
+	w := cottage()
+	// The tile just north of the cottage, behind its back wall and roof as seen from the south.
+	w.WalkTo(81, 43)
+	for range 400 {
+		w.Advance(0, 0, 50*time.Millisecond, false)
+	}
+	if x, z := w.Hero().Position(); math.Hypot(x-81, z-43) > 0.1 {
+		t.Fatalf("hero stands at %.1f, %.1f, want behind the cottage", x, z)
+	}
+	r := newRenderer(w, "L’Après-Règne")
+	r.zoom = zoom{current: 3}
+	c := r.render(160, 60, 0)
+	hero := 0
+	for _, p := range c.pixels {
+		if foremost(p.ink) && p.light > 0 {
+			hero++
+		}
+	}
+	if hero == 0 {
+		t.Fatal("the hero behind the cottage must show through its wall and roof")
+	}
+	if countInk(c, roofInks...) == 0 {
+		t.Fatal("the cottage must stay roofed while the hero stands outside it")
 	}
 }
 

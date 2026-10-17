@@ -122,6 +122,9 @@ func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 			if alongU < edgeU || lengthU-alongU < edgeU || alongV < edgeV || lengthV-alongV < edgeV {
 				brightness = 0
 			}
+			if c.hides(px, py, at) {
+				continue
+			}
 			c.plot(px, py, od+s*ud+t*vd-0.01, brightness, pointInk)
 		}
 	}
