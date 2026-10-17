@@ -20,13 +20,14 @@
 //	G  gate             +  grave
 //	D  open door        b  wooden floor
 //	B  battlements      H  bridge
-//	@  where the hero starts, on grass
+//	^  stone steps      @  where the hero starts, on grass
 //
 // A "start <col> <row>" setting starts the hero on a tile of any ground instead, and a
 // "models <file>" setting names a models file beside the map that shapes its fixtures as the game
 // models them.
 //
-// Walls, fences, gates and graves block the way, and a bridge is railed along the water.
+// Walls, fences, gates and graves block the way, and a bridge is railed along the water. Steps
+// climb the heights grid's slope in level treads.
 //
 // An areas grid, laid over the terrain, names the parts of the map. Each letter stands for the area
 // named by an "area <letter> <name>" setting, and . for none:
@@ -132,6 +133,7 @@ var tiles = map[rune]tile{
 	'b': {ground: world.Boards},
 	'B': {ground: world.Battlement},
 	'H': {ground: world.Bridge},
+	'^': {ground: world.Steps},
 }
 
 // fixtures are what the characters of the objects grid stand for.

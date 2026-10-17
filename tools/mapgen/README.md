@@ -42,6 +42,10 @@ writes somewhere else, and `--cache` keeps the download elsewhere.
   open on a few sides gets doorways in its archways.
 - **Heights.** The game's level-0 heights scaled into levels 0 to 9, with each
   body of water, room and bridge deck lying level.
+- **Steps.** The flights of stone steps up to the keep's doors are unnamed
+  objects laid flat on the ground (`STEPS` lists them by id). Their tiles become
+  steps and keep the game's heights, as do the landing at the top and the
+  ground at the foot, so the way climbs from the courtyard to the door.
 - **Objects.** Furniture and landmarks fill their footprints, turned with their
   rotation.
 - **Floors.** The game's levels 1 to 3 become the map's floors above the

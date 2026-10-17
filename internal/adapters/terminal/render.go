@@ -969,7 +969,7 @@ func (r *renderer) groundLight(c *forestCanvas, wx, wz, height, seconds float64)
 			if f.Noise(wx*3, wz*3, 23) > 0.78 {
 				light += 0.3
 			}
-		case ground == world.Floor || isWall(ground) || ground == world.Door:
+		case ground == world.Floor || isWall(ground) || ground == world.Door || ground == world.Steps:
 			ink, light = floorInk, flagstones(wx, wz, n)
 		case ground == world.Boards:
 			ink, light = boardsInk, boards(wx, wz, n)

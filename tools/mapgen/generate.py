@@ -48,6 +48,9 @@ CASTLE = {1911}
 FENCES = {814, 979, 980, 981, 997, 1007, 1008, 1415, 1624, 1625, 1626, 1631, 4325, 5633,
           12983, 12990, 12991}
 
+# The flights of stone steps up to the keep's doors, laid flat on the ground and unnamed.
+STEPS = {3684}
+
 # Roof pieces share their models and differ by texture: red clay tiles, thatch or slate.
 ROOFING = {}
 for _id in (1924, 1790, 5662, 5663, 5647, 5648, 1927, 1642, 1606):
@@ -177,6 +180,10 @@ class Lumbridge:
                 self.ground[r][c] = TREES[name]
             elif name == "Gravestone" and self.ground[r][c] in ".:_":
                 self.ground[r][c] = "+"
+        for p in self.placed:
+            c, r = col_row(p["x"], p["y"])
+            if p["type"] == 22 and p["id"] in STEPS and inside(c, r) and self.ground[r][c] in ".:_":
+                self.ground[r][c] = "^"
 
     def lay_floor(self):
         """A floor above the ground: stone and boards where the game floors this level, open air
@@ -429,7 +436,7 @@ class Lumbridge:
 
     def levels(self):
         """The game's heights scaled into levels 0 to 9, with each body of water, each room and each
-        bridge deck lying level."""
+        bridge deck lying level; steps keep the game's heights, rising up their slope."""
         heights = self.terrain_data.height
         top = max(heights[self.key(c, r)] for r in range(H) for c in range(W))
         level = [[min(9, round(heights[self.key(c, r)] * 9 / top)) for c in range(W)] for r in range(H)]
@@ -454,10 +461,16 @@ class Lumbridge:
                     low = min(level[y][x] for x, y in body)
                     for x, y in body:
                         level[y][x] = low
+        # A room lies level, but for the landing at the top of a flight of steps and the ground at
+        # its foot, which meet the steps at their own heights.
+        def beside_steps(x, y):
+            return any(inside(x + dc, y + dr) and self.ground[y + dr][x + dc] == "^" for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+
         for room in self.rooms:
             flat = statistics.mode(level[y][x] for x, y in room)
             for x, y in room:
-                level[y][x] = flat
+                if not beside_steps(x, y):
+                    level[y][x] = flat
         done = set()
         for r in range(H):
             for c in range(W):

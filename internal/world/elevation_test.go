@@ -3,6 +3,7 @@ package world_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"lapresregne/internal/world"
 )
@@ -172,5 +173,42 @@ func TestABridgesDeckLiesFlatAboveTheWater(t *testing.T) {
 		if height := w.Elevation(2*world.TileSize-0.001, z); math.Abs(height-deck) > 0.01 {
 			t.Fatalf("elevation of the bank at the deck's west end at z %v = %v, want the deck's %v", z, height, deck)
 		}
+	}
+}
+
+// flight is a map rising from level 0 in the west to level 4 in the east up a flight of steps on
+// columns 3 to 5 of row 1, with the hero at its foot.
+func flight() world.Map {
+	ground := [][]world.Ground{make([]world.Ground, 9), make([]world.Ground, 9), make([]world.Ground, 9)}
+	heights := [][]int{{0, 0, 0, 1, 2, 3, 4, 4, 4}, {0, 0, 0, 1, 2, 3, 4, 4, 4}, {0, 0, 0, 1, 2, 3, 4, 4, 4}}
+	for col := 3; col <= 5; col++ {
+		ground[1][col] = world.Steps
+	}
+	return world.Map{Name: "flight", Ground: ground, Heights: heights, StartCol: 1, StartRow: 1}
+}
+
+func TestStepsRiseInTreadsAndRisers(t *testing.T) {
+	w := world.NewOnMap(7, flight())
+	z := 1.5 * world.TileSize
+	treads := map[float64]bool{}
+	previous := 0.0
+	for x := 3.1 * world.TileSize; x < 5.9*world.TileSize; x += 0.05 {
+		height := w.Elevation(x, z)
+		if height < previous {
+			t.Fatalf("elevation at x %v = %v, below %v nearer the foot; want the steps only rising", x, height, previous)
+		}
+		previous = height
+		treads[height] = true
+	}
+	if len(treads) < 5 || len(treads) > 20 {
+		t.Fatalf("%d heights up the steps, want a flight of level treads", len(treads))
+	}
+}
+
+func TestTheHeroWalksUpTheSteps(t *testing.T) {
+	w := world.NewOnMap(7, flight())
+	w.Advance(1, 0, 3*time.Second, false)
+	if x, _ := w.Hero().Position(); x < 6*world.TileSize {
+		t.Fatalf("x = %v; want the hero up the steps at the top", x)
 	}
 }

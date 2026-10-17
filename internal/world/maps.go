@@ -24,6 +24,8 @@ const (
 	Door
 	// Bridge is a wooden deck carrying the way over water.
 	Bridge
+	// Steps are a flight of stone steps carrying the way up a slope.
+	Steps
 	Wall
 	// Battlement is a castle wall, crowned with merlons.
 	Battlement
@@ -291,7 +293,7 @@ func (t *terrain) coverAt(x, z float64) float64 {
 }
 
 // elevationAt is the height of the ground at a world position. Water and bridge decks lie flat on
-// their own level. Other ground blends the heights of the four tiles around the position, so it
+// their own level, and steps rise in level treads. Other ground blends the heights of the four tiles around the position, so it
 // slopes smoothly from tile to tile; its banks fall to meet the water at the water's edge, except
 // beside a bridge, whose deck holds them up on its level.
 func (t *terrain) elevationAt(x, z float64) float64 {
@@ -323,8 +325,16 @@ func (t *terrain) elevationAt(x, z float64) float64 {
 	}
 	north := heights[0]*(1-u) + heights[1]*u
 	south := heights[2]*(1-u) + heights[3]*u
-	return north*(1-v) + south*v
+	height := north*(1-v) + south*v
+	if ground, _ := t.tile(here.gx, here.gz); ground == Steps {
+		// Steps climb the slope in level treads, a riser apart.
+		return math.Round(height/riserHeight) * riserHeight
+	}
+	return height
 }
+
+// riserHeight is how far each of a flight's steps rises above the one below, in world units.
+const riserHeight = 0.25
 
 // clampedTile is the ground of a tile; beyond the map's edges, of the nearest tile on it.
 func (t *terrain) clampedTile(col, row int) (Ground, bool) {

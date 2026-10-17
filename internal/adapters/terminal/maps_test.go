@@ -696,3 +696,26 @@ func TestASignpostOfFourTilesStandsOnceWhereTheyMeet(t *testing.T) {
 		t.Fatalf("%d pixels of a post in the middle of one of its tiles, want one signpost, not four", found)
 	}
 }
+
+func TestStepsAreDrawnInStone(t *testing.T) {
+	ground := make([][]world.Ground, 30)
+	heights := make([][]int, 30)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 40)
+		heights[row] = make([]int, 40)
+		for col := range heights[row] {
+			heights[row][col] = min(4, max(0, col-17))
+		}
+	}
+	for row := 14; row <= 16; row++ {
+		for col := 18; col <= 20; col++ {
+			ground[row][col] = world.Steps
+		}
+	}
+	w := world.NewOnMap(7, world.Map{Name: "Stair", Ground: ground, Heights: heights, StartCol: 15, StartRow: 15})
+	_, c := closeView(w)
+	c.lift = 0
+	if found := inkNear(c, 39, w.Elevation(39, 31), 31, floorInk, shadowFloorInk); found < 10 {
+		t.Fatalf("%d of 25 pixels of stone on the steps, want them drawn in stone", found)
+	}
+}

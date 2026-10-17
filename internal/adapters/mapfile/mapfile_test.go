@@ -440,3 +440,13 @@ func TestAModelsFileNamesOnlyFloorsTheMapHas(t *testing.T) {
 		t.Fatalf("error = %v, want floor 2 reported on line 4 of the models file", err)
 	}
 }
+
+func TestACaretInTheTerrainLaysSteps(t *testing.T) {
+	loaded, err := Load(write(t, "stair.map", "terrain\n@^_\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Ground[0][1] != world.Steps {
+		t.Fatalf("ground = %v, want steps on tile 1, 0", loaded.Ground[0][1])
+	}
+}
