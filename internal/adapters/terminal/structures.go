@@ -106,6 +106,9 @@ func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 	if f.seamless {
 		edgeU = 0
 	}
+	if c.bandTo > 0 {
+		top, bottom = max(top, c.bandFrom), min(bottom, c.bandTo-1)
+	}
 	for py := max(0, top); py <= min(c.height-1, bottom); py++ {
 		for px := max(0, left); px <= min(c.width-1, right); px++ {
 			// The pixel's place on the face, as fractions along u and v.

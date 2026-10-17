@@ -50,6 +50,8 @@ type renderer struct {
 	palette [][3]int
 	// modelInks are the inks of each model's faces, in their order.
 	modelInks map[*world.Model][]int
+	// bands are the canvases the structures and models are drawn on at once, a band of rows each.
+	bands []forestCanvas
 }
 
 // newRenderer opens the view at the camera's zoom and yaw, so a resumed session starts where it was left.
@@ -149,6 +151,9 @@ type forestCanvas struct {
 	// counting from 1 into them; 0 for anything else.
 	doorways       []world.Doorway
 	drawingDoorway int
+	// bandFrom and bandTo limit what is plotted to the rows from bandFrom up to bandTo, so bands of
+	// one canvas can be drawn at once; while bandTo is 0 every row is plotted.
+	bandFrom, bandTo int
 	// elevation is how high the ground lies at a world position; nil for flat ground. highest is
 	// the highest it lies anywhere, and eye how high it lies under the camera, which looks down on
 	// the ground from the same height wherever it goes.
@@ -353,7 +358,7 @@ func (c *forestCanvas) mayShow(tree world.Tree) bool {
 }
 
 func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
-	if x < 0 || y < 0 || x >= c.width || y >= c.height {
+	if x < 0 || y < 0 || x >= c.width || y >= c.height || c.bandTo > 0 && (y < c.bandFrom || y >= c.bandTo) {
 		return
 	}
 	i := y*c.width + x
@@ -466,14 +471,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	ground.Wait()
 	c.doorways = c.doorways[:0]
 	if f.Mapped() {
-		r.drawStructures(c, &r.built)
-		r.drawModels(c, &r.built, f.Models())
-		for i := range r.upstairs {
-			c.floor = r.floorOf(i + 1)
-			r.drawStructures(c, &r.upstairs[i])
-			r.drawModels(c, &r.upstairs[i], f.ModelsOn(i+1))
-		}
-		c.floor = nil
+		r.drawBuilt(c)
 		r.drawRoofs(c)
 		c.clearing = clearing{}
 	}
@@ -909,6 +907,39 @@ func (r *renderer) shownFloor(x, z float64) (int, bool) {
 }
 
 // floorOf is how high a floor lies, for whatever is drawn on it; nil for the ground.
+// drawBuilt draws the structures and models of the ground and every floor shown above it. The
+// canvas is cut into bands of rows drawn at once across the cores: each band draws everything but
+// plots only its own rows, so every pixel is drawn in the same order as on a single core.
+func (r *renderer) drawBuilt(c *forestCanvas) {
+	f := r.world
+	count := min(runtime.GOMAXPROCS(0), c.height)
+	for len(r.bands) < count {
+		r.bands = append(r.bands, forestCanvas{})
+	}
+	var done sync.WaitGroup
+	for i := range count {
+		band := &r.bands[i]
+		// Each band lists the doorways it draws on its own, all in the same order.
+		doorways := band.doorways[:0]
+		*band = *c
+		band.doorways = doorways
+		band.bandFrom, band.bandTo = c.height*i/count, c.height*(i+1)/count
+		done.Add(1)
+		go func() {
+			defer done.Done()
+			r.drawStructures(band, &r.built)
+			r.drawModels(band, &r.built, f.Models())
+			for floor := range r.upstairs {
+				band.floor = r.floorOf(floor + 1)
+				r.drawStructures(band, &r.upstairs[floor])
+				r.drawModels(band, &r.upstairs[floor], f.ModelsOn(floor+1))
+			}
+		}()
+	}
+	done.Wait()
+	c.doorways = append(c.doorways, r.bands[0].doorways...)
+}
+
 func (r *renderer) floorOf(storey int) func(x, z float64) float64 {
 	if storey == 0 {
 		return nil
