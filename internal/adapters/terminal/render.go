@@ -68,13 +68,15 @@ type renderer struct {
 	// hiddenFrom is what the hero was last judged hidden or not from, and hidden the judgment.
 	hiddenFrom hidingView
 	hidden     bool
+	// style turns the canvas under each cell into the cell drawn.
+	style Style
 }
 
 // newRenderer opens the view on the hero at the camera's zoom and yaw, so a resumed session starts
 // where it was left.
 func newRenderer(forest *world.World, camera *Camera, title string) *renderer {
 	camera.lookAt(forest.Hero().Position())
-	r := &renderer{world: forest, camera: camera, title: title, zoom: zoom{current: float64(camera.Zoom())}, turn: turning{current: camera.Yaw()}}
+	r := &renderer{world: forest, camera: camera, title: title, zoom: zoom{current: float64(camera.Zoom())}, turn: turning{current: camera.Yaw()}, style: Dithered{}}
 	r.palette = append([][3]int(nil), forestPalette[:]...)
 	r.modelInks = make(map[*world.Model][]int)
 	for storey := range forest.Storeys() {
@@ -741,72 +743,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	for row := range rows {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
-			bits, ink := 0, 0
-			// The cell's eight pixels hold at most eight inks: tally each one's dots, the pixels it
-			// covers and their light.
-			var tally [8]struct {
-				ink, votes, coverage int
-				light                float64
-			}
-			inks := 0
-			figure := false
-			for dy := range 4 {
-				for dx := range 2 {
-					x, y := col*2+dx, row*4+dy
-					p := c.pixels[y*c.width+x]
-					lit, dotted := p.light > 0, p.light > (bayer[y%4][x%4]+0.5)/16
-					if !lit && !dotted {
-						continue
-					}
-					at := 0
-					for at < inks && tally[at].ink != p.ink {
-						at++
-					}
-					if at == inks {
-						tally[at].ink = p.ink
-						inks++
-					}
-					if lit {
-						tally[at].coverage++
-						tally[at].light += p.light
-						figure = figure || figureInk(p.ink)
-					}
-					if dotted {
-						bits |= 1 << brailleDot[dy][dx]
-						tally[at].votes++
-					}
-				}
-			}
-			best := 0
-			for _, counted := range tally[:inks] {
-				// The hero, their axe and flying chips stay visible over anything else in the cell.
-				score := counted.votes
-				if foremost(counted.ink) && score > 0 {
-					score += 64
-				}
-				if prominent(counted.ink) {
-					score *= 2
-				}
-				// Ties go to the lower ink, as when every ink was weighed in turn.
-				if score > best || score == best && score > 0 && counted.ink < ink {
-					ink, best = counted.ink, score
-				}
-			}
-			current[col] = forestCell{bits: uint8(bits), ink: uint8(ink), paper: background}
-			// A faint material color reinforces broad surfaces while the ordered dots carry their shading.
-			for _, counted := range tally[:inks] {
-				if material := counted.ink; counted.coverage >= 6 {
-					strength := 0.18
-					if prominent(material) || material == 2 || material == 3 || material == 4 || material >= 11 && material <= 16 {
-						strength = 0.35
-					}
-					current[col].paper = mix(background, r.palette[material], min(1, strength*c.underlay()*counted.light/float64(counted.coverage)))
-					break
-				}
-			}
-			if figure {
-				current[col] = c.figureCell(col, row)
-			}
+			current[col] = r.style.cell(c, r.palette, col, row)
 			if cover, covered := banner.at(row, col); covered {
 				if cover.glyph != 0 {
 					current[col] = cover

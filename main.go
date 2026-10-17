@@ -107,7 +107,7 @@ func run(seed uint64, mapPath string, mute bool, musicDir, savePath string) erro
 	}
 	camera := terminal.NewCamera(view.Zoom, view.Yaw)
 	// Progress and the view are kept however the session ends, even when it ends with an error.
-	played := session.Run(forest, camera, music, appTitle)
+	played := session.Run(forest, camera, terminal.Dithered{}, music, appTitle)
 	kept := views.Save(viewfile.View{Zoom: camera.Zoom(), Yaw: camera.Yaw()})
 	return errors.Join(played, forest.Keep(progress, time.Now()), kept)
 }
