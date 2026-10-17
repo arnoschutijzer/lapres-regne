@@ -316,6 +316,11 @@ func TestAClosedRoomIsARoofedBuilding(t *testing.T) {
 	if !w.Indoors() {
 		t.Fatal("the hero starts inside the room")
 	}
+	w.WalkTo(5, 7)
+	walkFor(w, 10*time.Second)
+	if !w.Indoors() {
+		t.Fatal("the hero standing in the doorway is still indoors")
+	}
 	w.WalkTo(11, 3)
 	walkFor(w, 10*time.Second)
 	if w.Indoors() {

@@ -125,6 +125,9 @@ func (t *terrain) findBuildings() {
 			}
 			// Gather the room, noting whether it opens onto anything but its walls and doors.
 			room, open, boards := []cell{start}, false, 0
+			// The room's doorways count as indoors too, so its roof stays lifted while the hero
+			// stands in one.
+			var doorways []cell
 			seen[start] = true
 			for i := 0; i < len(room); i++ {
 				here := room[i]
@@ -142,7 +145,9 @@ func (t *terrain) findBuildings() {
 							seen[next] = true
 							room = append(room, next)
 						}
-					case ground != Wall && ground != Battlement && ground != Door:
+					case ground == Door:
+						doorways = append(doorways, next)
+					case ground != Wall && ground != Battlement:
 						open = true
 					}
 				}
@@ -155,6 +160,9 @@ func (t *terrain) findBuildings() {
 				left, right = min(left, c.gx), max(right, c.gx)
 				top, bottom = min(top, c.gz), max(bottom, c.gz)
 				t.rooms[c] = len(t.buildings)
+			}
+			for _, doorway := range doorways {
+				t.rooms[doorway] = len(t.buildings)
 			}
 			t.buildings = append(t.buildings, Building{
 				Col: left - 1, Row: top - 1, Cols: right - left + 3, Rows: bottom - top + 3,
