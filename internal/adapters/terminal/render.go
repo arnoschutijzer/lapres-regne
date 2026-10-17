@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"lapresregne/internal/world"
 )
@@ -455,20 +456,8 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	} else {
 		r.rivers.sample(f, back, front, left, right, 1/c.scale)
 	}
-	// Each column of ground depends only on the world, so the columns are shared out across the
-	// cores, interleaved so columns crossing a river don't all land on one core.
-	var ground sync.WaitGroup
-	cores := runtime.GOMAXPROCS(0)
-	for core := range cores {
-		ground.Add(1)
-		go func() {
-			defer ground.Done()
-			for x := core; x < c.width; x += cores {
-				r.groundColumn(c, x, seconds)
-			}
-		}()
-	}
-	ground.Wait()
+	// Each column of ground depends only on the world, so the columns are shared out across the cores.
+	shareOut(c.width, func(x int) { r.groundColumn(c, x, seconds) })
 	c.doorways = c.doorways[:0]
 	if f.Mapped() {
 		r.drawBuilt(c)
@@ -907,6 +896,24 @@ func (r *renderer) shownFloor(x, z float64) (int, bool) {
 }
 
 // floorOf is how high a floor lies, for whatever is drawn on it; nil for the ground.
+// shareOut works through count pieces of work at once across the cores, each core taking the next
+// piece as soon as it is done with its last, so faster cores take on more and none waits long on a
+// slower one.
+func shareOut(count int, work func(i int)) {
+	var next atomic.Int64
+	var done sync.WaitGroup
+	for range min(runtime.GOMAXPROCS(0), count) {
+		done.Add(1)
+		go func() {
+			defer done.Done()
+			for i := int(next.Add(1)) - 1; i < count; i = int(next.Add(1)) - 1 {
+				work(i)
+			}
+		}()
+	}
+	done.Wait()
+}
+
 // drawBuilt draws the structures and models of the ground and every floor shown above it. The
 // canvas is cut into bands of rows drawn at once across the cores: each band draws everything but
 // plots only its own rows, so every pixel is drawn in the same order as on a single core.

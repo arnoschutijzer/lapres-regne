@@ -2,8 +2,6 @@ package terminal
 
 import (
 	"math"
-	"runtime"
-	"sync"
 
 	"lapresregne/internal/world"
 )
@@ -325,20 +323,11 @@ func (a *builtArea) survey(f *world.World, storey int, left, right, back, front 
 // eachTile works through every surveyed tile, sharing the rows out across the cores. Each tile is
 // worked on once, and may read the others.
 func (a *builtArea) eachTile(work func(tile *builtTile, col, row int)) {
-	var done sync.WaitGroup
-	cores := runtime.GOMAXPROCS(0)
-	for core := range cores {
-		done.Add(1)
-		go func() {
-			defer done.Done()
-			for row := core; row < a.rows; row += cores {
-				for col := range a.cols {
-					work(&a.tiles[row*a.cols+col], a.col+col, a.row+row)
-				}
-			}
-		}()
-	}
-	done.Wait()
+	shareOut(a.rows, func(row int) {
+		for col := range a.cols {
+			work(&a.tiles[row*a.cols+col], a.col+col, a.row+row)
+		}
+	})
 }
 
 // standsOn tells whether a structure fills any of a tile: a wall, door, fence, gate or grave on it,
