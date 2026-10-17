@@ -22,17 +22,52 @@ func oneCell(topInk int, topLight float64, bottomInk int, bottomLight float64) *
 
 func TestPixelArtDrawsTwoSquarePixelsInEachCell(t *testing.T) {
 	palette := forestPalette[:]
-	cell := PixelArt{}.cell(oneCell(2, 1, 3, 0), palette, 0, 0)
+	cell := PixelArt{}.cell(oneCell(2, 1, 3, 1), palette, 0, 0)
 	if !cell.solid || quadrants[cell.bits] != '▀' {
 		t.Fatalf("cell draws %q, solid %v; want an upper half block", quadrants[cell.bits], cell.solid)
 	}
-	if cell.color != forestPalette[2] {
-		t.Errorf("upper pixel = %v; want the fully lit ink %v", cell.color, forestPalette[2])
+	if cell.color == cell.paper {
+		t.Errorf("both pixels show %v; want each its own ink", cell.color)
 	}
-	if cell.paper != background {
-		t.Errorf("lower pixel = %v; want the background %v where nothing is lit", cell.paper, background)
+	unlit := PixelArt{}.cell(oneCell(2, 0, 3, 0), palette, 0, 0)
+	if unlit.color != background || unlit.paper != background {
+		t.Errorf("unlit pixels show %v and %v; want the background %v", unlit.color, unlit.paper, background)
 	}
 }
+
+func TestPixelArtShadowsTurnColdAndHighlightsWarm(t *testing.T) {
+	shadow := PixelArt{}.cell(oneCell(4, 0.2, 4, 0.2), forestPalette[:], 0, 0).color
+	if shadow[2] <= shadow[1] {
+		t.Errorf("bark in shadow = %v; want it sunk toward violet, bluer than green", shadow)
+	}
+	iron := forestPalette[32]
+	highlight := PixelArt{}.cell(oneCell(32, 1, 32, 1), forestPalette[:], 0, 0).color
+	if highlight[0]-highlight[2] <= iron[0]-iron[2] {
+		t.Errorf("iron in full light = %v; want it warmer than its own %v", highlight, iron)
+	}
+}
+
+func TestPixelArtOutlinesWhatStandsInFrontOfTheGround(t *testing.T) {
+	// Two cells side by side: the left one's ink stands far in front of the right one's.
+	c := &forestCanvas{width: 4, height: 4, pixels: make([]forestPixel, 16)}
+	for i := range c.pixels {
+		c.pixels[i] = forestPixel{ink: 4, light: 1, depth: -5}
+		if i%4 >= 2 {
+			c.pixels[i] = forestPixel{ink: 0, light: 1, depth: 0}
+		}
+	}
+	outlined := PixelArt{}.cell(c, forestPalette[:], 0, 0)
+	inside := PixelArt{}.cell(oneCell(4, 1, 4, 1), forestPalette[:], 0, 0)
+	if brightnessOf(outlined.color) >= brightnessOf(inside.color) {
+		t.Errorf("bark at the silhouette = %v; want darker than bark within it, %v", outlined.color, inside.color)
+	}
+	ground := PixelArt{}.cell(c, forestPalette[:], 1, 0)
+	if open := (PixelArt{}).cell(oneCell(0, 1, 0, 1), forestPalette[:], 0, 0); ground.color != open.color {
+		t.Errorf("ground behind the bark = %v; want it drawn without an outline", ground.color)
+	}
+}
+
+func brightnessOf(color [3]int) int { return color[0] + color[1] + color[2] }
 
 func TestPixelArtShadesInFlatBands(t *testing.T) {
 	palette := forestPalette[:]
