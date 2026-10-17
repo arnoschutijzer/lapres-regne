@@ -51,6 +51,8 @@ writes somewhere else, and `--cache` keeps the download elsewhere.
   The game leaves the floor out under a staircase or ladder above the ground,
   so those tiles take the floor beside them. A staircase or ladder leads up
   where the game stands its top on the same tiles a level higher.
+  Furniture and wall decorations upstairs are modelled too, each floor's
+  after a `floor` line in the models file.
 - **Models.** Every piece of furniture and every landmark is drawn as the game
   models it, written to `maps/lumbridge.models`; one the game stands
   diagonally is turned a further eighth of a turn. `models.py` ports RuneLite's object and model

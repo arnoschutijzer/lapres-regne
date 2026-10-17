@@ -21,12 +21,17 @@ import (
 //	place table 1 0 2 1
 //	hang banner 3 0
 //
+//	floor 1
+//	place table 4 2 2 1
+//
 // Each model lists its points, in world units about the middle of the ground it stands on with y
 // upward, then its triangles between three points by their index, each in a colour as six hex
 // digits. A place line stands a model over a block of tiles: its north-west tile's column and
 // row, then how many tiles it spans across and down. A hang line hangs a model on the walls of a
-// tile, about its middle, shaping none of the fixtures standing there.
-func readModels(path string) ([]world.PlacedModel, error) {
+// tile, about its middle, shaping none of the fixtures standing there. Models stand on the ground
+// floor, and a floor line stands those placed and hung after it on a floor above, of the floors
+// counted.
+func readModels(path string, floors int) (map[int][]world.PlacedModel, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -34,7 +39,8 @@ func readModels(path string) ([]world.PlacedModel, error) {
 	defer file.Close()
 	models := map[string]*world.Model{}
 	var current *world.Model
-	var placed []world.PlacedModel
+	placed := map[int][]world.PlacedModel{}
+	floor := 0
 	lines := bufio.NewScanner(file)
 	for number := 1; lines.Scan(); number++ {
 		fields := strings.Fields(lines.Text())
@@ -72,16 +78,22 @@ func readModels(path string) ([]world.PlacedModel, error) {
 			if !ok || len(ints) != 4 || !known {
 				return nil, mistake("place <model> <col> <row> <cols> <rows>, after the model")
 			}
-			placed = append(placed, world.PlacedModel{Col: ints[0], Row: ints[1], Cols: ints[2], Rows: ints[3], Model: model})
+			placed[floor] = append(placed[floor], world.PlacedModel{Col: ints[0], Row: ints[1], Cols: ints[2], Rows: ints[3], Model: model})
 		case "hang":
 			ints, ok := integers(fields[2:])
 			model, known := models[safe(fields, 1)]
 			if !ok || len(ints) != 2 || !known {
 				return nil, mistake("hang <model> <col> <row>, after the model")
 			}
-			placed = append(placed, world.PlacedModel{Col: ints[0], Row: ints[1], Cols: 1, Rows: 1, Model: model, Hangs: true})
+			placed[floor] = append(placed[floor], world.PlacedModel{Col: ints[0], Row: ints[1], Cols: 1, Rows: 1, Model: model, Hangs: true})
+		case "floor":
+			ints, ok := integers(fields[1:])
+			if !ok || len(ints) != 1 || ints[0] < 0 || ints[0] > floors {
+				return nil, mistake(fmt.Sprintf("floor <0 to %d>, a floor of the map", floors))
+			}
+			floor = ints[0]
 		default:
-			return nil, mistake("model, point, face, place or hang")
+			return nil, mistake("model, point, face, place, hang or floor")
 		}
 	}
 	return placed, lines.Err()

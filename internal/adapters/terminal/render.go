@@ -57,15 +57,17 @@ func newRenderer(forest *world.World, title string) *renderer {
 	r := &renderer{world: forest, title: title, zoom: zoom{current: float64(forest.Zoom())}, turn: turning{current: forest.Yaw()}}
 	r.palette = append([][3]int(nil), forestPalette[:]...)
 	r.modelInks = make(map[*world.Model][]int)
-	for _, placed := range forest.Models() {
-		if _, known := r.modelInks[placed.Model]; known {
-			continue
+	for storey := range forest.Storeys() {
+		for _, placed := range forest.ModelsOn(storey) {
+			if _, known := r.modelInks[placed.Model]; known {
+				continue
+			}
+			inks := make([]int, len(placed.Model.Faces))
+			for i, face := range placed.Model.Faces {
+				inks[i] = r.inkOf(face.Color)
+			}
+			r.modelInks[placed.Model] = inks
 		}
-		inks := make([]int, len(placed.Model.Faces))
-		for i, face := range placed.Model.Faces {
-			inks[i] = r.inkOf(face.Color)
-		}
-		r.modelInks[placed.Model] = inks
 	}
 	return r
 }

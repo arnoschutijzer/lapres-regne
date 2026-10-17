@@ -12,6 +12,11 @@ import (
 // staircase on tile 22, 11 rises through every floor, and the hero stands beside it on the ground
 // floor.
 func tower(upstairs int) *world.World {
+	return world.NewOnMap(7, towerMap(upstairs))
+}
+
+// towerMap is the map of the tower.
+func towerMap(upstairs int) world.Map {
 	const cols, rows = 40, 30
 	floor := func(ground world.Ground) ([][]world.Ground, world.Edges) {
 		tiles := make([][]world.Ground, rows)
@@ -42,7 +47,7 @@ func tower(upstairs int) *world.World {
 		boards, walls := floor(world.Boards)
 		m.Upstairs = append(m.Upstairs, world.UpperFloor{Ground: boards, Edges: walls, Fixtures: stairs})
 	}
-	return world.NewOnMap(7, m)
+	return m
 }
 
 func TestTheFloorTheHeroClimbedToIsDrawnAStoreyUp(t *testing.T) {
@@ -103,5 +108,19 @@ func TestFlightAtPicksTheStaircaseUnderAClick(t *testing.T) {
 	column, row := cellOf(r, 45, 0, 23)
 	if flight, ok := r.flightAt(column, row); !ok || flight.Col != 22 || flight.Row != 11 {
 		t.Fatalf("flightAt(%d, %d) = %+v, %v; want the staircase on tile 22, 11", column, row, flight, ok)
+	}
+}
+
+func TestAModelOnTheFloorTheHeroClimbedToIsDrawnAStoreyUp(t *testing.T) {
+	m := towerMap(1)
+	m.Upstairs[0].Fixtures = append(m.Upstairs[0].Fixtures, world.PlacedFixture{Col: 19, Row: 10, Kind: world.Table})
+	m.Upstairs[0].Models = []world.PlacedModel{{Col: 19, Row: 10, Cols: 1, Rows: 1, Model: tableModel()}}
+	w := world.NewOnMap(7, m)
+	w.Climb(true)
+	r, c := closeView(w)
+	c.lift = 0
+	top := r.inkOf(world.Color{R: 140, G: 30, B: 40})
+	if found := inkNear(c, 39, world.StoreyHeight+0.8, 21, top); found < 10 {
+		t.Fatalf("%d of 25 pixels of the table's top a storey up, want its model drawn on the first floor", found)
 	}
 }

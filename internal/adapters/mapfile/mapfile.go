@@ -166,8 +166,13 @@ func Load(path string) (world.Map, error) {
 		return world.Map{}, fmt.Errorf("read map %s: %w", path, err)
 	}
 	if models != "" {
-		if loaded.Models, err = readModels(filepath.Join(filepath.Dir(path), models)); err != nil {
+		placed, err := readModels(filepath.Join(filepath.Dir(path), models), len(loaded.Upstairs))
+		if err != nil {
 			return world.Map{}, fmt.Errorf("read map %s: %w", path, err)
+		}
+		loaded.Models = placed[0]
+		for floor := range loaded.Upstairs {
+			loaded.Upstairs[floor].Models = placed[floor+1]
 		}
 	}
 	return loaded, nil

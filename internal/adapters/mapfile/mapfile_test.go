@@ -398,3 +398,45 @@ func TestMistakesInAMapFilesFloorsAreReported(t *testing.T) {
 		}
 	}
 }
+
+func TestAModelsFileStandsModelsOnTheFloorsAboveTheGround(t *testing.T) {
+	folder := t.TempDir()
+	if err := os.WriteFile(filepath.Join(folder, "tower.models"), []byte(`model stool
+point -1 0 -0.5
+point 1 0 -0.5
+point 0 0.8 0.5
+face 0 1 2 785032
+
+place stool 1 0 1 1
+floor 1
+place stool 2 0 1 1
+hang stool 1 0
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(folder, "tower.map")
+	if err := os.WriteFile(path, []byte("models tower.models\n\nterrain\n@__\n\nterrain 1\n.bb\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Models) != 1 || loaded.Models[0].Col != 1 {
+		t.Fatalf("ground floor models = %+v, want the stool on tile 1, 0", loaded.Models)
+	}
+	upstairs := loaded.Upstairs[0].Models
+	if len(upstairs) != 2 || upstairs[0].Col != 2 || !upstairs[1].Hangs {
+		t.Fatalf("first floor models = %+v, want a stool on tile 2, 0 and one hung on tile 1, 0", upstairs)
+	}
+}
+
+func TestAModelsFileNamesOnlyFloorsTheMapHas(t *testing.T) {
+	folder := t.TempDir()
+	os.WriteFile(filepath.Join(folder, "hut.models"), []byte("model stool\npoint 0 0 0\n\nfloor 2\nplace stool 0 0 1 1\n"), 0o600)
+	path := filepath.Join(folder, "hut.map")
+	os.WriteFile(path, []byte("models hut.models\n\nterrain\n@_\n\nterrain 1\n.b\n"), 0o600)
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "line 4") {
+		t.Fatalf("error = %v, want floor 2 reported on line 4 of the models file", err)
+	}
+}
