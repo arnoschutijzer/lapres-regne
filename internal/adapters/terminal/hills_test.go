@@ -114,3 +114,65 @@ func TestTheViewRisesAndFallsWithTheHero(t *testing.T) {
 		t.Fatalf("the hero's feet are on canvas row %.1f, want them on row %.1f where the camera looks", feet, want)
 	}
 }
+
+// hillsideCottage is cottage's walled room of flagstones up on a rise of level 4, north of the
+// hero on level 0.
+func hillsideCottage() *world.World {
+	m := world.Map{Name: "Hillside", Ground: make([][]world.Ground, 60), StartCol: 40, StartRow: 30}
+	for row := range m.Ground {
+		m.Ground[row] = make([]world.Ground, 80)
+		m.Heights = append(m.Heights, make([]int, 80))
+		for col := 32; col <= 48 && row >= 22 && row <= 27; col++ {
+			m.Ground[row][col] = world.Floor
+			if row == 22 || row == 27 || col == 32 || col == 48 {
+				m.Ground[row][col] = world.Wall
+			}
+		}
+		for col := range m.Heights[row] {
+			if row <= 28 {
+				m.Heights[row][col] = 4
+			}
+		}
+	}
+	m.Ground[27][40] = world.Door
+	return world.NewOnMap(7, m)
+}
+
+func TestAWallOnARiseStandsOnTopOfIt(t *testing.T) {
+	r := newRenderer(hillsideCottage(), "L’Après-Règne")
+	r.zoom = zoom{current: 3}
+	c := r.render(160, 60, 0)
+	// The south wall's face rises from its foot at z 55.35, on ground 4 levels up.
+	c.lift = 4 * world.LevelHeight
+	x, foot, _ := c.project(76, 0, 55.35)
+	_, top, _ := c.project(76, wallHeight*0.9, 55.35)
+	stone := 0
+	for y := int(top); y < int(foot); y++ {
+		if ink := c.pixels[y*c.width+int(x)].ink; ink == stoneInk || ink == shadedStoneInk {
+			stone++
+		}
+	}
+	if stone < int(foot-top)/2 {
+		t.Fatalf("stone pixels = %d of %d up the wall's face, want it standing on the rise", stone, int(foot-top))
+	}
+}
+
+func TestARoofOnARiseCrownsItsWalls(t *testing.T) {
+	r := newRenderer(hillsideCottage(), "L’Après-Règne")
+	r.zoom = zoom{current: 3}
+	c := r.render(160, 60, 0)
+	highest := c.height
+	for i, p := range c.pixels {
+		if p.ink == slateInk || p.ink == shadedSlateInk {
+			highest = min(highest, i/c.width)
+		}
+	}
+	// The roof shows highest along its ridge or its far eaves, whichever the view lifts higher.
+	shape := roofOver(r.world.Buildings()[0])
+	c.lift = 4 * world.LevelHeight
+	_, ridge, _ := c.project(80, shape.ridge(), (shape.z0+shape.z1)/2)
+	_, farEaves, _ := c.project(80, eaves, shape.z0)
+	if top := math.Min(ridge, farEaves); math.Abs(float64(highest)-top) > 2 {
+		t.Fatalf("the roof's top is on canvas row %d, want it on the rise at row %.0f", highest, top)
+	}
+}

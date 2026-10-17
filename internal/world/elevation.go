@@ -6,10 +6,11 @@ import "math"
 const HillHeight = 6.0
 
 // Elevation is how high the ground lies at a world position, in world units above the lowest
-// ground. The endless forest rolls in gentle hills that level out into the river valleys.
+// ground. The endless forest rolls in gentle hills that level out into the river valleys; a map
+// slopes from tile to tile with its heights.
 func (w *World) Elevation(x, z float64) float64 {
 	if w.terrain != nil {
-		return 0
+		return w.terrain.elevationAt(x, z)
 	}
 	distance, width := w.River(x, z)
 	return w.hills(x, z, distance, width)
@@ -36,7 +37,7 @@ func (w *World) hills(x, z, distance, width float64) float64 {
 // Highest is the highest the ground can lie anywhere in the world.
 func (w *World) Highest() float64 {
 	if w.terrain != nil {
-		return 0
+		return float64(w.terrain.highest) * LevelHeight
 	}
 	return HillHeight
 }

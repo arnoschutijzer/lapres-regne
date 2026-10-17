@@ -123,6 +123,23 @@ func TestAnAreaMustBeNamedBeforeItIsDrawn(t *testing.T) {
 	}
 }
 
+func TestAMapFileRaisesItsTilesToTheirHeights(t *testing.T) {
+	loaded, err := Load(write(t, "hill.map", "terrain\n.@..\n....\n\nheights\n0123\n9\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := [][]int{{0, 1, 2, 3}, {9}}; !reflect.DeepEqual(loaded.Heights, want) {
+		t.Fatalf("heights = %v, want %v", loaded.Heights, want)
+	}
+}
+
+func TestAHeightMustBeADigit(t *testing.T) {
+	_, err := Load(write(t, "hill.map", "terrain\n.@\n\nheights\n0x\n"))
+	if err == nil || !strings.Contains(err.Error(), "line 5: height 'x' is not a digit") {
+		t.Fatalf("load = %v, want the height that is not a digit reported", err)
+	}
+}
+
 func TestTheLumbridgeMapLoadsWithTheHeroInTheCastleCourtyard(t *testing.T) {
 	lumbridge, err := Load(filepath.Join("..", "..", "..", "maps", "lumbridge.map"))
 	if err != nil {

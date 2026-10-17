@@ -48,7 +48,13 @@ type Map struct {
 	// Areas names the part of the map each tile belongs to, row by row as Ground, such as a castle
 	// or a village; "" for none.
 	Areas [][]string
+	// Heights is the level of each tile, row by row as Ground, each level LevelHeight above the
+	// last; tiles left out lie at level 0.
+	Heights [][]int
 }
+
+// LevelHeight is how much higher each level of a map's heights lies than the last, in world units.
+const LevelHeight = 0.75
 
 // PlantedTree is a tree of a kind growing on a tile of a map.
 type PlantedTree struct {
@@ -78,13 +84,21 @@ type terrain struct {
 	// buildings lists the map's roofed buildings, and rooms the tiles inside each of them.
 	buildings []Building
 	rooms     map[cell]int
-	trees  map[cell]TreeKind
+	trees     map[cell]TreeKind
 	// cover is the canopy over each tile, row by row.
 	cover [][]float64
+	// heights is the level of each tile, row by row, and highest the highest level.
+	heights [][]int
+	highest int
 }
 
 func newTerrain(m Map) *terrain {
-	t := &terrain{ground: m.Ground, areas: m.Areas, trees: make(map[cell]TreeKind), cover: make([][]float64, len(m.Ground))}
+	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, trees: make(map[cell]TreeKind), cover: make([][]float64, len(m.Ground))}
+	for _, levels := range m.Heights {
+		for _, level := range levels {
+			t.highest = max(t.highest, level)
+		}
+	}
 	for row, tiles := range m.Ground {
 		t.cover[row] = make([]float64, len(tiles))
 		for col := range tiles {
@@ -205,6 +219,31 @@ func (t *terrain) coverAt(x, z float64) float64 {
 	north := t.tileCover(col, row)*(1-u) + t.tileCover(col+1, row)*u
 	south := t.tileCover(col, row+1)*(1-u) + t.tileCover(col+1, row+1)*u
 	return north*(1-v) + south*v
+}
+
+// elevationAt blends the heights of the four tiles around a world position, so the ground slopes
+// smoothly from tile to tile.
+func (t *terrain) elevationAt(x, z float64) float64 {
+	u, v := x/TileSize-0.5, z/TileSize-0.5
+	col, row := int(math.Floor(u)), int(math.Floor(v))
+	u, v = u-float64(col), v-float64(row)
+	north := t.tileHeight(col, row)*(1-u) + t.tileHeight(col+1, row)*u
+	south := t.tileHeight(col, row+1)*(1-u) + t.tileHeight(col+1, row+1)*u
+	return north*(1-v) + south*v
+}
+
+// tileHeight is the height of a tile; beyond the map's edges the ground keeps the height of the
+// nearest tile on it.
+func (t *terrain) tileHeight(col, row int) float64 {
+	row = min(max(row, 0), len(t.ground)-1)
+	if row < 0 || row >= len(t.heights) {
+		return 0
+	}
+	col = min(max(col, 0), len(t.ground[row])-1)
+	if col < 0 || col >= len(t.heights[row]) {
+		return 0
+	}
+	return float64(t.heights[row][col]) * LevelHeight
 }
 
 func (t *terrain) tileCover(col, row int) float64 {

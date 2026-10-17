@@ -73,6 +73,8 @@ func (r *renderer) drawRoofs(c *forestCanvas) {
 
 // draw lays the roof's two slopes and its stone gable ends.
 func (r roof) draw(c *forestCanvas) {
+	// The roof rests on walls standing on the ground at the middle of the building.
+	c.standOn((r.x0+r.x1)/2, (r.z0+r.z1)/2)
 	ink, pattern := slateInk, surface(slates)
 	if r.thatched {
 		ink, pattern = thatchInk, surface(thatch)

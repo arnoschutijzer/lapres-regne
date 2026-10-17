@@ -30,6 +30,12 @@
 //
 //	areas
 //	CCC..
+//
+// A heights grid, laid over the terrain, raises each tile to a level from 0 to 9; the ground slopes
+// smoothly from tile to tile, and tiles the grid leaves out lie at level 0:
+//
+//	heights
+//	00122
 package mapfile
 
 import (
@@ -115,6 +121,15 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 				}
 			}
 			m.Ground = append(m.Ground, ground)
+		case grid == "heights":
+			row := make([]int, 0, len(line))
+			for _, char := range line {
+				if char < '0' || char > '9' {
+					return world.Map{}, fmt.Errorf("line %d: height %q is not a digit", number, char)
+				}
+				row = append(row, int(char-'0'))
+			}
+			m.Heights = append(m.Heights, row)
 		case grid == "areas":
 			row := make([]string, 0, len(line))
 			for _, char := range []rune(line) {
@@ -127,7 +142,7 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 			m.Areas = append(m.Areas, row)
 		case line == "terrain":
 			grid, hasTerrain = line, true
-		case line == "areas":
+		case line == "areas" || line == "heights":
 			grid = line
 		default:
 			setting, value, _ := strings.Cut(line, " ")

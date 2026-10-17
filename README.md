@@ -103,6 +103,16 @@ areas
 CCC..
 ```
 
+Raise the ground with a `heights` grid laid over the terrain: each digit lifts
+its tile to a level from 0 to 9, three quarters of a world unit apart. The
+ground slopes smoothly from tile to tile, and tiles the grid leaves out lie at
+level 0. Keep a building's tiles on one level so its walls and roof sit square.
+
+```text
+heights
+00122
+```
+
 Walls, fences, gates and graves block the way, a bridge's rails keep the hero
 out of the water beside it, and nothing beyond the map's edges can be walked on. Clicking the ground or a tree walks round whatever
 blocks the way, or as close as the hero can get. Progress keeps the map's name,

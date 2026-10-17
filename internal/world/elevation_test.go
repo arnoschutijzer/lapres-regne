@@ -77,3 +77,31 @@ func TestElevationAmidSampledRiversMatchesElevation(t *testing.T) {
 		}
 	}
 }
+
+func TestAMapRisesAndFallsWithItsHeights(t *testing.T) {
+	m := pond()
+	m.Heights = [][]int{
+		{0, 0, 2, 2},
+		{0, 0, 2, 2},
+	}
+	w := world.NewOnMap(7, m)
+	centre := func(col, row int) (float64, float64) {
+		return (float64(col) + 0.5) * world.TileSize, (float64(row) + 0.5) * world.TileSize
+	}
+	if height := w.Elevation(centre(2, 0)); height != 2*world.LevelHeight {
+		t.Fatalf("elevation at the centre of a level 2 tile = %v, want %v", height, 2*world.LevelHeight)
+	}
+	if height := w.Elevation(centre(1, 1)); height != 0 {
+		t.Fatalf("elevation at the centre of a level 0 tile = %v, want 0", height)
+	}
+	if height := w.Elevation(2*world.TileSize, 0.5*world.TileSize); height != world.LevelHeight {
+		t.Fatalf("elevation between a level 0 and a level 2 tile = %v, want it halfway at %v", height, world.LevelHeight)
+	}
+	// Tiles the heights leave out lie at level 0.
+	if height := w.Elevation(centre(1, 3)); height != 0 {
+		t.Fatalf("elevation of a tile without a height = %v, want 0", height)
+	}
+	if w.Highest() != 2*world.LevelHeight {
+		t.Fatalf("highest = %v, want the highest tile's %v", w.Highest(), 2*world.LevelHeight)
+	}
+}

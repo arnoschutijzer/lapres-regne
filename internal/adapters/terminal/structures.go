@@ -417,6 +417,8 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 			continue
 		}
 		x, z := float64(col)*world.TileSize, float64(row)*world.TileSize
+		// Each structure stands on the ground at the middle of its tile.
+		c.standOn(x+world.TileSize/2, z+world.TileSize/2)
 		switch tile.ground {
 		case world.Wall:
 			drawWall(c, x, z, tile.joined, tile.windowed() && r.world.Random(col, row, 43) < 0.5)
