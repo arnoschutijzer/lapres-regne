@@ -350,19 +350,22 @@ func TestARoomOpenToTheOutsideHasNoRoof(t *testing.T) {
 	}
 }
 
-func TestBoardedRoomsAreThatchedAndStoneRoomsSlated(t *testing.T) {
+func TestABuildingIsRoofedAsTheMapSaysWhateverItsFloor(t *testing.T) {
 	m := courtyard()
 	m.Ground[3][2] = world.Door
-	if building := world.NewOnMap(7, m).Buildings()[0]; building.Thatched {
-		t.Fatal("a room floored in stone must be slated")
-	}
 	for row := 1; row <= 2; row++ {
 		for col := 1; col <= 3; col++ {
 			m.Ground[row][col] = world.Boards
 		}
 	}
-	if building := world.NewOnMap(7, m).Buildings()[0]; !building.Thatched {
-		t.Fatal("a room floored in boards must be thatched")
+	if building := world.NewOnMap(7, m).Buildings()[0]; building.Roof != world.Slate {
+		t.Fatalf("roof = %v, want slate for a building the map leaves unmarked", building.Roof)
+	}
+	for _, roofing := range []world.Roofing{world.Thatch, world.ClayTiles} {
+		m.Roofs = [][]world.Roofing{{}, {world.Slate, roofing, roofing, roofing}}
+		if building := world.NewOnMap(7, m).Buildings()[0]; building.Roof != roofing {
+			t.Fatalf("roof = %v, want %v as marked over the building", building.Roof, roofing)
+		}
 	}
 }
 

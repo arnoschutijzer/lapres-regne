@@ -189,6 +189,8 @@ var forestPalette = [...][3]int{
 	{252, 206, 108}, // flames
 	{232, 224, 198}, // candle wax
 	{170, 144, 100}, // burlap
+	{160, 74, 56},   // clay roof tiles
+	{104, 52, 46},   // shaded clay roof tiles
 }
 
 // foremost marks the inks of the hero, their axe, flying chips and fireworks.

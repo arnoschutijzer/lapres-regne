@@ -37,6 +37,13 @@
 //	heights
 //	00122
 //
+// A roofs grid, laid over the terrain, lays each building's roof: s slate, t thatch or c clay
+// tiles, whichever most of its rooms lie under. Tiles the grid leaves out, or marks ., lie under
+// slate:
+//
+//	roofs
+//	..ccc
+//
 // An objects grid, laid over the terrain, stands furniture and landmarks on its tiles, each blocking
 // the way but crops, with . for none:
 //
@@ -108,6 +115,9 @@ var fixtures = map[rune]world.Fixture{
 	'K': world.Counter, 'b': world.Bed,
 }
 
+// roofings are what the characters of the roofs grid stand for.
+var roofings = map[rune]world.Roofing{'.': world.Slate, 's': world.Slate, 't': world.Thatch, 'c': world.ClayTiles}
+
 // Load reads the map in the file at path. A map without a name is named after its file.
 func Load(path string) (world.Map, error) {
 	file, err := os.Open(path)
@@ -177,6 +187,16 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 				m.Fixtures = append(m.Fixtures, world.PlacedFixture{Col: col, Row: objectRows, Kind: fixture})
 			}
 			objectRows++
+		case grid == "roofs":
+			row := make([]world.Roofing, 0, len(line))
+			for _, char := range line {
+				roofing, known := roofings[char]
+				if !known {
+					return world.Map{}, fmt.Errorf("line %d: unknown roofing %q", number, char)
+				}
+				row = append(row, roofing)
+			}
+			m.Roofs = append(m.Roofs, row)
 		case grid == "areas":
 			row := make([]string, 0, len(line))
 			for _, char := range []rune(line) {
@@ -189,7 +209,7 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 			m.Areas = append(m.Areas, row)
 		case line == "terrain":
 			grid, hasTerrain = line, true
-		case line == "areas" || line == "heights" || line == "objects":
+		case line == "areas" || line == "heights" || line == "objects" || line == "roofs":
 			grid = line
 		default:
 			setting, value, _ := strings.Cut(line, " ")

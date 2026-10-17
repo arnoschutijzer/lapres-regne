@@ -117,6 +117,16 @@ heights
 00122
 ```
 
+A room closed in by walls and doors is roofed while the hero is outside it.
+Lay each building's roof with a `roofs` grid over the terrain: `s` for slate,
+`t` for thatch or `c` for red clay tiles; a building takes whichever most of its
+rooms lie under, and tiles the grid leaves out, or marks `.`, lie under slate.
+
+```text
+roofs
+.ccc.
+```
+
 Stand furniture and landmarks on the map with an `objects` grid laid over the
 terrain, using `.` for none. A fixture covering several tiles repeats its
 letter on each, and tiles of the same kind side by side join into one, such as

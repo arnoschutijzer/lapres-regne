@@ -325,20 +325,28 @@ func TestWaterIsEdgedWithMuddyBanksAndReeds(t *testing.T) {
 // cottage is meadow's open grass with a walled room of flagstones north of the hero, its door in
 // the middle of its south wall.
 func cottage() *world.World {
+	return roofedCottage(world.Slate)
+}
+
+// roofedCottage is the cottage under a roof of the given roofing.
+func roofedCottage(roofing world.Roofing) *world.World {
 	ground := make([][]world.Ground, 60)
+	roofs := make([][]world.Roofing, 60)
 	for row := range ground {
 		ground[row] = make([]world.Ground, 80)
+		roofs[row] = make([]world.Roofing, 80)
 	}
 	for row := 22; row <= 27; row++ {
 		for col := 32; col <= 48; col++ {
 			ground[row][col] = world.Floor
+			roofs[row][col] = roofing
 			if row == 22 || row == 27 || col == 32 || col == 48 {
 				ground[row][col] = world.Wall
 			}
 		}
 	}
 	ground[27][40] = world.Door
-	return world.NewOnMap(7, world.Map{Name: "Cottage", Ground: ground, StartCol: 40, StartRow: 30})
+	return world.NewOnMap(7, world.Map{Name: "Cottage", Ground: ground, Roofs: roofs, StartCol: 40, StartRow: 30})
 }
 
 func TestMossCreepsUpTheFootOfWalls(t *testing.T) {
@@ -409,7 +417,7 @@ func TestBoardedFloorsAreDrawnInWood(t *testing.T) {
 }
 
 // roofInks are the inks a roof is drawn in.
-var roofInks = []int{thatchInk, shadedThatchInk, slateInk, shadedSlateInk}
+var roofInks = []int{thatchInk, shadedThatchInk, slateInk, shadedSlateInk, clayInk, shadedClayInk}
 
 func TestBuildingsAreRoofedFromOutside(t *testing.T) {
 	r := newRenderer(cottage(), "L’Après-Règne")
@@ -422,6 +430,24 @@ func TestBuildingsAreRoofedFromOutside(t *testing.T) {
 	x, y, _ := c.project(80, wallHeight+copingHeight+1.5, 50)
 	if ink := c.pixels[int(y)*c.width+int(x)].ink; ink != slateInk && ink != shadedSlateInk {
 		t.Fatalf("ink at the roof's ridge = %d, want slate", ink)
+	}
+}
+
+func TestEachRoofingIsDrawnInItsOwnColour(t *testing.T) {
+	for _, roofing := range []struct {
+		kind world.Roofing
+		inks []int
+	}{
+		{world.Slate, []int{slateInk, shadedSlateInk}},
+		{world.Thatch, []int{thatchInk, shadedThatchInk}},
+		{world.ClayTiles, []int{clayInk, shadedClayInk}},
+	} {
+		r := newRenderer(roofedCottage(roofing.kind), "L’Après-Règne")
+		r.zoom = zoom{current: 3}
+		c := r.render(160, 60, 0)
+		if countInk(c, roofing.inks...) == 0 {
+			t.Errorf("roofing %d drew no pixels in inks %v", roofing.kind, roofing.inks)
+		}
 	}
 }
 

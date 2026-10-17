@@ -204,3 +204,21 @@ func TestEachObjectLetterStandsForItsFixture(t *testing.T) {
 		}
 	}
 }
+
+func TestAMapFileRoofsItsBuildings(t *testing.T) {
+	loaded, err := Load(write(t, "houses.map", "terrain\n@...\n\nroofs\n.stc\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][]world.Roofing{{world.Slate, world.Slate, world.Thatch, world.ClayTiles}}
+	if !reflect.DeepEqual(loaded.Roofs, want) {
+		t.Fatalf("roofs = %v, want %v", loaded.Roofs, want)
+	}
+}
+
+func TestAnUnknownRoofingIsReported(t *testing.T) {
+	_, err := Load(write(t, "houses.map", "terrain\n@.\n\nroofs\n.x\n"))
+	if err == nil || !strings.Contains(err.Error(), "line 5") {
+		t.Fatalf("error = %v, want the unknown roofing reported on line 5", err)
+	}
+}

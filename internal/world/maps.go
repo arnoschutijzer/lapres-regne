@@ -53,6 +53,9 @@ type Map struct {
 	// Heights is the level of each tile, row by row as Ground, each level LevelHeight above the
 	// last; tiles left out lie at level 0.
 	Heights [][]int
+	// Roofs is the roofing over each tile, row by row as Ground; a building takes the roofing most
+	// of its rooms lie under, and tiles left out lie under slate.
+	Roofs [][]Roofing
 }
 
 // LevelHeight is how much higher each level of a map's heights lies than the last, in world units.
@@ -75,9 +78,18 @@ const (
 // tiles from Col, Row across Cols and Rows, walls included.
 type Building struct {
 	Col, Row, Cols, Rows int
-	// Thatched marks a building floored mostly with boards; one floored with stone is slated.
-	Thatched bool
+	Roof                 Roofing
 }
+
+// Roofing is what a building's roof is laid with.
+type Roofing byte
+
+const (
+	Slate Roofing = iota
+	Thatch
+	// ClayTiles are red clay roof tiles.
+	ClayTiles
+)
 
 // terrain answers questions about the tiles of a map.
 type terrain struct {
@@ -93,10 +105,11 @@ type terrain struct {
 	// heights is the level of each tile, row by row, and highest the highest level.
 	heights [][]int
 	highest int
+	roofs   [][]Roofing
 }
 
 func newTerrain(m Map) *terrain {
-	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
+	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, roofs: m.Roofs, trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
 	for _, levels := range m.Heights {
 		for _, level := range levels {
 			t.highest = max(t.highest, level)
@@ -146,16 +159,13 @@ func (t *terrain) findBuildings() {
 				continue
 			}
 			// Gather the room, noting whether it opens onto anything but its walls and doors.
-			room, open, boards := []cell{start}, false, 0
+			room, open := []cell{start}, false
 			// The room's doorways count as indoors too, so its roof stays lifted while the hero
 			// stands in one.
 			var doorways []cell
 			seen[start] = true
 			for i := 0; i < len(room); i++ {
 				here := room[i]
-				if t.ground[here.gz][here.gx] == Boards {
-					boards++
-				}
 				for _, step := range steps {
 					next := cell{here.gx + step.gx, here.gz + step.gz}
 					ground, ok := t.tile(next.gx, next.gz)
@@ -188,10 +198,27 @@ func (t *terrain) findBuildings() {
 			}
 			t.buildings = append(t.buildings, Building{
 				Col: left - 1, Row: top - 1, Cols: right - left + 3, Rows: bottom - top + 3,
-				Thatched: boards*2 > len(room),
+				Roof: t.roofing(room),
 			})
 		}
 	}
+}
+
+// roofing is the roofing most of a room's tiles lie under.
+func (t *terrain) roofing(room []cell) Roofing {
+	counts := make(map[Roofing]int)
+	commonest := Slate
+	for _, c := range room {
+		roofing := Slate
+		if c.gz < len(t.roofs) && c.gx < len(t.roofs[c.gz]) {
+			roofing = t.roofs[c.gz][c.gx]
+		}
+		counts[roofing]++
+		if counts[roofing] > counts[commonest] {
+			commonest = roofing
+		}
+	}
+	return commonest
 }
 
 // tile is the ground of a tile, or false beyond the map's edges.

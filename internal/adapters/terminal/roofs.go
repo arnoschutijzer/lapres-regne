@@ -14,6 +14,12 @@ const (
 	shadedSlateInk
 )
 
+// The inks of clay-tiled roofs, in sunlight and turned from it, after the furniture's.
+const (
+	clayInk = burlapInk + 1 + iota
+	shadedClayInk
+)
+
 // The proportions of roofs, in world units.
 const (
 	// eaves is the height the roof rests at, on top of the walls' coping.
@@ -28,8 +34,8 @@ const (
 type roof struct {
 	x0, z0, x1, z1 float64
 	// alongX marks a ridge running east to west.
-	alongX   bool
-	thatched bool
+	alongX  bool
+	roofing world.Roofing
 }
 
 // roofOver shapes the roof of a building, reaching from the outer faces of its walls with an
@@ -39,7 +45,7 @@ func roofOver(b world.Building) roof {
 	x0, z0 := float64(b.Col)*world.TileSize+outside, float64(b.Row)*world.TileSize+outside
 	x1 := float64(b.Col+b.Cols)*world.TileSize - outside
 	z1 := float64(b.Row+b.Rows)*world.TileSize - outside
-	return roof{x0, z0, x1, z1, x1-x0 >= z1-z0, b.Thatched}
+	return roof{x0, z0, x1, z1, x1-x0 >= z1-z0, b.Roof}
 }
 
 // ridge is the height of the roof's ridge above the ground.
@@ -76,8 +82,11 @@ func (r roof) draw(c *forestCanvas) {
 	// The roof rests on walls standing on the ground at the middle of the building.
 	c.standOn((r.x0+r.x1)/2, (r.z0+r.z1)/2)
 	ink, pattern := slateInk, surface(slates)
-	if r.thatched {
+	switch r.roofing {
+	case world.Thatch:
 		ink, pattern = thatchInk, surface(thatch)
+	case world.ClayTiles:
+		ink, pattern = clayInk, surface(clayTiles)
 	}
 	rise := r.ridge() - eaves
 	if r.alongX {
@@ -112,6 +121,17 @@ func slates(u, v float64, at vec) (float64, int) {
 	return 0.8 + 0.2*wave(row*1.9+math.Floor(along/0.4)*2.7), keepInk
 }
 
+// clayTiles lays a roof in rows of curved clay tiles running down its slope, each row overlapping
+// the one below.
+func clayTiles(u, v float64, at vec) (float64, int) {
+	row := math.Floor(v / 0.35)
+	if v-row*0.35 < 0.05 {
+		return 0.4, keepInk
+	}
+	curve := 0.5 + 0.5*math.Cos(u/0.25*math.Pi)
+	return 0.6 + 0.3*curve + 0.1*wave(row*2.3), keepInk
+}
+
 // thatch streaks a roof with straw running down its slope, bound in bands across it.
 func thatch(u, v float64, at vec) (float64, int) {
 	if math.Mod(v, 0.7) < 0.06 {
@@ -130,6 +150,8 @@ func shadedOf(ink int) int {
 		return shadedThatchInk
 	case slateInk:
 		return shadedSlateInk
+	case clayInk:
+		return shadedClayInk
 	}
 	return ink
 }
