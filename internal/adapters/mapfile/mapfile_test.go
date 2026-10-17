@@ -450,3 +450,25 @@ func TestACaretInTheTerrainLaysSteps(t *testing.T) {
 		t.Fatalf("ground = %v, want steps on tile 1, 0", loaded.Ground[0][1])
 	}
 }
+
+func TestLumbridgesUpperFloorsStandNoWallsInTheAir(t *testing.T) {
+	lumbridge, err := Load(filepath.Join("..", "..", "..", "maps", "lumbridge.map"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for storey, floor := range lumbridge.Upstairs {
+		floored := func(col, row int) bool {
+			return row >= 0 && row < len(floor.Ground) && col >= 0 && col < len(floor.Ground[row]) && floor.Ground[row][col] != world.Grass
+		}
+		for row := range floor.Edges.West {
+			for col := range floor.Edges.West[row] {
+				if floor.Edges.West[row][col] != world.Grass && !floored(col-1, row) && !floored(col, row) {
+					t.Fatalf("floor %d: a wall along the west edge of tile %d, %d stands in the air", storey+1, col, row)
+				}
+				if floor.Edges.North[row][col] != world.Grass && !floored(col, row-1) && !floored(col, row) {
+					t.Fatalf("floor %d: a wall along the north edge of tile %d, %d stands in the air", storey+1, col, row)
+				}
+			}
+		}
+	}
+}

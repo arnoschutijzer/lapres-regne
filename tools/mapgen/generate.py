@@ -217,6 +217,31 @@ class Lumbridge:
                 if self.ground[y][x] == ".":
                     self.ground[y][x] = max(set(beside), key=beside.count) if beside else "_"
 
+    def clear_the_air(self):
+        """Above the ground, the game also places walls where the level has no floor: under roofs,
+        and pieces it lowers onto the ground, such as the bridge's. A wall with open air on both
+        sides stands on no floor of this level, so it is left out, and so is a decoration left
+        hanging on no wall."""
+        def air(c, r):
+            return not inside(c, r) or self.ground[r][c] == "."
+
+        for r in range(H + 1):
+            for c in range(W + 1):
+                if air(c - 1, r) and air(c, r):
+                    self.west[r][c] = " "
+                if air(c, r - 1) and air(c, r):
+                    self.north[r][c] = " "
+        for r in range(H):
+            for c in range(W):
+                if air(c, r):
+                    self.rising[r][c] = self.falling[r][c] = " "
+
+        def walled(c, r):
+            edges = [self.edge("w", c, r), self.edge("w", c + 1, r), self.edge("n", c, r), self.edge("n", c, r + 1)]
+            return any(e != " " for e in edges) or self.crossed(c, r)
+
+        self.hung = [h for h in self.hung if walled(h[3], h[4])]
+
     def floored(self):
         """Whether the game floors any tile of this level."""
         return any(g != "." for row in self.ground for g in row)
@@ -608,6 +633,7 @@ def upper_floor(cache, game, level):
     floor.floor_flights()
     floor.furnish()
     floor.hang_decorations()
+    floor.clear_the_air()
     return floor
 
 
