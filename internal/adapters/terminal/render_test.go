@@ -408,7 +408,7 @@ func TestTheInventoryPanelOpensWithTintedLogsAndClosesCleanly(t *testing.T) {
 	}
 	r.inventoryOpen = true
 	open := r.frame(100, 30, 0)
-	if !strings.Contains(open, "inventory 1/28") || !strings.Contains(open, icon(world.Logs)) {
+	if !strings.Contains(open, "inventory 1/28") || !strings.Contains(open, icon(world.Logs)[0]) {
 		t.Fatal("the open panel must count the slots and show the normal log in its tint")
 	}
 	if strings.Count(open, emptySlot) != world.InventorySize-1 {

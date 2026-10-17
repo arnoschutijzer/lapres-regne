@@ -651,8 +651,13 @@ func (r *renderer) slotAt(column, row int) (int, bool) {
 	}
 	cols := r.canvas.width / 2
 	panelColumn := column - 1 - (r.screenWidth-cols)/2 - max(0, cols-panelWidth)
-	slotRow := row - 2 - slotLine
-	if panelColumn < slotIndent || panelColumn >= slotIndent+panelColumns*slotPitch || slotRow < 0 || slotRow >= world.InventorySize/panelColumns {
+	line := row - 2 - slotLine
+	slotRow := line / iconLines
+	// A short terminal cuts the panel off at the forest's last row.
+	if row-2 >= r.canvas.height/4 {
+		return 0, false
+	}
+	if panelColumn < slotIndent || panelColumn >= slotIndent+panelColumns*slotPitch || line < 0 || slotRow >= world.InventorySize/panelColumns {
 		return 0, false
 	}
 	return slotRow*panelColumns + (panelColumn-slotIndent)/slotPitch, true

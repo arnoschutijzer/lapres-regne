@@ -50,16 +50,18 @@ func TestTheBankShowsEachStackAsAnIconUnderItsCount(t *testing.T) {
 	w := banking(t, 3)
 	lines := bankPanel(w.Bank(), bankMaxColumns, bankCursor{}, 0)
 	// The first slot's count sits above its icon, both a cell into the slot.
-	if want := strings.Repeat(" ", slotIndent+1) + countTint(3) + "3   "; !strings.HasPrefix(lines[slotLine], want) {
+	if want := strings.Repeat(" ", slotIndent+1) + countTint(3) + "3 "; !strings.HasPrefix(lines[slotLine], want) {
 		t.Fatalf("count line = %q, want it to start %q", lines[slotLine], want)
 	}
-	if want := strings.Repeat(" ", slotIndent+1) + icon(world.Logs); !strings.HasPrefix(lines[slotLine+1], want) {
-		t.Fatalf("icon line = %q, want it to start %q", lines[slotLine+1], want)
+	for line, drawn := range icon(world.Logs) {
+		if want := strings.Repeat(" ", slotIndent+1) + drawn; !strings.HasPrefix(lines[slotLine+1+line], want) {
+			t.Fatalf("icon line %d = %q, want it to start %q", line, lines[slotLine+1+line], want)
+		}
 	}
 }
 
 func TestTheBankGridIsEightAcrossWhenThereIsRoom(t *testing.T) {
-	cases := map[int]int{100: 8, 62: 8, 61: 7, 40: 3}
+	cases := map[int]int{220: 8, 127: 8, 126: 7, 100: 5}
 	for cols, want := range cases {
 		if got := bankColumns(cols); got != want {
 			t.Errorf("bankColumns(%d) = %d, want %d", cols, got, want)
@@ -135,20 +137,20 @@ func TestStackAtFindsTheClickedStackInTheOpenBank(t *testing.T) {
 	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.toggleBank()
 	r.frame(100, 30, 0)
-	// The first stack's count sits on the panel's fourth line, the fifth row of the screen, and its
-	// icon below; its slot spans five cells from the panel's indent.
-	for _, cell := range [][2]int{{slotIndent + 1, 5}, {slotIndent + bankPitch, 6}} {
+	// The first stack's count sits on the panel's second line, the third row of the screen, and its
+	// icon on the four rows below; its slot spans bankPitch cells from the panel's indent.
+	for _, cell := range [][2]int{{slotIndent + 1, 3}, {slotIndent + bankPitch, 7}} {
 		if stack, ok := r.stackAt(cell[0], cell[1]); !ok || stack != 0 {
 			t.Errorf("stackAt(%d, %d) = %d, %v; want the first stack", cell[0], cell[1], stack, ok)
 		}
 	}
-	for _, cell := range [][2]int{{slotIndent, 5}, {slotIndent + bankPitch + 1, 5}, {slotIndent + 1, 7}, {slotIndent + 1, 4}} {
+	for _, cell := range [][2]int{{slotIndent, 3}, {slotIndent + bankPitch + 1, 3}, {slotIndent + 1, 8}, {slotIndent + 1, 2}} {
 		if _, ok := r.stackAt(cell[0], cell[1]); ok {
 			t.Errorf("stackAt(%d, %d) must not pick a stack", cell[0], cell[1])
 		}
 	}
 	r.toggleBank()
-	if _, ok := r.stackAt(slotIndent+1, 5); ok {
+	if _, ok := r.stackAt(slotIndent+1, 3); ok {
 		t.Error("a closed bank has no stacks to click")
 	}
 }
@@ -223,15 +225,15 @@ func TestClickingAStackHighlightsItAndWithdrawsOne(t *testing.T) {
 
 func TestTheHighlightedStackIsBracketed(t *testing.T) {
 	lines := bankPanel(banking(t, 1).Bank(), bankMaxColumns, bankCursor{active: true, stack: 0}, 0)
-	if want := strings.Repeat(" ", slotIndent) + "[" + icon(world.Logs) + panelText + "]"; !strings.HasPrefix(lines[slotLine+1], want) {
+	if want := strings.Repeat(" ", slotIndent) + "[" + icon(world.Logs)[0] + panelText + "]"; !strings.HasPrefix(lines[slotLine+1], want) {
 		t.Fatalf("icon line = %q, want it to start %q", lines[slotLine+1], want)
 	}
 }
 
 func TestTheBankScrollsToKeepTheHighlightInView(t *testing.T) {
-	// 50 stacks fill 7 rows of 8; 4 rows show at once.
+	// 50 stacks fill 7 rows of 8; 5 rows show at once.
 	cases := []struct{ top, stack, want int }{
-		{0, 31, 0}, {0, 32, 1}, {0, 49, 3}, {3, 8, 1}, {2, 20, 2},
+		{0, 39, 0}, {0, 40, 1}, {0, 49, 2}, {2, 8, 1}, {1, 20, 1},
 	}
 	for _, c := range cases {
 		if got := scrolled(c.top, bankCursor{active: true, stack: c.stack}, 8, 50); got != c.want {
@@ -256,14 +258,14 @@ func TestRightClickingAnInventorySlotOffersToDepositOneOrAll(t *testing.T) {
 	w := withLogs(t, 3)
 	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.frame(100, 30, 0)
-	// The inventory's first slot sits four columns into the panel, on the screen's fifth row.
+	// The inventory's first slot sits a column past the panel's indent, from the screen's third row.
 	inventoryColumn := 100 - panelWidth + 1 + slotIndent + 1
-	if r.rightClick(inventoryColumn, 5) {
+	if r.rightClick(inventoryColumn, 3) {
 		t.Fatal("with the bank closed, a right-click on the inventory offers nothing")
 	}
 	r.toggleBank()
 	r.frame(100, 30, 0)
-	if !r.rightClick(inventoryColumn, 5) || r.menuTitle != "Logs" || !reflect.DeepEqual(r.menu, []string{"Deposit-1", "Deposit-All"}) {
+	if !r.rightClick(inventoryColumn, 3) || r.menuTitle != "Logs" || !reflect.DeepEqual(r.menu, []string{"Deposit-1", "Deposit-All"}) {
 		t.Fatalf("menu = %q %v, want Deposit-1 and Deposit-All for the logs", r.menuTitle, r.menu)
 	}
 	r.choose(1)
@@ -277,14 +279,14 @@ func TestRightClickingABankStackOffersToWithdrawOneOrAll(t *testing.T) {
 	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.toggleBank()
 	r.frame(100, 30, 0)
-	if !r.rightClick(slotIndent+2, 6) || !reflect.DeepEqual(r.menu, []string{"Withdraw-1", "Withdraw-All"}) {
+	if !r.rightClick(slotIndent+2, 4) || !reflect.DeepEqual(r.menu, []string{"Withdraw-1", "Withdraw-All"}) {
 		t.Fatalf("menu = %q %v, want Withdraw-1 and Withdraw-All", r.menuTitle, r.menu)
 	}
 	r.choose(0)
 	if w.Hero().Inventory().Len() != 1 {
 		t.Fatal("Withdraw-1 must withdraw one log")
 	}
-	r.rightClick(slotIndent+2, 6)
+	r.rightClick(slotIndent+2, 4)
 	r.choose(1)
 	if w.Hero().Inventory().Len() != 3 || len(w.Bank().Stacks()) != 0 || r.bankCursor.active {
 		t.Fatalf("carried = %d, bank = %v, cursor = %+v; want the rest withdrawn", w.Hero().Inventory().Len(), w.Bank().Stacks(), r.bankCursor)
@@ -352,8 +354,8 @@ func TestTheWheelScrollsTheBankUnderThePointer(t *testing.T) {
 }
 
 func TestTheBankScrollsByRowsWithinItsStacks(t *testing.T) {
-	// 50 stacks fill 7 rows of 8; 4 rows show at once.
-	cases := []struct{ top, by, want int }{{0, 1, 1}, {0, -1, 0}, {2, 5, 3}, {3, -2, 1}}
+	// 50 stacks fill 7 rows of 8; 5 rows show at once.
+	cases := []struct{ top, by, want int }{{0, 1, 1}, {0, -1, 0}, {1, 5, 2}, {2, -2, 0}}
 	for _, c := range cases {
 		if got := scrolled(c.top+c.by, bankCursor{}, 8, 50); got != c.want {
 			t.Errorf("scrolling %d rows from row %d = %d, want %d", c.by, c.top, got, c.want)
@@ -366,13 +368,13 @@ func TestTheBankTitleShowsWhichWaysItScrolls(t *testing.T) {
 	cases := []struct {
 		top, rows int
 		want      string
-	}{{0, 4, "bank"}, {0, 7, "bank ↓"}, {2, 7, "bank ↑↓"}, {3, 7, "bank ↑"}}
+	}{{0, bankRows, "bank"}, {0, bankRows + 2, "bank ↓"}, {1, bankRows + 2, "bank ↑↓"}, {2, bankRows + 2, "bank ↑"}}
 	for _, c := range cases {
 		if got := strings.TrimSpace(bankTitle(c.top, c.rows)); got != c.want {
 			t.Errorf("bankTitle(%d, %d) = %q, want %q", c.top, c.rows, got, c.want)
 		}
 	}
-	if !strings.Contains(bankPanel(bank, bankMaxColumns, bankCursor{}, 0)[1], "bank") {
+	if !strings.Contains(bankPanel(bank, bankMaxColumns, bankCursor{}, 0)[0], "bank") {
 		t.Fatal("the panel must carry the title")
 	}
 }
@@ -383,5 +385,18 @@ func TestMovingTheHighlightScrollsItBackIntoView(t *testing.T) {
 	r.moveBankCursor(1)
 	if r.bankTop != 0 {
 		t.Fatalf("top = %d, want the highlighted first stack's row shown", r.bankTop)
+	}
+}
+
+func TestStacksCutOffByAShortTerminalCannotBeClicked(t *testing.T) {
+	r := bankOfFour(t)
+	// At 40 by 14 the bank shows one stack a row on forest rows 2 to 12: the third stack's count
+	// would fall on the hint line, row 13.
+	r.frame(40, 14, 0)
+	if stack, ok := r.stackAt(slotIndent+1, 12); !ok || stack != 1 {
+		t.Fatalf("stackAt on the forest's last row = %d, %v; want the second stack", stack, ok)
+	}
+	if _, ok := r.stackAt(slotIndent+1, 13); ok {
+		t.Fatal("a click on the hint line must not pick a stack hidden below it")
 	}
 }

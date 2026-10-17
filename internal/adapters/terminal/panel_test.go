@@ -61,21 +61,55 @@ func TestXWithoutAHighlightedLogDropsTheFirstOne(t *testing.T) {
 	}
 }
 
-func TestALogIconIsItsBarkInItsColorThenItsPalerCutEnd(t *testing.T) {
+func TestAnIconIsLinesOfHalfBlockPixels(t *testing.T) {
+	drawn := icon(world.OakLogs)
+	if len(drawn) != iconLines {
+		t.Fatalf("lines = %d, want %d", len(drawn), iconLines)
+	}
+	for _, line := range drawn {
+		if strings.Count(line, "▀") != iconCells || !strings.HasSuffix(line, paperOf(background)) {
+			t.Fatalf("line = %q, want %d half blocks ending on the background paper", line, iconCells)
+		}
+	}
+}
+
+func TestALogIconShowsAPaleCutEndAtItsUpperRightAndBarkBelowIt(t *testing.T) {
 	oak := [3]int{178, 128, 74}
-	if got, want := icon(world.OakLogs), foreground(oak)+logBark+foreground(cutEnd(oak))+logEnd; got != want {
-		t.Fatalf("oak logs icon = %q, want %q", got, want)
+	pixels := ditherIcon(logShader, oak, 16, 16)
+	// The cut end is centred toward the upper right; the bark runs down to the lower left.
+	end, bark := pixels[5][10], pixels[11][4]
+	if end == background || bark == background {
+		t.Fatalf("end %v, bark %v; want the log to cover both", end, bark)
+	}
+	if end[0]+end[1]+end[2] <= bark[0]+bark[1]+bark[2] {
+		t.Fatalf("cut end %v must be paler than the bark %v", end, bark)
+	}
+	if pixels[0][0] != background || pixels[15][15] != background {
+		t.Fatal("the corners away from the log must show the background")
+	}
+}
+
+func TestEachLogsIconKeepsItsTreesTint(t *testing.T) {
+	seen := map[string]world.Item{}
+	for _, item := range []world.Item{world.Logs, world.OakLogs, world.WillowLogs, world.YewLogs} {
+		drawn := strings.Join(icon(item), "")
+		if other, taken := seen[drawn]; taken {
+			t.Errorf("%v draw the same icon as %v", item, other)
+		}
+		seen[drawn] = item
 	}
 }
 
 func TestTheHighlightedSlotIsBracketed(t *testing.T) {
 	w := withLogs(t, 1)
 	lines := inventoryPanel(w.Hero().Inventory(), slotCursor{active: true, slot: 0})
-	if !strings.Contains(lines[3], "["+icon(world.Logs)+panelText+"]") {
-		t.Fatalf("first slot row = %q, want the first slot bracketed", lines[3])
+	for line, drawn := range icon(world.Logs) {
+		if !strings.Contains(lines[slotLine+line], "["+drawn+panelText+"]") {
+			t.Fatalf("first slot line %d = %q, want the first slot bracketed", line, lines[slotLine+line])
+		}
 	}
-	// Color escapes contain "[", so count the closing brackets.
-	if strings.Count(strings.Join(lines, ""), "]") != 1 {
+	// Color escapes contain "[", so count the closing brackets: one a line of the icon.
+	if strings.Count(strings.Join(lines, ""), "]") != iconLines {
 		t.Fatal("only the highlighted slot must be bracketed")
 	}
 }
@@ -83,24 +117,27 @@ func TestTheHighlightedSlotIsBracketed(t *testing.T) {
 func TestSlotAtFindsTheClickedSlotInTheOpenPanel(t *testing.T) {
 	r := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne")
 	r.inventoryOpen = true
-	r.frame(100, 30, 0)
-	// The panel's slots start four columns into the panel, on its fourth line.
+	r.frame(100, 40, 0)
+	// The panel's slots start past its indent, from its second line, the screen's third row; each
+	// is slotPitch cells wide and iconLines rows tall.
 	left := 100 - panelWidth + 1
+	first := left + slotIndent
 	cases := []struct {
 		column, row, slot int
 	}{
-		{left + 3, 5, 0}, {left + 4, 5, 0}, {left + 7, 5, 1}, {left + 3, 6, 4}, {left + 15, 11, 27},
+		{first, 3, 0}, {first + slotPitch - 1, 3 + iconLines - 1, 0}, {first + slotPitch, 3, 1},
+		{first, 3 + iconLines, 4}, {first + 4*slotPitch - 1, 3 + 7*iconLines - 1, 27},
 	}
 	for _, c := range cases {
 		if slot, ok := r.slotAt(c.column, c.row); !ok || slot != c.slot {
 			t.Errorf("slotAt(%d, %d) = %d, %v; want slot %d", c.column, c.row, slot, ok, c.slot)
 		}
 	}
-	if _, ok := r.slotAt(left+3, 3); ok {
+	if _, ok := r.slotAt(first, 2); ok {
 		t.Error("the panel title must not be a slot")
 	}
 	r.inventoryOpen = false
-	if _, ok := r.slotAt(left+3, 5); ok {
+	if _, ok := r.slotAt(first, 3); ok {
 		t.Error("a closed panel has no slots to click")
 	}
 }
@@ -118,5 +155,19 @@ func TestALogsCutEndIsPalerThanItsBarkAndKeepsItsTreesTint(t *testing.T) {
 	}
 	if len(ends) != 4 {
 		t.Fatal("each tree's logs must keep a cut end of their own")
+	}
+}
+
+func TestSlotsCutOffByAShortTerminalCannotBeClicked(t *testing.T) {
+	r := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne")
+	r.inventoryOpen = true
+	// A terminal 20 rows tall shows the forest on rows 2 to 18, below the title row.
+	r.frame(100, 20, 0)
+	first := 100 - panelWidth + 1 + slotIndent
+	if _, ok := r.slotAt(first, 18); !ok {
+		t.Fatal("a slot on the forest's last row must still be clickable")
+	}
+	if _, ok := r.slotAt(first, 19); ok {
+		t.Fatal("a click on the hint line must not pick a slot hidden below it")
 	}
 }
