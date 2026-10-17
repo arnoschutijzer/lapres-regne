@@ -130,7 +130,12 @@ func (s *Session) Run(world *world.World, camera *Camera, music soundtrack.Playe
 			camera.panBy(float64(event.panRight)*distance, float64(event.panDown)*distance)
 			return false
 		}
+		if event.rightClick {
+			view.rightClick(event.column, event.row)
+			return false
+		}
 		if event.click {
+			view.menu = nil
 			if slot, ok := view.slotAt(event.column, event.row); ok {
 				view.clickSlot(slot)
 				return false

@@ -39,6 +39,8 @@ type keyEvent struct {
 	repeat   bool
 	mouse    bool
 	click    bool
+	// rightClick is the right button pressed, which opens the menu for a slot or stack.
+	rightClick bool
 	// zoom is 1 for the wheel scrolling up and -1 for scrolling down.
 	zoom int
 	// turn is -1 for the wheel scrolling left and 1 for scrolling right.
@@ -226,7 +228,7 @@ func (d *keyDecoder) sequence(final byte) keyEvent {
 	return event
 }
 
-// mouseEvent reports pointer movement, left clicks and the wheel in any direction, and ignores releases and other buttons.
+// mouseEvent reports pointer movement, left and right clicks and the wheel in any direction, and ignores releases and the middle button.
 func mouseEvent(params string, final byte) keyEvent {
 	fields := strings.Split(params, ";")
 	if len(fields) != 3 || final != 'M' {
@@ -267,6 +269,9 @@ func mouseEvent(params string, final byte) keyEvent {
 	}
 	if button&3 == 0 {
 		return keyEvent{click: true, column: column, row: row}
+	}
+	if button&3 == 2 {
+		return keyEvent{rightClick: true, column: column, row: row}
 	}
 	return keyEvent{}
 }

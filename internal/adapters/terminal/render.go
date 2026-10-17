@@ -46,12 +46,13 @@ type renderer struct {
 	upstairs []builtArea
 	// menu lists the actions offered for the tree, doorway, staircase or ladder in reach, named by
 	// menuTitle; nil when closed. menuFor is what it offers them for.
-	menu      []string
-	menuTitle string
-	menuFor   menuFor
-	zoom      zoom
-	turn      turning
-	gait      gait
+	menu       []string
+	menuTitle  string
+	menuFor    menuFor
+	menuTarget int
+	zoom       zoom
+	turn       turning
+	gait       gait
 	// lastSeconds is when the last frame was rendered, so the gait can follow the time between frames.
 	lastSeconds float64
 	// palette is the color of each ink: the forest's own, then the colors of the map's models.

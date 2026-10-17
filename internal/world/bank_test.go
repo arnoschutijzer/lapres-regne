@@ -128,3 +128,45 @@ func TestResumingSkipsEmptyStacks(t *testing.T) {
 		t.Fatalf("stacks = %v, want only the oak logs", stacks)
 	}
 }
+
+func TestDepositAllBanksEveryItemOfTheSlotsKind(t *testing.T) {
+	w := carrying(t, world.OakLogs, world.Logs, world.OakLogs, world.OakLogs)
+	if !w.DepositAll(2) {
+		t.Fatal("a filled slot must deposit its kind")
+	}
+	if slots := w.Hero().Inventory().Slots(); !slots[1].Filled || w.Hero().Inventory().Len() != 1 {
+		t.Fatalf("slots = %v, want only the normal log left", slots[:4])
+	}
+	if stacks := w.Bank().Stacks(); !reflect.DeepEqual(stacks, []world.Stack{{Item: world.OakLogs, Count: 3}}) {
+		t.Fatalf("stacks = %v, want the three oak logs banked", stacks)
+	}
+	if w.DepositAll(0) {
+		t.Fatal("an empty slot must deposit nothing")
+	}
+}
+
+func TestWithdrawAllTakesTheWholeStackWhenItFits(t *testing.T) {
+	w := carrying(t, world.YewLogs, world.YewLogs, world.Logs)
+	w.DepositAll(0)
+	if !w.WithdrawAll(0) || len(w.Bank().Stacks()) != 0 || w.Hero().Inventory().Len() != 3 {
+		t.Fatalf("bank = %v, carried = %d; want both yew logs back", w.Bank().Stacks(), w.Hero().Inventory().Len())
+	}
+}
+
+func TestWithdrawAllTakesOnlyAsManyAsFit(t *testing.T) {
+	carried := make([]world.Slot, world.InventorySize-2)
+	for index := range carried {
+		carried[index] = world.Slot{Item: world.Logs, Filled: true}
+	}
+	snapshot := world.Snapshot{Seed: 7, Inventory: carried, Bank: []world.Stack{{Item: world.YewLogs, Count: 5}}}
+	w, _ := world.Resume(7, &memoryProgress{snapshot: snapshot, saved: true}, quitAt)
+	if !w.WithdrawAll(0) || !w.Hero().Inventory().Full() {
+		t.Fatal("withdrawing all must fill the free slots")
+	}
+	if stacks := w.Bank().Stacks(); !reflect.DeepEqual(stacks, []world.Stack{{Item: world.YewLogs, Count: 3}}) {
+		t.Fatalf("stacks = %v, want three yew logs left behind for want of room", stacks)
+	}
+	if w.Message() != "You don't have enough inventory space." {
+		t.Fatalf("message = %q, want the hero told there is no room for the rest", w.Message())
+	}
+}

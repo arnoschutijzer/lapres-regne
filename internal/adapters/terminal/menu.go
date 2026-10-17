@@ -9,6 +9,10 @@ const (
 	menuTree menuFor = iota
 	menuDoorway
 	menuFlight
+	// menuSlot offers to deposit the item in an inventory slot, and menuStack to withdraw from a
+	// bank stack; menuTarget is which slot or stack.
+	menuSlot
+	menuStack
 )
 
 // The actions offered for a staircase or ladder.
@@ -69,6 +73,10 @@ func (r *renderer) choose(index int) {
 		r.world.ToggleDoor()
 	case menuFlight:
 		r.world.Climb(r.menu[index] == climbUp)
+	case menuSlot:
+		r.deposit(r.menuTarget, index == 1)
+	case menuStack:
+		r.withdrawFrom(r.menuTarget, index == 1)
 	}
 	r.menu = nil
 }

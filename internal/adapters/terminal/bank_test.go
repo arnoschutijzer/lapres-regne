@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -238,5 +239,62 @@ func TestTheBankScrollsToKeepTheHighlightInView(t *testing.T) {
 	}
 	if got := scrolled(5, bankCursor{}, 8, 9); got != 0 {
 		t.Errorf("a bank that fits must show from the top, got row %d", got)
+	}
+}
+
+func TestRightClicksReportTheCell(t *testing.T) {
+	var d keyDecoder
+	events := feed(&d, "\x1b[<2;12;7M")
+	last := events[len(events)-1]
+	if !last.rightClick || last.click || last.column != 12 || last.row != 7 {
+		t.Fatalf("event = %+v, want a right click at column 12, row 7", last)
+	}
+}
+
+func TestRightClickingAnInventorySlotOffersToDepositOneOrAll(t *testing.T) {
+	w := withLogs(t, 3)
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
+	r.frame(100, 30, 0)
+	// The inventory's first slot sits four columns into the panel, on the screen's fifth row.
+	inventoryColumn := 100 - panelWidth + 1 + slotIndent + 1
+	if r.rightClick(inventoryColumn, 5) {
+		t.Fatal("with the bank closed, a right-click on the inventory offers nothing")
+	}
+	r.toggleBank()
+	r.frame(100, 30, 0)
+	if !r.rightClick(inventoryColumn, 5) || r.menuTitle != "Logs" || !reflect.DeepEqual(r.menu, []string{"Deposit-1", "Deposit-All"}) {
+		t.Fatalf("menu = %q %v, want Deposit-1 and Deposit-All for the logs", r.menuTitle, r.menu)
+	}
+	r.choose(1)
+	if w.Hero().Inventory().Len() != 0 || w.Bank().Stacks()[0].Count != 3 || r.menu != nil {
+		t.Fatalf("carried = %d, bank = %v; want every log deposited and the menu closed", w.Hero().Inventory().Len(), w.Bank().Stacks())
+	}
+}
+
+func TestRightClickingABankStackOffersToWithdrawOneOrAll(t *testing.T) {
+	w := banking(t, 3)
+	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
+	r.toggleBank()
+	r.frame(100, 30, 0)
+	if !r.rightClick(slotIndent+2, 6) || !reflect.DeepEqual(r.menu, []string{"Withdraw-1", "Withdraw-All"}) {
+		t.Fatalf("menu = %q %v, want Withdraw-1 and Withdraw-All", r.menuTitle, r.menu)
+	}
+	r.choose(0)
+	if w.Hero().Inventory().Len() != 1 {
+		t.Fatal("Withdraw-1 must withdraw one log")
+	}
+	r.rightClick(slotIndent+2, 6)
+	r.choose(1)
+	if w.Hero().Inventory().Len() != 3 || len(w.Bank().Stacks()) != 0 || r.bankCursor.active {
+		t.Fatalf("carried = %d, bank = %v, cursor = %+v; want the rest withdrawn", w.Hero().Inventory().Len(), w.Bank().Stacks(), r.bankCursor)
+	}
+}
+
+func TestRightClickingElsewhereOffersNothing(t *testing.T) {
+	r := newRenderer(banking(t, 1), NewCamera(0, 0), "L’Après-Règne")
+	r.toggleBank()
+	r.frame(100, 30, 0)
+	if r.rightClick(50, 20) || r.menu != nil {
+		t.Fatal("a right-click on the forest must not open a menu")
 	}
 }

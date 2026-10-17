@@ -193,9 +193,59 @@ func (r *renderer) moveBankCursor(step int) {
 
 // clickStack highlights a clicked bank stack and withdraws one item from it.
 func (r *renderer) clickStack(stack int) {
+	r.withdrawFrom(stack, false)
+}
+
+// withdrawFrom highlights a bank stack and withdraws one item from it, or all that fit.
+func (r *renderer) withdrawFrom(stack int, all bool) {
 	r.bankCursor = bankCursor{active: true, stack: stack}
-	r.world.Withdraw(stack)
+	if all {
+		r.world.WithdrawAll(stack)
+	} else {
+		r.world.Withdraw(stack)
+	}
 	r.bankCursor.keep(len(r.world.Bank().Stacks()))
+}
+
+// deposit highlights an inventory slot and deposits its item, or every item of its kind.
+func (r *renderer) deposit(slot int, all bool) {
+	r.cursor = slotCursor{active: true, slot: slot}
+	if all {
+		r.world.DepositAll(slot)
+	} else {
+		r.world.Deposit(slot)
+	}
+}
+
+// rightClick opens the menu for the item under a 1-based terminal cell while the bank is open:
+// to deposit one or all from an inventory slot, or to withdraw one or all from a bank stack. It
+// reports whether it opened one.
+func (r *renderer) rightClick(column, row int) bool {
+	if !r.bankOpen {
+		return false
+	}
+	if slot, ok := r.slotAt(column, row); ok {
+		carried := r.world.Hero().Inventory().Slots()[slot]
+		if !carried.Filled {
+			return false
+		}
+		r.cursor = slotCursor{active: true, slot: slot}
+		r.offer(carried.Item, menuSlot, slot, "Deposit-1", "Deposit-All")
+		return true
+	}
+	if stack, ok := r.stackAt(column, row); ok {
+		r.bankCursor = bankCursor{active: true, stack: stack}
+		r.offer(r.world.Bank().Stacks()[stack].Item, menuStack, stack, "Withdraw-1", "Withdraw-All")
+		return true
+	}
+	return false
+}
+
+// offer opens the menu of actions for an item, titled with its name.
+func (r *renderer) offer(item world.Item, target menuFor, index int, actions ...string) {
+	name := item.String()
+	r.menuTitle = strings.ToUpper(name[:1]) + name[1:]
+	r.menu, r.menuFor, r.menuTarget = actions, target, index
 }
 
 // withdraw withdraws one item from the highlighted stack, or the first, while the bank is open,

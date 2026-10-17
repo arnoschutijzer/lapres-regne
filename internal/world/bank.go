@@ -62,3 +62,33 @@ func (w *World) Withdraw(stack int) bool {
 	w.hero.inventory.add(w.bank.withdraw(stack))
 	return true
 }
+
+// DepositAll moves every item of the kind in an inventory slot into the bank, reporting whether
+// the slot held one.
+func (w *World) DepositAll(slot int) bool {
+	slots := w.hero.inventory.Slots()
+	if slot < 0 || slot >= InventorySize || !slots[slot].Filled {
+		return false
+	}
+	for index, carried := range slots {
+		if carried.Filled && carried.Item == slots[slot].Item {
+			w.Deposit(index)
+		}
+	}
+	return true
+}
+
+// WithdrawAll takes every item of a pile in the bank into the inventory, or as many as fit,
+// reporting whether it took any.
+func (w *World) WithdrawAll(stack int) bool {
+	if stack < 0 || stack >= len(w.bank.stacks) {
+		return false
+	}
+	item := w.bank.stacks[stack].Item
+	took := false
+	// The pile's place empties once its last item is taken.
+	for stack < len(w.bank.stacks) && w.bank.stacks[stack].Item == item && w.Withdraw(stack) {
+		took = true
+	}
+	return took
+}
