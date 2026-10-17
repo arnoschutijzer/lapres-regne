@@ -39,12 +39,12 @@ EARTHY_UNDERLAYS = {62, 63, 64}  # desert sand and bare earth
 TREES = {"Tree": "T", "Oak tree": "O", "Willow tree": "W", "Yew tree": "Y", "Dead tree": "X"}
 
 # Most wall pieces are unnamed. The castle's stone walls are battlemented where they face the open
-# air; these ids are wooden fences; the riverbank pieces are invisible barriers keeping players out
-# of the water, left out so the river can be waded. Everything else is a stone wall.
+# air, and these ids are wooden fences. Pieces whose models are empty are invisible barriers, such
+# as those keeping players out of the river and out of the bushes by the castle's door: they are
+# left out, so the river can be waded. Everything else is a stone wall.
 CASTLE = {1911}
-FENCES = {814, 979, 980, 981, 997, 1007, 1008, 1415, 1624, 1625, 1626, 1631, 2639, 4325, 5633,
-          12983, 12990, 12991, 38848, 44598, 44599}
-RIVERBANK = {44603, 5611}
+FENCES = {814, 979, 980, 981, 997, 1007, 1008, 1415, 1624, 1625, 1626, 1631, 4325, 5633,
+          12983, 12990, 12991}
 
 # Roof pieces share their models and differ by texture: red clay tiles, thatch or slate.
 ROOFING = {}
@@ -125,6 +125,7 @@ def read_areas(path):
 class Lumbridge:
     def __init__(self, terrain, placed, names, sizes, definitions):
         self.terrain_data, self.names, self.sizes, self.definitions = terrain, names, sizes, definitions
+        self.cache, self.model_points = None, {}
         # shaped lists the furniture drawn as the game models it: object, type, orientation and
         # its footprint's north-west tile and size; hung, the wall decorations and their tiles.
         self.shaped, self.hung = [], []
@@ -177,9 +178,22 @@ class Lumbridge:
 
     # --- Walls -------------------------------------------------------------------------------
 
+    def wall_models(self, oid, kind):
+        definition = models.ObjectDefinition(self.definitions[oid])
+        return tuple(definition.models_for(0 if kind == 2 else kind) or definition.models_for(0))
+
+    def visible(self, oid, kind):
+        """Whether a wall piece placed as a type has a model with any points to draw."""
+        return any(self.points_in(model) for model in self.wall_models(oid, kind))
+
+    def points_in(self, model):
+        if model not in self.model_points:
+            self.model_points[model] = len(models.Model(self.cache.group(models.MODELS, model)).x)
+        return self.model_points[model]
+
     def kind_of(self, p):
         name = self.names.get(p["id"]) or ""
-        if "oor" in name or "ate" in name:
+        if "oor" in name or "ate" in name or self.wall_models(p["id"], 0) in self.door_models:
             return "D"
         if p["id"] in CASTLE:
             return "C"
@@ -190,8 +204,12 @@ class Lumbridge:
             if 0 <= r < len(grid) and 0 <= c < len(grid[r]) and grid[r][c] != "D":
                 grid[r][c] = kind
 
+        # Doors are told by their names, or by sharing a named door's model, as the castle's own
+        # large doors do.
+        self.door_models = {self.wall_models(p["id"], 0) for p in self.placed if p["type"] == 0
+                            and any(word in (self.names.get(p["id"]) or "") for word in ("oor", "ate"))}
         for p in self.placed:
-            if p["type"] not in (0, 2, 9) or p["id"] in RIVERBANK:
+            if p["type"] not in (0, 2, 9) or not self.visible(p["id"], p["type"]):
                 continue
             c, r = col_row(p["x"], p["y"])
             kind = self.kind_of(p)
@@ -221,6 +239,7 @@ class Lumbridge:
                     if grid[r][c] == "C":
                         grid[r][c] = "B"
         self.trim_partial_floors()
+        self.floor_holes()
         self.open_doors()
         for r in range(H):
             for c in range(W):
@@ -237,6 +256,17 @@ class Lumbridge:
                 if self.ground[r][c] in "_b" and shape != 0 and not self.crossed(c, r):
                     if any(self.crossed(c + dc, r + dr) for dc in (-1, 0, 1) for dr in (-1, 0, 1)):
                         self.ground[r][c] = ":" if t.underlay.get(self.key(c, r)) in EARTHY_UNDERLAYS else "."
+
+    def floor_holes(self):
+        """A tile the game leaves unfloored in the middle of a room, such as under the castle
+        kitchen's trapdoor, takes the floor round it."""
+        for r in range(H):
+            for c in range(W):
+                if self.ground[r][c] not in ".:":
+                    continue
+                around = [self.ground[r + dr][c + dc] if inside(c + dc, r + dr) else "." for dc, dr in ((1, 0), (-1, 0), (0, 1), (0, -1))]
+                if all(g in "_b" for g in around):
+                    self.ground[r][c] = max(set(around), key=around.count)
 
     def edge(self, kind, c, r):
         grid = self.west if kind == "w" else self.north
@@ -262,7 +292,12 @@ class Lumbridge:
                 ):
                     if other == kind or self.edge(other, oc, orr) != " ":
                         continue
-                    if self.edge(*beyond) not in "#BC" or self.edge(*before) not in "#BC":
+                    # A doorway two tiles wide, a leaf of a pair of doors in each, runs on through
+                    # the other leaf's edge to the wall beyond.
+                    step_c, step_r = beyond[1] - oc, beyond[2] - orr
+                    further = (other, beyond[1] + step_c, beyond[2] + step_r)
+                    closed = self.edge(*beyond) in "#BC" or self.edge(*beyond) in " D" and self.edge(*further) in "#BC"
+                    if not closed or self.edge(*before) not in "#BC":
                         continue
                     (self.west if other == "w" else self.north)[orr][oc] = "D"
                     (self.west if kind == "w" else self.north)[r][c] = " "
@@ -499,6 +534,7 @@ class Lumbridge:
 def generate(cache_folder, areas_path, out_path):
     cache = Cache(cache_folder)
     lumbridge = Lumbridge(*read_game(cache))
+    lumbridge.cache = cache
     lumbridge.lay_ground()
     lumbridge.stand_walls()
     lumbridge.find_rooms()

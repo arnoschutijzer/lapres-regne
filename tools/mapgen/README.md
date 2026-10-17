@@ -29,9 +29,14 @@ writes somewhere else, and `--cache` keeps the download elsewhere.
 - **Walls.** Wall objects stand along tile edges (rotation 0 to 3: west, north,
   east, south), corners along two, and diagonal walls across a tile (even
   rotations rising, odd falling). Most are unnamed, so `generate.py` lists the
-  castle's stone walls, the wooden fences and the invisible riverbank barriers
-  it leaves out by id. A door that stands open in the game hangs on the edge
-  square to its doorway; it moves into the gap in the wall at its hinge.
+  castle's stone walls and the wooden fences by id. A piece whose model is
+  empty is an invisible barrier, as along the riverbanks and round the bushes by
+  the castle's door, and is left out. Doors are told by their names, or by
+  sharing a named door's model, as the castle's own large doors do. A door that
+  stands open in the game hangs on the edge square to its doorway; it moves into
+  the gap in the wall at its hinge, each leaf of a double door into its half. A
+  tile the game leaves unfloored inside a room, as under the castle kitchen's
+  trapdoor, takes the floor round it.
 - **Roofs.** Roof pieces share their models and differ in texture: red clay
   tiles, thatch or slate. A room under none stays open to the sky; a roofed room
   open on a few sides gets doorways in its archways.
