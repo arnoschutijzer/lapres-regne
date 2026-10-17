@@ -60,9 +60,10 @@ type placed struct {
 
 // sprites draws each sprite once at a size and keeps it.
 type sprites struct {
-	trees  map[treeLook]*image.RGBA
-	stumps map[int]*image.RGBA
-	heroes map[world.Facing]*image.RGBA
+	trees   map[treeLook]*image.RGBA
+	stump   *image.RGBA
+	heroes  map[world.Facing]*image.RGBA
+	shadows map[image.Point]*image.RGBA
 }
 
 // treeLook is what tells one tree's art from another's.
@@ -73,18 +74,30 @@ type treeLook struct {
 }
 
 func newSprites() *sprites {
-	return &sprites{trees: map[treeLook]*image.RGBA{}, stumps: map[int]*image.RGBA{}, heroes: map[world.Facing]*image.RGBA{}}
+	return &sprites{trees: map[treeLook]*image.RGBA{}, stump: stumpSprite(), heroes: map[world.Facing]*image.RGBA{}, shadows: map[image.Point]*image.RGBA{}}
+}
+
+// heightSquash is how far up the screen a point rises for each unit it stands above the ground,
+// compared with a unit across.
+const heightSquash = 0.69
+
+// crownWidth is how many art pixels across a tree's crown spans.
+func crownWidth(t world.Tree) int { return int(math.Round(t.Radius * 2 * unit * 0.8)) }
+
+// shadow is the flat shadow an ellipse across wide pixels and down tall casts.
+func (s *sprites) shadow(across, down int) *image.RGBA {
+	size := image.Pt(across, down)
+	if _, ok := s.shadows[size]; !ok {
+		s.shadows[size] = shadowSprite(across, down)
+	}
+	return s.shadows[size]
 }
 
 func (s *sprites) tree(t world.Tree) *image.RGBA {
 	if t.Stump {
-		width := max(6, int(math.Round(t.Trunk*2*unit*1.6)))
-		if _, ok := s.stumps[width]; !ok {
-			s.stumps[width] = stumpSprite(width)
-		}
-		return s.stumps[width]
+		return s.stump
 	}
-	look := treeLook{t.Kind, int(math.Round(t.Radius * 2 * unit)), int(math.Round(t.Height * unit)), int(t.Variation * 4)}
+	look := treeLook{t.Kind, crownWidth(t), int(math.Round(t.Height * unit * heightSquash)), int(t.Variation * 4)}
 	if _, ok := s.trees[look]; !ok {
 		s.trees[look] = treeSprite(look.kind, look.crownWidth, look.tall, float64(look.variation)/4)
 	}
@@ -98,18 +111,32 @@ func (s *sprites) hero(facing world.Facing) *image.RGBA {
 	return s.heroes[facing]
 }
 
-// arrange places every sprite the camera shows, the farthest first, so nearer sprites cover them.
-func arrange(w *world.World, view camera, art *sprites) []placed {
-	var scene []placed
+// arrange places every sprite the camera shows, the farthest first, so nearer sprites cover them,
+// and the shadows they cast on the ground.
+func arrange(w *world.World, view camera, art *sprites) (scene, shadows []placed) {
+	onScreen := func(left, top int, sprite *image.RGBA) bool {
+		bounds := sprite.Bounds()
+		return left <= screenWidth && top <= screenHeight && left+bounds.Dx() >= 0 && top+bounds.Dy() >= 0
+	}
+	// A sprite stands on the pixel at its bottom middle; a shadow lies centred a little down and
+	// right of its caster's foot, away from the light.
 	put := func(sprite *image.RGBA, x, z float64, tree *world.Tree) {
 		sx, sy := view.toScreen(x, z)
 		bounds := sprite.Bounds()
 		left := int(math.Round(sx)) - bounds.Dx()/2
 		top := int(math.Round(sy)) - bounds.Dy() + 1
-		if left > screenWidth || top > screenHeight || left+bounds.Dx() < 0 || top+bounds.Dy() < 0 {
-			return
+		if onScreen(left, top, sprite) {
+			scene = append(scene, placed{art: sprite, x: left, y: top, depth: z, tree: tree})
 		}
-		scene = append(scene, placed{art: sprite, x: left, y: top, depth: z, tree: tree})
+	}
+	cast := func(across, down int, x, z float64) {
+		sx, sy := view.toScreen(x, z)
+		shadow := art.shadow(across, down)
+		left := int(math.Round(sx)) - across/2 + across/6
+		top := int(math.Round(sy)) - down/2 + down/8
+		if onScreen(left, top, shadow) {
+			shadows = append(shadows, placed{art: shadow, x: left, y: top, depth: z})
+		}
 	}
 	// Trees reach into the view from below its bottom edge, so the search runs past it.
 	left, back := view.toWorld(-unit*4, -unit*2)
@@ -119,13 +146,19 @@ func arrange(w *world.World, view camera, art *sprites) []placed {
 		for gx := int(math.Floor(left / spacing)); gx <= int(math.Ceil(right/spacing)); gx++ {
 			if tree, ok := w.TreeAt(gx, gz); ok {
 				put(art.tree(tree), tree.X, tree.Z, &tree)
+				// A crown of leaves casts a broad shadow; a stump or bare limbs barely do.
+				if !tree.Stump && tree.Kind != world.DeadTree {
+					across := crownWidth(tree)
+					cast(across, across*9/20, tree.X, tree.Z)
+				}
 			}
 		}
 	}
 	x, z := w.Hero().Position()
 	put(art.hero(w.Hero().Facing()), x, z, nil)
+	cast(11, 5, x, z)
 	sort.SliceStable(scene, func(i, j int) bool { return scene[i].depth < scene[j].depth })
-	return scene
+	return scene, shadows
 }
 
 // treeAt is the frontmost standing tree whose art covers a point of the screen.

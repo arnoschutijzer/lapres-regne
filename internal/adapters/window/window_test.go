@@ -209,3 +209,48 @@ func TestTheSameGroundIsPaintedEveryTime(t *testing.T) {
 		t.Fatal("painting one chunk twice gives two pictures")
 	}
 }
+
+func brightness(c color.RGBA) int { return int(c.R) + int(c.G) + int(c.B) }
+
+func TestACrownIsLitFromTheUpperLeft(t *testing.T) {
+	for _, kind := range []world.TreeKind{world.NormalTree, world.Oak, world.Willow, world.Yew} {
+		sprite := treeSprite(kind, 60, 60, 0.4)
+		bounds := sprite.Bounds()
+		// Compare the crown's upper left quarter with its lower right one, above the trunk.
+		var lit, shaded, litCount, shadedCount int
+		for y := 0; y < bounds.Dy()*2/3; y++ {
+			for x := 0; x < bounds.Dx(); x++ {
+				c := sprite.RGBAAt(x, y)
+				if c.A == 0 {
+					continue
+				}
+				if x < bounds.Dx()/2 && y < bounds.Dy()/3 {
+					lit, litCount = lit+brightness(c), litCount+1
+				} else if x >= bounds.Dx()/2 && y >= bounds.Dy()/3 {
+					shaded, shadedCount = shaded+brightness(c), shadedCount+1
+				}
+			}
+		}
+		if litCount == 0 || shadedCount == 0 || lit/litCount <= shaded/shadedCount {
+			t.Errorf("%v's crown is no brighter at its upper left than its lower right", kind)
+		}
+	}
+}
+
+func TestStandingTreesCastShadowsAwayFromTheLight(t *testing.T) {
+	g := newGame(world.New(7), nil)
+	g.step(controls{}, tick)
+	if len(g.shadows) < 2 {
+		t.Fatalf("%d shadows lie on the ground; want the trees' and the hero's", len(g.shadows))
+	}
+	x, z := g.world.Hero().Position()
+	footX, _ := g.view.snapped().toScreen(x, z)
+	for _, shadow := range g.shadows {
+		if shadow.depth != z {
+			continue
+		}
+		if middle := float64(shadow.x) + float64(shadow.art.Bounds().Dx())/2; middle <= footX {
+			t.Errorf("the hero's shadow centres at x %v, not right of their foot at %v", middle, footX)
+		}
+	}
+}

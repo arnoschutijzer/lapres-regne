@@ -76,6 +76,10 @@ type game struct {
 	view  camera
 	art   *sprites
 	scene []placed
+	// shadows are laid on the ground through shade, an image of the screen, so that where they
+	// overlap they stay one flat shade.
+	shadows []placed
+	shade   *ebiten.Image
 	// drawn holds each sprite's art once it has been sent to the graphics card, and chunks the
 	// painted ground near the camera.
 	drawn  map[*image.RGBA]*ebiten.Image
@@ -118,7 +122,7 @@ func (g *game) step(c controls, dt time.Duration) error {
 	}
 	x, z := g.world.Hero().Position()
 	g.view.follow(x, z, dt.Seconds())
-	g.scene = arrange(g.world, g.view.snapped(), g.art)
+	g.scene, g.shadows = arrange(g.world, g.view.snapped(), g.art)
 	return nil
 }
 
@@ -133,16 +137,31 @@ func (g *game) Update() error {
 func (g *game) Draw(screen *ebiten.Image) {
 	screen.Fill(voidColor)
 	g.drawGround(screen)
-	for _, p := range g.scene {
-		sprite, ok := g.drawn[p.art]
-		if !ok {
-			sprite = ebiten.NewImageFromImage(p.art)
-			g.drawn[p.art] = sprite
-		}
-		options := &ebiten.DrawImageOptions{}
-		options.GeoM.Translate(float64(p.x), float64(p.y))
-		screen.DrawImage(sprite, options)
+	if g.shade == nil {
+		g.shade = ebiten.NewImage(screenWidth, screenHeight)
 	}
+	g.shade.Clear()
+	for _, p := range g.shadows {
+		g.drawSprite(g.shade, p)
+	}
+	options := &ebiten.DrawImageOptions{}
+	options.ColorScale.ScaleAlpha(shadowAlpha)
+	screen.DrawImage(g.shade, options)
+	for _, p := range g.scene {
+		g.drawSprite(screen, p)
+	}
+}
+
+// drawSprite draws a placed sprite, sending its art to the graphics card the first time.
+func (g *game) drawSprite(target *ebiten.Image, p placed) {
+	sprite, ok := g.drawn[p.art]
+	if !ok {
+		sprite = ebiten.NewImageFromImage(p.art)
+		g.drawn[p.art] = sprite
+	}
+	options := &ebiten.DrawImageOptions{}
+	options.GeoM.Translate(float64(p.x), float64(p.y))
+	target.DrawImage(sprite, options)
 }
 
 // drawGround draws the chunks of ground the camera shows, painting any not painted yet, and lets go

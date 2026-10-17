@@ -1,6 +1,10 @@
 package window
 
-import "image/color"
+import (
+	"image/color"
+
+	"lapresregne/internal/world"
+)
 
 // The window's palette is picked by hand, after Hyper Light Drifter's flat fields of teal, moss
 // and violet, sunk into Blasphemous's darkness: every material runs through a few tones from a
@@ -34,3 +38,22 @@ var (
 	goldTones    = tones{rgb(0x6b4414), rgb(0xc8902e), rgb(0xf2cf6b)}
 	paleTones    = tones{rgb(0x4a4260), rgb(0x9a90b8), rgb(0xd8d0ec)}
 )
+
+// Each kind of tree has its own leaves, from the shadow deep in its crown to the light on its top.
+var canopyTones = map[world.TreeKind]tones{
+	world.NormalTree: {rgb(0x06111a), rgb(0x0b1d24), rgb(0x112d2e), rgb(0x184036), rgb(0x22573f), rgb(0x357449), rgb(0x62a058)},
+	world.Oak:        {rgb(0x110e0c), rgb(0x1d1a12), rgb(0x2c2915), rgb(0x423c1b), rgb(0x5c5421), rgb(0x80742b), rgb(0xbca448)},
+	world.Willow:     {rgb(0x0b1516), rgb(0x142429), rgb(0x20362e), rgb(0x314a37), rgb(0x466343), rgb(0x668654), rgb(0xa2bc76)},
+	world.Yew:        {rgb(0x040c15), rgb(0x071721), rgb(0x0c242b), rgb(0x123435), rgb(0x1a473f), rgb(0x28604a), rgb(0x4a855a)},
+}
+
+var (
+	barkTones     = tones{rgb(0x0d090d), rgb(0x1c1317), rgb(0x31201d), rgb(0x4a3124), rgb(0x684830)}
+	deadBarkTones = tones{rgb(0x14111a), rgb(0x28222e), rgb(0x413946), rgb(0x675d6e), rgb(0x968c9e)}
+	// woodTones are the pale wood a cut shows.
+	woodTones = tones{rgb(0x5a3e28), rgb(0x9a7046), rgb(0xd0a468)}
+	// shadowColor is the flat shade a canopy or the hero casts on the ground, laid at shadowAlpha.
+	shadowColor = rgb(0x02040e)
+)
+
+const shadowAlpha = 0.5
