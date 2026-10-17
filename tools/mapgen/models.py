@@ -2,6 +2,7 @@
 (github.com/runelite/runelite, cache/.../definitions/loaders), and turn a placed object's model
 into coloured triangles in the map's world units."""
 
+import math
 import struct
 
 # Index 7 holds the models.
@@ -323,7 +324,12 @@ def placed_mesh(cache, palette, definition, kind, orientation, height_scale):
     """The triangles an object placed as a type and turned by an orientation draws: points in world
     units about the middle of its footprint (x east, y up, z south), each triangle's colour as
     red, green, blue. A tile is 128 of the game's units across and two world units; heights are
-    scaled by height_scale besides, to keep models in proportion with the hero."""
+    scaled by height_scale besides, to keep models in proportion with the hero. An object of type
+    11 stands as one of type 10 turned a further eighth of a turn, diagonally."""
+    angle = math.radians(orientation % 4 * 90 + (45 if kind == 11 else 0))
+    cos, sin = math.cos(angle), math.sin(angle)
+    if kind == 11:
+        kind = 10
     recolor = dict(definition.recolor)
     retexture = dict(definition.retexture)
     points, faces = [], []
@@ -333,8 +339,8 @@ def placed_mesh(cache, palette, definition, kind, orientation, height_scale):
         for x, y, z in zip(model.x, model.y, model.z):
             if definition.mirrored:
                 z = -z
-            for _ in range(orientation % 4):
-                x, z = z, -x
+            # Each quarter turn takes x, z to z, -x.
+            x, z = x * cos + z * sin, -x * sin + z * cos
             x = x * definition.scale[0] / 128 + definition.offset[0]
             y = y * definition.scale[1] / 128 - definition.offset[1]
             z = z * definition.scale[2] / 128 + definition.offset[2]
@@ -350,3 +356,25 @@ def placed_mesh(cache, palette, definition, kind, orientation, height_scale):
                 b, c = c, b
             faces.append((base + a, base + b, base + c, rgb))
     return points, faces
+
+
+def reduce_colours(colours, limit):
+    """Merge the closest of a set of colours until at most limit remain, the commonest kept as they
+    are: each colour maps to the one standing for it."""
+    counts = {}
+    for colour in colours:
+        counts[colour] = counts.get(colour, 0) + 1
+    order = sorted(counts, key=lambda c: -counts[c])
+    reach = 0
+    while True:
+        kept, mapping = [], {}
+        for colour in order:
+            near = min(kept, key=lambda k: sum((a - b) ** 2 for a, b in zip(k, colour)), default=None)
+            if near is not None and sum((a - b) ** 2 for a, b in zip(near, colour)) <= reach:
+                mapping[colour] = near
+            else:
+                kept.append(colour)
+                mapping[colour] = colour
+        if len(kept) <= limit:
+            return mapping
+        reach = max(1, reach * 2)

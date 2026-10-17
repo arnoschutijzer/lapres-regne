@@ -39,10 +39,13 @@ writes somewhere else, and `--cache` keeps the download elsewhere.
   body of water, room and bridge deck lying level.
 - **Objects.** Furniture and landmarks fill their footprints, turned with their
   rotation.
-- **Models.** Tables and workbenches are drawn as the game models them, written
-  to `maps/lumbridge.models`. `models.py` ports RuneLite's object and model
+- **Models.** Every piece of furniture and every landmark is drawn as the game
+  models it, written to `maps/lumbridge.models`; one the game stands
+  diagonally is turned a further eighth of a turn. `models.py` ports RuneLite's object and model
   loaders; each object's models are recoloured, retextured, mirrored, turned,
   scaled and offset as its definition says, and a textured face takes its
   texture's average colour. Heights are scaled by 0.6, as the game's people
   stand about a tile and a half tall and the hero under one; footprints stay
-  exact. `MODELLED` in `generate.py` lists the fixtures drawn this way.
+  exact. The renderer has inks for a limited number of colours, so the closest
+  of the models' colours are merged until 160 remain. `MODELLED` in
+  `generate.py` lists the fixtures drawn this way.
