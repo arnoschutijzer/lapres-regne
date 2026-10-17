@@ -595,3 +595,29 @@ func TestOnlyTreesThatReachTheCanvasAreDrawn(t *testing.T) {
 		t.Fatal("a tree wholly beside the canvas must be skipped")
 	}
 }
+
+func TestADeadTreeStandsBareOfLeaves(t *testing.T) {
+	ground := make([][]world.Ground, 30)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 40)
+	}
+	swamp := func(trees []world.PlantedTree) *world.World {
+		return world.NewOnMap(7, world.Map{Name: "Swamp", Ground: ground, StartCol: 20, StartRow: 16, Trees: trees})
+	}
+	leaves := leavesOf(world.NormalTree)
+	for _, scale := range []float64{0, 6} {
+		render := func(w *world.World) *forestCanvas {
+			r := newRenderer(w, "L’Après-Règne")
+			r.zoom = zoom{current: scale}
+			return r.render(160, 90, 0)
+		}
+		bare := render(swamp(nil))
+		dead := render(swamp([]world.PlantedTree{{Col: 20, Row: 13, Kind: world.DeadTree}}))
+		if countInk(dead, 4) <= countInk(bare, 4) {
+			t.Errorf("zoom %v: the dead tree must stand in bark", scale)
+		}
+		if countInk(dead, leaves.shaded, leaves.sunlit) > countInk(bare, leaves.shaded, leaves.sunlit) {
+			t.Errorf("zoom %v: the dead tree must bear no leaves", scale)
+		}
+	}
+}

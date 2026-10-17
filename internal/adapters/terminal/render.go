@@ -328,7 +328,8 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	}
 	r.drawScatter(c, left, right, back, front)
 	for _, tree := range trees {
-		if !tree.Stump {
+		// Only a crown of leaves throws a shadow; a stump or a dead tree's bare limbs barely do.
+		if !tree.Stump && tree.Kind != world.DeadTree {
 			c.shadow(tree)
 		}
 	}

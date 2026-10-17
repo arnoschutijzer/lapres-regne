@@ -14,6 +14,7 @@
 //	.  grass            ~  water
 //	T  tree             O  oak
 //	W  willow           Y  yew
+//	X  dead tree
 //	:  earth path       _  stone floor
 //	#  wall             =  fence
 //	G  gate             +  grave
@@ -107,6 +108,7 @@ var tiles = map[rune]tile{
 	'O': {ground: world.Grass, tree: true, kind: world.Oak},
 	'W': {ground: world.Grass, tree: true, kind: world.Willow},
 	'Y': {ground: world.Grass, tree: true, kind: world.Yew},
+	'X': {ground: world.Grass, tree: true, kind: world.DeadTree},
 	':': {ground: world.Path},
 	'_': {ground: world.Floor},
 	'#': {ground: world.Wall},

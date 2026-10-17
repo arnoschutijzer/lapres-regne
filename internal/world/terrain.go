@@ -110,7 +110,8 @@ func (w *World) TreeAt(gx, gz int) (Tree, bool) {
 // grow sizes a tree of a kind standing at x, z in cell gx, gz.
 func (w *World) grow(gx, gz int, x, z float64, kind TreeKind) Tree {
 	height, radius := 4.5+w.Random(gx, gz, 4)*3, 2.0+w.Random(gx, gz, 5)*1.35
-	// Oaks spread low and wide, willows broaden, and yews grow tall and narrow.
+	// Oaks spread low and wide, willows broaden, yews grow tall and narrow, and dead trees stand
+	// low and spare.
 	switch kind {
 	case Oak:
 		height, radius = height*0.85, radius*1.2
@@ -118,6 +119,8 @@ func (w *World) grow(gx, gz int, x, z float64, kind TreeKind) Tree {
 		height, radius = height*0.9, radius*1.15
 	case Yew:
 		height, radius = height*1.15, radius*0.85
+	case DeadTree:
+		height, radius = height*0.75, radius*0.7
 	}
 	return Tree{x, z, height, radius, 0.18 + w.Random(gx, gz, 6)*0.14, w.Random(gx, gz, 7), kind, w.felled[cell{gx, gz}] > 0, cell{gx, gz}}
 }

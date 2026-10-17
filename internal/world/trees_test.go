@@ -2,6 +2,7 @@ package world_test
 
 import (
 	"testing"
+	"time"
 
 	"lapresregne/internal/world"
 )
@@ -74,5 +75,31 @@ func TestApproachingATreeAboveTheHerosLevelRefusesOnArrival(t *testing.T) {
 	approachUntilChopping(w)
 	if w.Chopping() || w.Message() != "You need woodcutting level 30 to chop this willow." {
 		t.Fatalf("chopping = %v, message = %q; want a refusal on arrival", w.Chopping(), w.Message())
+	}
+}
+
+func TestADeadTreeIsChoppedForLogsLikeANormalTree(t *testing.T) {
+	if world.DeadTree.String() != "dead tree" || world.DeadTree.Logs() != world.Logs {
+		t.Fatalf("dead tree = %q giving %v, want a dead tree giving logs", world.DeadTree, world.DeadTree.Logs())
+	}
+	m := pond()
+	m.Trees = []world.PlantedTree{{Col: 1, Row: 1, Kind: world.DeadTree}}
+	w := world.NewOnMap(7, m)
+	tree, _ := w.TreeAt(1, 1)
+	w.Approach(tree)
+	walkFor(w, 5*time.Second)
+	if !w.Chopping() {
+		t.Fatal("a level 1 hero must chop a dead tree")
+	}
+}
+
+func TestADeadTreeSpreadsNoCanopy(t *testing.T) {
+	m := pond()
+	m.Trees = []world.PlantedTree{{Col: 1, Row: 1, Kind: world.DeadTree}}
+	w := world.NewOnMap(7, m)
+	open := world.NewOnMap(7, world.Map{Name: "pond", Ground: m.Ground, StartCol: 1, StartRow: 2})
+	x, z := 1.5*world.TileSize, 1.5*world.TileSize
+	if w.Cover(x, z) != open.Cover(x, z) {
+		t.Fatalf("cover under the dead tree = %v, want the open sky's %v", w.Cover(x, z), open.Cover(x, z))
 	}
 }

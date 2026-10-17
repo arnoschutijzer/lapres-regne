@@ -173,6 +173,8 @@ func (r *renderer) drawTree(c *forestCanvas, tree world.Tree, shake float64) {
 		r.drawWillow(c, tree, shake)
 	case world.Yew:
 		r.drawYew(c, tree, shake)
+	case world.DeadTree:
+		drawDeadTree(c, tree, shake)
 	default:
 		r.drawCommonTree(c, tree, shake)
 	}
@@ -290,6 +292,31 @@ func (r *renderer) drawYew(c *forestCanvas, tree world.Tree, shake float64) {
 	}
 	r.crowns(c, crowns[:], leaves)
 	drawTrunk(c, tree, tree.Trunk*1.2, h, shake)
+}
+
+// drawDeadTree raises a bare, gnarled trunk that forks into crooked limbs, each splitting again
+// into thin twigs, with no leaves at all.
+func drawDeadTree(c *forestCanvas, tree world.Tree, shake float64) {
+	x, z, h, radius := tree.X, tree.Z, tree.Height, tree.Radius
+	a := tree.Variation * 6.28
+	var limbs [12]limbShape
+	for i := range 4 {
+		angle := a + float64(i)*1.571 + 0.3*math.Sin(float64(i)*2.7)
+		lean := shake * (0.5 + 0.1*float64(i))
+		startY := h * (0.45 + 0.12*float64(i%2))
+		reach := radius * (0.55 + 0.25*math.Abs(math.Sin(float64(i)*1.9+tree.Variation*4)))
+		// Each limb bends once, then forks into two twigs.
+		elbowX, elbowZ := x+lean+math.Cos(angle)*reach*0.6, z+math.Sin(angle)*reach*0.6
+		elbowY := startY + h*0.25
+		limbs[i*3] = limbShape{x + lean*0.5, startY, z, elbowX, elbowY, elbowZ, 0.62, tree.Trunk * 0.5}
+		for twig := range 2 {
+			fork := angle + 0.6*float64(2*twig-1)
+			tipX, tipZ := elbowX+math.Cos(fork)*reach*0.45, elbowZ+math.Sin(fork)*reach*0.45
+			limbs[i*3+1+twig] = limbShape{elbowX, elbowY, elbowZ, tipX, elbowY + h*(0.18+0.1*float64(twig)), tipZ, 0.55, tree.Trunk * 0.25}
+		}
+	}
+	drawBranches(c, limbs[:])
+	drawTrunk(c, tree, tree.Trunk*0.9, h*0.8, shake)
 }
 
 // drawTrunk raises a trunk, its top leaning with shake: three bark strands in the forest view,

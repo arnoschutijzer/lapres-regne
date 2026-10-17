@@ -94,7 +94,7 @@ WY...
 | `G`  | gate    | `+`  | grave   |
 | `D`  | open door | `b`  | wooden floor |
 | `B`  | battlements | `H`  | bridge  |
-| `@`  | where the hero starts | | |
+| `X`  | dead tree | `@`  | where the hero starts |
 
 Name parts of the map with `area <letter> <name>` settings and an `areas`
 grid laid over the terrain, using `.` for none; the status line names the area

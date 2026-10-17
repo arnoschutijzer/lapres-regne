@@ -13,10 +13,12 @@ const (
 	Oak
 	Willow
 	Yew
+	// DeadTree is a leafless tree, chopped exactly as a normal one.
+	DeadTree
 )
 
 func (k TreeKind) String() string {
-	return [...]string{"tree", "oak", "willow", "yew"}[k]
+	return [...]string{"tree", "oak", "willow", "yew", "dead tree"}[k]
 }
 
 // Logs is the item this kind of tree gives when chopped.
@@ -44,6 +46,7 @@ var species = [...]treeSpecies{
 	Oak:        {logs: OakLogs, level: 15, xp: 37.5, low: 32, high: 100, lifetime: 45 * gameTick, respawn: 14 * gameTick},
 	Willow:     {logs: WillowLogs, level: 30, xp: 67.5, low: 16, high: 50, lifetime: 50 * gameTick, respawn: 14 * gameTick},
 	Yew:        {logs: YewLogs, level: 60, xp: 175, low: 4, high: 12, lifetime: 190 * gameTick, respawn: 99 * gameTick},
+	DeadTree:   {logs: Logs, level: 1, xp: 25, low: 64, high: 200, fallsWithFirstLog: true, respawn: 36 * time.Second, respawnSpread: 24 * time.Second},
 }
 
 // chance is the chance one tick cuts a log at a level, rolled as Old School RuneScape does.

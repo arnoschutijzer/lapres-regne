@@ -131,6 +131,10 @@ func newTerrain(m Map) *terrain {
 	}
 	for _, tree := range m.Trees {
 		t.trees[cell{tree.Col, tree.Row}] = tree.Kind
+		// A dead tree has no leaves to shade the ground.
+		if tree.Kind == DeadTree {
+			continue
+		}
 		for row := tree.Row - 1; row <= tree.Row+1; row++ {
 			for col := tree.Col - 1; col <= tree.Col+1; col++ {
 				if _, ok := t.tile(col, row); ok {
@@ -140,7 +144,7 @@ func newTerrain(m Map) *terrain {
 		}
 	}
 	for _, tree := range m.Trees {
-		if _, ok := t.tile(tree.Col, tree.Row); ok {
+		if _, ok := t.tile(tree.Col, tree.Row); ok && tree.Kind != DeadTree {
 			t.cover[tree.Row][tree.Col] = treeTopCover
 		}
 	}

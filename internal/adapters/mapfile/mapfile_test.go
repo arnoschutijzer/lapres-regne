@@ -265,3 +265,13 @@ func TestAStartSettingStartsTheHeroOnAnyGround(t *testing.T) {
 		t.Fatalf("start = %d, %d on %v; want the hero on the stone floor at 2, 1", loaded.StartCol, loaded.StartRow, loaded.Ground[1][2])
 	}
 }
+
+func TestAnXInTheTerrainPlantsADeadTree(t *testing.T) {
+	loaded, err := Load(write(t, "swamp.map", "terrain\n@X\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []world.PlantedTree{{Col: 1, Row: 0, Kind: world.DeadTree}}; !reflect.DeepEqual(loaded.Trees, want) {
+		t.Fatalf("trees = %+v, want %+v", loaded.Trees, want)
+	}
+}
