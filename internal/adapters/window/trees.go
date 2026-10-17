@@ -82,7 +82,7 @@ func treeSprite(kind world.TreeKind, crownWidth, height int, variation float64) 
 	sprite := image.NewRGBA(image.Rect(0, 0, width, height+1))
 	centre := width / 2
 	if kind == world.DeadTree {
-		drawTrunk(sprite, centre, height/5, height, max(3, crownWidth/9), deadBarkTones)
+		drawTrunk(sprite, centre, height/5, height, max(4, crownWidth/6), deadBarkTones)
 		drawBranches(sprite, float64(centre), float64(height)/5+2, float64(height)*0.5, variation)
 		return sprite
 	}
@@ -97,28 +97,35 @@ func treeSprite(kind world.TreeKind, crownWidth, height int, variation float64) 
 	middleY := float64(height) - trunkShows(height) - down
 	drawTrunk(sprite, centre, int(middleY), height, max(4, crownWidth/8), barkTones)
 	leaves := canopyTones[kind]
+	// The lobes lie unevenly, some large and some straggling at the edge, so no two crowns share a
+	// shape, and their edges are torn into ragged clumps of leaves.
+	seed := uint64(variation*977) + uint64(kind)*31
 	type lobe struct{ x, y, r, phase float64 }
-	lobes := []lobe{{float64(centre), middleY, math.Min(across, down) * 0.62, variation * 9}}
-	count := 6
+	size := math.Min(across, down)
+	lobes := []lobe{{float64(centre), middleY, size * 0.55, variation * 9}}
+	count := 7 + int(hash(1, 2, seed)*4)
 	for i := range count {
-		angle := float64(i)/float64(count)*2*math.Pi + variation*5
-		r := math.Min(across, down) * (0.42 + 0.1*hash(i, 1, uint64(variation*977)))
+		angle := hash(i, 3, seed) * 2 * math.Pi
+		reach := 0.35 + 0.4*hash(i, 4, seed)
+		r := size * (0.26 + 0.26*hash(i, 5, seed))
 		lobes = append(lobes, lobe{
-			float64(centre) + math.Cos(angle)*(across-r),
-			middleY + math.Sin(angle)*(down-r),
+			float64(centre) + math.Cos(angle)*(across-r)*reach/0.75,
+			middleY + math.Sin(angle)*(down-r)*reach/0.75,
 			r,
-			float64(i) * 1.7,
+			hash(i, 6, seed) * 6,
 		})
 	}
 	light := [3]float64{-0.5, -0.62, 0.6}
 	bounds := sprite.Bounds()
+	inCrown := make([]bool, bounds.Dx()*bounds.Dy())
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			nearest, shade, rim := math.Inf(1), 0.0, false
 			for _, l := range lobes {
 				dx, dy := float64(x)+0.5-l.x, float64(y)+0.5-l.y
-				// A scalloped edge of leaves runs round each lobe.
-				r := l.r * (1 + 0.07*math.Sin(math.Atan2(dy, dx)*7+l.phase))
+				angle := math.Atan2(dy, dx)
+				ragged := hash(int(math.Floor((angle+math.Pi)/(2*math.Pi)*22)), int(l.phase*10), seed)
+				r := l.r * (1 + 0.08*math.Sin(angle*5+l.phase) + 0.2*(ragged-0.5))
 				d := (dx*dx + dy*dy) / (r * r)
 				if d > 1 {
 					continue
@@ -128,22 +135,35 @@ func treeSprite(kind world.TreeKind, crownWidth, height int, variation float64) 
 				if order := -(l.y + nz*l.r*0.3); order < nearest {
 					nearest = order
 					shade = (dx/r)*light[0] + (dy/r)*light[1] + nz*light[2]
-					rim = d > 0.86 && dy > 0
+					rim = d > 0.8 && dy > 0
 				}
 			}
 			if math.IsInf(nearest, 1) {
 				continue
 			}
-			value := (shade+0.42+leaf(x, y)*0.16)*3.4 + 0.5
+			inCrown[y*bounds.Dx()+x] = true
+			value := (shade+0.22+leaf(x, y)*0.2)*4.2 + 0.2
 			if rim {
 				// The underside of each lobe sinks into the dark between it and the next.
-				value = math.Min(value, 1.2)
+				value = math.Min(value, 1)
+			}
+			// Gaps in the leaves open onto the dark inside the crown.
+			if shade < 0.35 && hash(x/3, y/2, seed+7) < 0.07 {
+				value = 0
 			}
 			sprite.SetRGBA(x, y, leaves.dithered(value, x, y))
 		}
 	}
+	// Boughs reach out from the trunk, seen through the gaps in the leaves and below them.
+	drawBoughs(sprite, centre, middleY, across, down, seed, func(x, y int) bool {
+		if !inCrown[y*bounds.Dx()+x] {
+			return y > int(middleY)
+		}
+		c := sprite.RGBAAt(x, y)
+		return c == leaves.at(0) || c == leaves.at(1)
+	})
 	if kind == world.Willow {
-		drawStrands(sprite, centre, middleY, across, down, leaves)
+		drawStrands(sprite, inCrown, leaves)
 	}
 	return sprite
 }
@@ -151,31 +171,69 @@ func treeSprite(kind world.TreeKind, crownWidth, height int, variation float64) 
 // trunkShows is how much of a tree's trunk shows below its crown, for a tree height pixels tall.
 func trunkShows(height int) float64 { return float64(height) * 0.22 }
 
-// drawTrunk draws a trunk from top down to its foot at the bottom, width pixels wide and lit from
-// the left, flaring into roots at the foot.
+// drawTrunk draws a trunk from top down to its foot at the bottom, width pixels wide where it
+// meets the ground and narrowing above, twisting as it rises, lit from the left and clawing into
+// the ground with its roots.
 func drawTrunk(sprite *image.RGBA, centre, top, foot, width int, bark tones) {
-	left := centre - width/2
+	twist := hash(centre, foot, 13) * 6
 	for y := top; y <= foot; y++ {
-		flare := 0
+		rise := float64(foot-y) / float64(max(1, foot-top))
+		across := max(2, int(math.Round(float64(width)*(1-0.35*rise))))
 		if y >= foot-1 {
-			flare = 1
+			across += 2
 		}
-		for x := left - flare; x < left+width+flare; x++ {
-			tone := 2
-			switch {
-			case x <= left:
-				tone = 3
-			case x >= left+width-2:
-				tone = 1
-			case hash(x, y/3, 17) > 0.8:
-				// Furrows in the bark run up the trunk.
-				tone = 1
+		shift := int(math.Round(math.Sin(float64(y)*0.13+twist) * 1.3 * rise))
+		left := centre - across/2 + shift
+		for x := left; x < left+across; x++ {
+			// Light falls from the left, and furrows run up the bark.
+			value := 3.2 - float64(x-left)/float64(across)*2.4
+			if hash(x-shift, y/4, 17) > 0.72 {
+				value -= 1.2
 			}
-			if x < left || x >= left+width {
-				tone = 0
+			if x == left || x == left+across-1 {
+				value = math.Min(value, 0.8)
 			}
-			sprite.SetRGBA(x, y, bark.at(tone))
+			sprite.SetRGBA(x, y, bark.dithered(value, x, y))
 		}
+	}
+	// Roots spread from the foot, sinking into the ground as they reach out.
+	for i, reach := range [...]float64{-1, 1, -0.6, 0.7} {
+		length := float64(width) * (0.9 + hash(i, centre, 14)*0.8)
+		for step := 0.0; step < length; step += 0.5 {
+			x := centre + int(math.Round(reach*(float64(width)/2+step)))
+			y := foot - 1 + int(step*0.25) + i/2
+			if image.Pt(x, y).In(sprite.Bounds()) {
+				sprite.SetRGBA(x, y, bark.dithered(2-step/length*1.5, x, y))
+			}
+		}
+	}
+}
+
+// drawBoughs draws the boughs reaching up and out from the top of the trunk into the crown, where
+// shows tells that a pixel is not covered by leaves.
+func drawBoughs(sprite *image.RGBA, centre int, middleY, across, down float64, seed uint64, shows func(x, y int) bool) {
+	var bough func(x, y, angle, length float64, depth int)
+	bough = func(x, y, angle, length float64, depth int) {
+		for step := 0.0; step < length; step += 0.5 {
+			px, py := int(x+math.Cos(angle)*step), int(y+math.Sin(angle)*step)
+			for thick := 0; thick < 3-depth; thick++ {
+				at := image.Pt(px+thick, py)
+				if at.In(sprite.Bounds()) && shows(at.X, at.Y) {
+					sprite.SetRGBA(at.X, at.Y, barkTones.at(1+min(thick, 1)))
+				}
+			}
+		}
+		if depth == 2 {
+			return
+		}
+		endX, endY := x+math.Cos(angle)*length, y+math.Sin(angle)*length
+		bough(endX, endY, angle-0.5, length*0.6, depth+1)
+		bough(endX, endY, angle+0.45, length*0.55, depth+1)
+	}
+	base := middleY + down*0.6
+	for i := range 3 {
+		angle := -math.Pi/2 + (float64(i)-1)*0.75 + (hash(i, 9, seed)-0.5)*0.4
+		bough(float64(centre), base, angle, across*0.45, 0)
 	}
 }
 
@@ -209,21 +267,28 @@ func drawBranches(sprite *image.RGBA, centre, from, reach, variation float64) {
 	limb(centre, from, -math.Pi/2+(variation-0.5)*0.3, reach*0.3, 0)
 }
 
-// drawStrands hangs a willow's long strands of leaves down from the lower half of its crown.
-func drawStrands(sprite *image.RGBA, centre int, middleY, across, down float64, leaves tones) {
-	for x := centre - int(across) + 3; x <= centre+int(across)-3; x += 2 {
-		dx := float64(x-centre) / across
-		edge := middleY + down*math.Sqrt(math.Max(0, 1-dx*dx))*0.85
-		length := 5 + int(hash(x, 0, 29)*9)
-		for y := int(edge); y < int(edge)+length; y++ {
-			if !image.Pt(x, y).In(sprite.Bounds()) {
+// drawStrands hangs a willow's long strands of leaves from the lower edge of its crown, where
+// inCrown marks the crown's pixels row by row.
+func drawStrands(sprite *image.RGBA, inCrown []bool, leaves tones) {
+	bounds := sprite.Bounds()
+	for x := bounds.Min.X; x < bounds.Max.X; x++ {
+		if hash(x, 0, 29) < 0.35 {
+			continue
+		}
+		edge := -1
+		for y := bounds.Max.Y - 1; y >= bounds.Min.Y; y-- {
+			if inCrown[y*bounds.Dx()+x] {
+				edge = y
 				break
 			}
-			tone := 3 - (y-int(edge))*3/length
-			if dx < -0.3 {
-				tone++
-			}
-			sprite.SetRGBA(x, y, leaves.at(tone))
+		}
+		if edge < 0 {
+			continue
+		}
+		length := 6 + int(hash(x, 1, 29)*12)
+		for y := edge - 2; y < edge+length && y < bounds.Max.Y; y++ {
+			value := 2.6 - float64(y-edge)/float64(length)*2
+			sprite.SetRGBA(x, y, leaves.dithered(value, x, y))
 		}
 	}
 }

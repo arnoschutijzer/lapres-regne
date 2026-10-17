@@ -155,7 +155,7 @@ func arrange(w *world.World, view camera, art *sprites, heroFrame int) (scene, s
 				put(art.tree(tree), tree.X, tree.Z, &tree)
 				// A crown of leaves casts a broad shadow; a stump or bare limbs barely do.
 				if !tree.Stump && tree.Kind != world.DeadTree {
-					across := crownWidth(tree)
+					across := crownWidth(tree) * 4 / 5
 					cast(across, across*9/20, tree.X, tree.Z)
 				}
 			}
