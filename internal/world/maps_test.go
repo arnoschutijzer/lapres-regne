@@ -203,6 +203,22 @@ func TestWallsStopTheHero(t *testing.T) {
 	}
 }
 
+func TestPushingAlmostStraightIntoAWallStopsTheHero(t *testing.T) {
+	w := world.NewOnMap(7, courtyard())
+	w.Advance(0, -1, 2*time.Second, false)
+	walked := make(chan struct{})
+	go func() {
+		// A turned camera can leave a hair's breadth of sideways walking in the direction.
+		w.Advance(1e-11, -1, time.Second, false)
+		close(walked)
+	}()
+	select {
+	case <-walked:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the hero kept edging along the wall instead of stopping against it")
+	}
+}
+
 func TestTheHeroWalksOutThroughADoorway(t *testing.T) {
 	m := courtyard()
 	m.Ground[3][2] = world.Door

@@ -105,8 +105,11 @@ func (c *Character) move(dx, dz, distance float64) float64 {
 	}
 	moved := 0.0
 	for moved < distance {
-		covered := c.slide(dx, dz, math.Min(collisionStep, distance-moved))
-		if covered == 0 {
+		step := math.Min(collisionStep, distance-moved)
+		covered := c.slide(dx, dz, step)
+		// Sliding along a wall almost straight into it covers next to nothing, and would take
+		// endless steps to cover the distance, so the hero stops against the wall instead.
+		if covered < step*0.01 {
 			break
 		}
 		moved += covered
