@@ -68,6 +68,9 @@ func terminalSize() (int, int, error) {
 	return cols, rows, nil
 }
 
+// frameRate is how many frames a second the session aims to draw.
+const frameRate = 120
+
 // Run lets the traveler explore the world until they quit. Music is nil when muted.
 func (s *Session) Run(world *world.World, music soundtrack.Player, title string) error {
 	if _, err := stty("raw", "-echo"); err != nil {
@@ -94,7 +97,10 @@ func (s *Session) Run(world *world.World, music soundtrack.Player, title string)
 		}
 	}()
 
-	frames := time.NewTicker(time.Second / 60)
+	// The world advances once a frame by the time since the last, as Ebitengine's SyncWithFPS mode
+	// updates a game once per frame drawn: a frame drawn late drops the ticks it missed rather than
+	// queueing them, and the world still moves at the same pace.
+	frames := time.NewTicker(time.Second / frameRate)
 	defer frames.Stop()
 	started := time.Now()
 	view := newRenderer(world, title)
