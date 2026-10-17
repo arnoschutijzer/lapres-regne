@@ -40,8 +40,10 @@ type Snapshot struct {
 	// Seed names the world the position and stumps belong to.
 	Seed uint64
 	// Map names the map the position and stumps belong to; empty for the endless forest.
-	Map           string
-	X, Z          float64
+	Map  string
+	X, Z float64
+	// Storey is the floor the hero stood on: 0 for the ground floor.
+	Storey        int
 	WoodcuttingXP float64
 	// Zoom is the camera's zoom, in steps in from the forest view.
 	Zoom int

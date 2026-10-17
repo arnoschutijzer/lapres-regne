@@ -47,6 +47,9 @@ type progressJSON struct {
 type heroJSON struct {
 	X float64 `json:"x"`
 	Z float64 `json:"z"`
+	// Storey is absent while the hero stands on the ground floor, as in saves made before maps had
+	// floors.
+	Storey int `json:"storey,omitempty"`
 }
 
 type cameraJSON struct {
@@ -80,7 +83,7 @@ func (f File) Load() (world.Snapshot, bool, error) {
 		return world.Snapshot{}, false, fmt.Errorf("read %s: unknown version %d", f.Path, saved.Version)
 	}
 	snapshot := world.Snapshot{
-		Seed: saved.Seed, Map: saved.Map, X: saved.Hero.X, Z: saved.Hero.Z,
+		Seed: saved.Seed, Map: saved.Map, X: saved.Hero.X, Z: saved.Hero.Z, Storey: saved.Hero.Storey,
 		WoodcuttingXP: saved.Woodcutting.XP, Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw, SavedAt: saved.SavedAt,
 	}
 	// Version 1 counted logs before they had kinds; they were all normal logs.
@@ -109,7 +112,7 @@ func (f File) Load() (world.Snapshot, bool, error) {
 func (f File) Save(snapshot world.Snapshot) error {
 	saved := progressJSON{
 		Version: version, Seed: snapshot.Seed, Map: snapshot.Map, SavedAt: snapshot.SavedAt,
-		Hero:        heroJSON{X: snapshot.X, Z: snapshot.Z},
+		Hero:        heroJSON{X: snapshot.X, Z: snapshot.Z, Storey: snapshot.Storey},
 		Woodcutting: skillJSON{XP: snapshot.WoodcuttingXP},
 		Camera:      cameraJSON{Zoom: snapshot.Zoom, Yaw: snapshot.Yaw},
 		Inventory:   []string{},

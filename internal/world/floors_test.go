@@ -152,3 +152,41 @@ func TestApproachingAStaircaseLeadingBothWaysOffersTheChoice(t *testing.T) {
 		t.Fatal("the choice must be offered once")
 	}
 }
+
+func TestResumingReturnsTheHeroToTheFloorTheyStoodOn(t *testing.T) {
+	kept := world.NewOnMap(7, tower())
+	kept.Climb(true)
+	progress := &memoryProgress{}
+	kept.Keep(progress, quitAt)
+	w, err := world.ResumeOn(tower(), 7, progress, quitAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Storey() != 1 {
+		t.Fatalf("storey = %d, want the first floor the hero was saved on", w.Storey())
+	}
+	x, z := w.Hero().Position()
+	if keptX, keptZ := kept.Hero().Position(); x != keptX || z != keptZ {
+		t.Fatalf("position = %v, %v; want %v, %v", x, z, keptX, keptZ)
+	}
+}
+
+func TestResumingOnAFloorTheMapNoLongerHasStartsAfresh(t *testing.T) {
+	kept := world.NewOnMap(7, tower())
+	kept.Climb(true)
+	kept.Climb(true)
+	progress := &memoryProgress{}
+	kept.Keep(progress, quitAt)
+	shorter := tower()
+	shorter.Upstairs = shorter.Upstairs[:1]
+	w, err := world.ResumeOn(shorter, 7, progress, quitAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Storey() != 0 {
+		t.Fatalf("storey = %d, want the hero back on the ground floor", w.Storey())
+	}
+	if x, z := w.Hero().Position(); x != 4.5*world.TileSize || z != 2.5*world.TileSize {
+		t.Fatalf("position = %v, %v; want the start tile", x, z)
+	}
+}

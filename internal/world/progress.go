@@ -12,6 +12,7 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 		Map:           w.mapName,
 		X:             w.hero.x,
 		Z:             w.hero.z,
+		Storey:        w.storey,
 		WoodcuttingXP: w.hero.woodcutting.XP(),
 		Zoom:          w.zoom,
 		Yaw:           w.yaw,
@@ -51,11 +52,16 @@ func resume(w *World, progress Progress, now time.Time) (*World, error) {
 	if snapshot.Seed != w.seed || snapshot.Map != w.mapName {
 		return w, nil
 	}
-	// A map changed since the save may have built something where the hero stood; they start
-	// afresh rather than stuck inside it.
-	if w.passable(snapshot.X, snapshot.Z) {
-		w.hero.x, w.hero.z = snapshot.X, snapshot.Z
-		w.cameraX, w.cameraZ = snapshot.X, snapshot.Z
+	// A map changed since the save may have built something where the hero stood, or taken away
+	// the floor they stood on; they start afresh rather than stuck inside it.
+	if snapshot.Storey >= 0 && snapshot.Storey < w.Storeys() {
+		w.storey = snapshot.Storey
+		if w.passable(snapshot.X, snapshot.Z) {
+			w.hero.x, w.hero.z = snapshot.X, snapshot.Z
+			w.cameraX, w.cameraZ = snapshot.X, snapshot.Z
+		} else {
+			w.storey = 0
+		}
 	}
 	// A clock set back before the save counts as no time away.
 	away := max(0, now.Sub(snapshot.SavedAt))
