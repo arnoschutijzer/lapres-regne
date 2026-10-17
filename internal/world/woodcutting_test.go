@@ -363,3 +363,23 @@ func TestApproachingATreeRunsWhileSprinting(t *testing.T) {
 		t.Fatalf("x = %v running, %v walking; want running to cover twice the ground", ranX, walkedX)
 	}
 }
+
+func TestTheChopAtTheEndOfAnApproachStartsOnceTheWalkIsDone(t *testing.T) {
+	w := besideTree()
+	tree, _ := w.TreeInReach()
+	for range 6 {
+		w.Walk(-1, 0, false)
+	}
+	if !w.Approach(tree) {
+		t.Fatal("the hero must approach a standing tree")
+	}
+	for range 10 {
+		if w.Chopping() {
+			break
+		}
+		w.Advance(0, 0, time.Second, false)
+	}
+	if _, since, ok := w.LastStrike(); !ok || since != 0 {
+		t.Fatalf("last strike %v ago, chopping = %v; want the chop to start with no time spent on it", since, ok)
+	}
+}

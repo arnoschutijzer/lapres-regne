@@ -15,14 +15,10 @@ type order interface {
 }
 
 // carryOutOrder works on the current order for dt. An order handed over on arrival, such as
-// chopping the tree the hero walked up to, starts work in the same frame.
+// chopping the tree the hero walked up to, starts work in the next frame, since the walk there
+// took this frame's time.
 func (w *World) carryOutOrder(dt time.Duration, speed float64) {
-	if w.order == nil {
-		return
-	}
-	current := w.order
-	w.order = current.carryOut(dt, speed)
-	if w.order != nil && w.order != current {
+	if w.order != nil {
 		w.order = w.order.carryOut(dt, speed)
 	}
 }
