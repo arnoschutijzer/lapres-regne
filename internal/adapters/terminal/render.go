@@ -146,6 +146,8 @@ var forestPalette = [...][3]int{
 	{74, 112, 60},   // bushes
 	{110, 92, 62},   // muddy bank
 	{150, 160, 96},  // reeds
+	{92, 120, 64},   // moss
+	{70, 96, 124},   // window glass
 }
 
 // foremost marks the inks of the hero, their axe, flying chips and fireworks.

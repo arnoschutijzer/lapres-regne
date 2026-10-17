@@ -320,3 +320,42 @@ func TestWaterIsEdgedWithMuddyBanksAndReeds(t *testing.T) {
 		t.Fatal("reeds must grow along the pond")
 	}
 }
+
+// cottage is meadow's open grass with a walled room of flagstones north of the hero.
+func cottage() *world.World {
+	ground := make([][]world.Ground, 60)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 80)
+	}
+	for row := 22; row <= 27; row++ {
+		for col := 32; col <= 48; col++ {
+			ground[row][col] = world.Floor
+			if row == 22 || row == 27 || col == 32 || col == 48 {
+				ground[row][col] = world.Wall
+			}
+		}
+	}
+	return world.NewOnMap(7, world.Map{Name: "Cottage", Ground: ground, StartCol: 40, StartRow: 30})
+}
+
+func TestMossCreepsUpTheFootOfWalls(t *testing.T) {
+	r := newRenderer(walledMeadow(), "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	if countInk(r.render(160, 60, 0), mossInk) == 0 {
+		t.Fatal("walls must weather with moss near the ground")
+	}
+}
+
+func TestOnlyTheWallsOfBuildingsHaveWindows(t *testing.T) {
+	render := func(w *world.World) *forestCanvas {
+		r := newRenderer(w, "L’Après-Règne")
+		r.zoom = zoom{current: 6}
+		return r.render(160, 60, 0)
+	}
+	if countInk(render(cottage()), glassInk) == 0 {
+		t.Fatal("the cottage's walls must have windows")
+	}
+	if countInk(render(walledMeadow()), glassInk) != 0 {
+		t.Fatal("walls across open fields must have no windows")
+	}
+}

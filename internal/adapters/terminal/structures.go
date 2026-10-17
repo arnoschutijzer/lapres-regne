@@ -54,10 +54,16 @@ type face struct {
 	origin, u, v, normal vec
 }
 
-// fill draws a face whose surface pattern gives the brightness of each point, from its distances
-// along u and v in world units. Its edges are left dark, so neighbouring faces read apart in
-// braille. Faces turned away from the viewer are skipped.
-func (c *forestCanvas) fill(f face, ink int, pattern func(u, v float64) float64) {
+// surface patterns a face: the brightness of each point and its ink, or keepInk for the face's own,
+// from its distances along the face's u and v in world units and its place in the world.
+type surface func(u, v float64, at vec) (brightness float64, ink int)
+
+// keepInk leaves a point of a face in the face's own ink.
+const keepInk = -1
+
+// fill draws a face patterned by its surface. Its edges are left dark, so neighbouring faces read
+// apart in braille. Faces turned away from the viewer are skipped.
+func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 	if f.normal.dot(c.viewer()) <= 0 {
 		return
 	}
@@ -98,18 +104,23 @@ func (c *forestCanvas) fill(f face, ink int, pattern func(u, v float64) float64)
 				continue
 			}
 			alongU, alongV := s*lengthU, t*lengthV
-			brightness := light * pattern(alongU, alongV)
+			at := vec{f.origin.x + f.u.x*s + f.v.x*t, f.origin.y + f.u.y*s + f.v.y*t, f.origin.z + f.u.z*s + f.v.z*t}
+			brightness, pointInk := pattern(alongU, alongV, at)
+			brightness *= light
+			if pointInk == keepInk {
+				pointInk = ink
+			}
 			if alongU < edgeU || lengthU-alongU < edgeU || alongV < edgeV || lengthV-alongV < edgeV {
 				brightness = 0
 			}
-			c.plot(px, py, od+s*ud+t*vd-0.01, brightness, ink)
+			c.plot(px, py, od+s*ud+t*vd-0.01, brightness, pointInk)
 		}
 	}
 }
 
 // box draws a block standing on the ground from x0, z0 to x1, z1, between heights y0 and y1.
 // Sides listed in hidden, as north, east, south, west, are left out where they meet another block.
-func (c *forestCanvas) box(x0, z0, x1, z1, y0, y1 float64, hidden [4]bool, ink int, pattern func(u, v float64) float64) {
+func (c *forestCanvas) box(x0, z0, x1, z1, y0, y1 float64, hidden [4]bool, ink int, pattern surface) {
 	width, depth, height := vec{x1 - x0, 0, 0}, vec{0, 0, z1 - z0}, vec{0, y1 - y0, 0}
 	c.fill(face{vec{x0, y1, z0}, width, depth, vec{0, 1, 0}}, ink, pattern)
 	sides := [4]face{
@@ -125,20 +136,49 @@ func (c *forestCanvas) box(x0, z0, x1, z1, y0, y1 float64, hidden [4]bool, ink i
 	}
 }
 
-// stonework lays dressed stone in courses, each block a little lighter or darker than the next,
-// with dark mortar between them.
-func stonework(u, v float64) float64 {
+// stonework lays dressed stone in courses, each block lighter or darker than the next, with dark
+// mortar between them and moss creeping up from the ground in damp patches.
+func stonework(u, v float64, at vec) (float64, int) {
+	if at.y < 1 && leafClumps(at.x*1.4, at.y*2.2, at.z*1.4) > 0.55+at.y*0.45 {
+		return 0.6, mossInk
+	}
 	course := math.Floor(v / 0.45)
 	along := u + math.Mod(course, 2)*0.45
 	block := math.Floor(along / 0.9)
 	if math.Mod(v, 0.45) < 0.06 || math.Mod(along, 0.9) < 0.06 {
-		return 0.45
+		return 0.45, keepInk
 	}
-	return 0.85 + 0.15*wave(block*3.1+course*1.7)
+	return 0.72 + 0.28*wave(block*3.1+course*1.7), keepInk
 }
 
+// windowed sets a window in stonework, its middle centre along u: a frame of dressed stone around
+// dark glass, from sill to lintel.
+func windowed(centre float64) surface {
+	const halfWidth, sill, lintel, frame = 0.35, 1.15, 2.05, 0.08
+	return func(u, v float64, at vec) (float64, int) {
+		across := math.Abs(u - centre)
+		if across > halfWidth+frame || v < sill-frame || v > lintel+frame {
+			return stonework(u, v, at)
+		}
+		if across > halfWidth || v < sill || v > lintel {
+			return 1, keepInk
+		}
+		// Glazing bars cross the window.
+		if math.Abs(u-centre) < 0.03 || math.Abs(v-(sill+lintel)/2) < 0.03 {
+			return 0.8, plankInk
+		}
+		return 0.45, glassInk
+	}
+}
+
+// The inks of a wall's weathering and its windows.
+const (
+	mossInk = reedInk + 1 + iota
+	glassInk
+)
+
 // plain gives a structure even brightness.
-func plain(u, v float64) float64 { return 1 }
+func plain(u, v float64, at vec) (float64, int) { return 1, keepInk }
 
 // neighbours are the tile steps north, east, south and west.
 var neighbours = [4][2]int{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
@@ -151,6 +191,22 @@ type builtTile struct {
 	joined [4]bool
 	// walled marks a tile with a wall beside it, so a door there is set in a wall.
 	walled bool
+	// beside is what lies on the tiles to the north, east, south and west.
+	beside [4]world.Ground
+}
+
+// windowed tells whether a wall tile is a straight stretch of a building's wall, with a floor
+// on one side, where a window may be set.
+func (t builtTile) windowed() bool {
+	indoors := func(g world.Ground) bool { return g == world.Floor }
+	north, east, south, west := t.joined[0], t.joined[1], t.joined[2], t.joined[3]
+	if east && west && !north && !south {
+		return indoors(t.beside[0]) || indoors(t.beside[2])
+	}
+	if north && south && !east && !west {
+		return indoors(t.beside[1]) || indoors(t.beside[3])
+	}
+	return false
 }
 
 // builtArea surveys the tiles within the drawn area once a frame, for drawing structures and the
@@ -180,6 +236,7 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 		col, row := a.col+i%a.cols, a.row+i/a.cols
 		for side, step := range neighbours {
 			beside := a.at(col+step[0], row+step[1]).ground
+			tile.beside[side] = beside
 			tile.walled = tile.walled || beside == world.Wall
 			switch tile.ground {
 			case world.Wall:
@@ -334,7 +391,7 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 		x, z := float64(col)*world.TileSize, float64(row)*world.TileSize
 		switch tile.ground {
 		case world.Wall:
-			drawWall(c, x, z, tile.joined)
+			drawWall(c, x, z, tile.joined, tile.windowed() && r.world.Random(col, row, 43) < 0.5)
 		case world.Door:
 			if tile.walled {
 				drawDoor(c, x, z, tile.joined)
@@ -372,13 +429,19 @@ func span(joinedStart, joinedEnd bool) (from, to float64) {
 }
 
 // drawWall raises a stone wall through the middle of a tile toward each joined side, capped with
-// a jutting course of coping stones; a wall joined to nothing stands as a pillar.
-func drawWall(c *forestCanvas, x, z float64, joined [4]bool) {
+// a jutting course of coping stones, with a window through its middle if it has one; a wall joined
+// to nothing stands as a pillar.
+func drawWall(c *forestCanvas, x, z float64, joined [4]bool, window bool) {
 	north, east, south, west := joined[0], joined[1], joined[2], joined[3]
 	half := wallThickness / 2
 	middleX, middleZ := x+world.TileSize/2, z+world.TileSize/2
 	slab := func(x0, z0, x1, z1 float64, hidden [4]bool) {
-		c.box(x0, z0, x1, z1, 0, wallHeight, hidden, stoneInk, stonework)
+		pattern := surface(stonework)
+		if window {
+			// Along the wall the faces start at the slab's west or north end.
+			pattern = windowed(max(middleX-x0, middleZ-z0))
+		}
+		c.box(x0, z0, x1, z1, 0, wallHeight, hidden, stoneInk, pattern)
 		c.box(x0-0.08, z0-0.08, x1+0.08, z1+0.08, wallHeight, wallHeight+copingHeight, hidden, stoneInk, plain)
 	}
 	if east || west || !north && !south {
@@ -433,11 +496,11 @@ func drawOpenGate(c *forestCanvas, x, z float64, joined [4]bool) {
 }
 
 // planks runs dark seams down a door or gate every fifth of a unit, along its width.
-func planks(u, v float64) float64 {
+func planks(u, v float64, at vec) (float64, int) {
 	if math.Mod(u, 0.22) < 0.04 {
-		return 0.55
+		return 0.55, keepInk
 	}
-	return 0.9
+	return 0.9, keepInk
 }
 
 // drawRailing draws a post in the middle of a tile, with rails at the given heights running from it
