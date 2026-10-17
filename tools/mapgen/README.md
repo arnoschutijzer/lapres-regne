@@ -49,3 +49,9 @@ writes somewhere else, and `--cache` keeps the download elsewhere.
   exact. The renderer has inks for a limited number of colours, so the closest
   of the models' colours are merged until 160 remain. `MODELLED` in
   `generate.py` lists the fixtures drawn this way.
+- **Wall decorations.** Banners, tapestries, paintings, torches and the like
+  hang on the walls as the game models them (`hang` lines). The game models
+  each with its back on a tile's west edge and turns it to its wall; one on a
+  diagonal wall turns a further eighth of a turn, its inside face half a turn
+  round from the outside. The map's walls stand thicker than the game's, so
+  every decoration is set 24 of the game's units clear of its wall.

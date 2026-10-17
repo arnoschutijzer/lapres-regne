@@ -320,16 +320,14 @@ def sprite_average(data):
     return tuple(sum(p[i] for p in pixels) // len(pixels) for i in range(3))
 
 
-def placed_mesh(cache, palette, definition, kind, orientation, height_scale):
-    """The triangles an object placed as a type and turned by an orientation draws: points in world
-    units about the middle of its footprint (x east, y up, z south), each triangle's colour as
-    red, green, blue. A tile is 128 of the game's units across and two world units; heights are
-    scaled by height_scale besides, to keep models in proportion with the hero. An object of type
-    11 stands as one of type 10 turned a further eighth of a turn, diagonally."""
-    angle = math.radians(orientation % 4 * 90 + (45 if kind == 11 else 0))
+def placed_mesh(cache, palette, definition, kind, degrees, height_scale, push=0):
+    """The triangles an object draws with its models of a type, turned by degrees and first pushed
+    push of the game's units east: points in world units about the middle of its footprint (x east,
+    y up, z south), each triangle's colour as red, green, blue. A tile is 128 of the game's units
+    across and two world units; heights are scaled by height_scale besides, to keep models in
+    proportion with the hero."""
+    angle = math.radians(degrees)
     cos, sin = math.cos(angle), math.sin(angle)
-    if kind == 11:
-        kind = 10
     recolor = dict(definition.recolor)
     retexture = dict(definition.retexture)
     points, faces = [], []
@@ -339,6 +337,7 @@ def placed_mesh(cache, palette, definition, kind, orientation, height_scale):
         for x, y, z in zip(model.x, model.y, model.z):
             if definition.mirrored:
                 z = -z
+            x += push
             # Each quarter turn takes x, z to z, -x.
             x, z = x * cos + z * sin, -x * sin + z * cos
             x = x * definition.scale[0] / 128 + definition.offset[0]
