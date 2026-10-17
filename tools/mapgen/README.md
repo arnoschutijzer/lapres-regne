@@ -1,0 +1,41 @@
+# mapgen
+
+Generates `maps/lumbridge.map` one to one from Old School RuneScape's own map
+data, read from the game cache in the [OpenRS2 archive](https://archive.openrs2.org).
+
+```sh
+python3 tools/mapgen/generate.py
+```
+
+The first run downloads the parts of the cache it needs into
+`tools/mapgen/.cache`; later runs work offline. It needs Python 3.10 or newer and
+nothing beyond the standard library.
+
+The map's ground, water, bridges, trees, graves, walls, fences, doorways,
+heights, roofs and furniture all come from the game. Only the names of the
+map's areas are kept by hand: the tool reads the `area` settings and the
+`areas` grid from the map it replaces (`--areas` picks another file). `--out`
+writes somewhere else, and `--cache` keeps the download elsewhere.
+
+## How the game's data becomes the map
+
+- **Cache.** Cache 2499 (March 2026, build 236), the newest that still names its
+  map groups. Map squares 49 to 51 east and north cover Lumbridge, x 3150 to
+  3283 and y 3184 to 3291. `cache.py` downloads, decrypts and unpacks groups;
+  `decode.py` reads terrain, placed objects and object definitions.
+- **Ground.** Floor overlays give water (the river and the swamp's pools),
+  stone, boards and earth; the sand and bare-earth underlays give earth. Tiles
+  the game raises a bridge's deck over become bridge.
+- **Walls.** Wall objects stand along tile edges (rotation 0 to 3: west, north,
+  east, south), corners along two, and diagonal walls across a tile (even
+  rotations rising, odd falling). Most are unnamed, so `generate.py` lists the
+  castle's stone walls, the wooden fences and the invisible riverbank barriers
+  it leaves out by id. A door that stands open in the game hangs on the edge
+  square to its doorway; it moves into the gap in the wall at its hinge.
+- **Roofs.** Roof pieces share their models and differ in texture: red clay
+  tiles, thatch or slate. A room under none stays open to the sky; a roofed room
+  open on a few sides gets doorways in its archways.
+- **Heights.** The game's level-0 heights scaled into levels 0 to 9, with each
+  body of water, room and bridge deck lying level.
+- **Objects.** Furniture and landmarks fill their footprints, turned with their
+  rotation.

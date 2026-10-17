@@ -64,7 +64,7 @@ go run . --map maps/lumbridge.map
 `maps/lumbridge.map` holds Old School RuneScape's Lumbridge one to one, made
 from the game's own map data (x 3150 to 3283, y 3184 to 3291): its paths,
 floors, water, trees, walls, fences, doorways, heights, roofs and furniture all
-stand where the game has them. It covers the forest
+stand where the game has them. `tools/mapgen` regenerates it. It covers the forest
 west of the castle, the castle and its courtyard, the village, Bob's axes, the
 church and graveyard, the River Lum and its bridges, Groats' farm, the goblins'
 yard round Lozar's house, the swamp's northern edge, and the Al Kharid toll
