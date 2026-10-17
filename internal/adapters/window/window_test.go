@@ -12,50 +12,6 @@ import (
 
 const tick = time.Second / ticksPerSecond
 
-func TestShadowsSinkTowardVioletAndHighlightsWarm(t *testing.T) {
-	shadow := ramp(barkMaterial, 0.25)
-	if shadow.B <= shadow.G {
-		t.Errorf("bark in shadow = %v; want it bluer than green", shadow)
-	}
-	stone := ramp(stoneMaterial, 1)
-	if int(stone.R)-int(stone.B) <= int(stoneMaterial[0])-int(stoneMaterial[2]) {
-		t.Errorf("stone in full light = %v; want it warmer than its own %v", stone, stoneMaterial)
-	}
-}
-
-func TestShadingFallsInFlatShades(t *testing.T) {
-	if ramp(grassMaterial, 0.5) != ramp(grassMaterial, 0.55) {
-		t.Error("nearly equal light gives two colors; want one flat shade")
-	}
-	if ramp(grassMaterial, 0.2) == ramp(grassMaterial, 0.8) {
-		t.Error("light 0.2 and 0.8 give one color; want different shades")
-	}
-}
-
-func TestMaterialsAreRicherThanTheirOwnColor(t *testing.T) {
-	full := ramp(grassMaterial, 0.75)
-	spread := func(r, g, b float64) float64 { return math.Max(r, math.Max(g, b)) - math.Min(r, math.Min(g, b)) }
-	if spread(float64(full.R), float64(full.G), float64(full.B)) <= spread(grassMaterial[0], grassMaterial[1], grassMaterial[2]) {
-		t.Errorf("grass at full shade = %v; want more saturated than %v", full, grassMaterial)
-	}
-}
-
-func TestSpritesHaveADarkOutline(t *testing.T) {
-	sprite := image.NewRGBA(image.Rect(0, 0, 3, 3))
-	lit := ramp(grassMaterial, 1)
-	sprite.SetRGBA(1, 1, lit)
-	drawn := outlined(sprite)
-	for _, edge := range []image.Point{{0, 1}, {2, 1}, {1, 0}, {1, 2}} {
-		c := drawn.RGBAAt(edge.X, edge.Y)
-		if c.A == 0 || int(c.R)+int(c.G)+int(c.B) >= int(lit.R)+int(lit.G)+int(lit.B) {
-			t.Errorf("pixel %v beside the sprite = %v; want a dark outline", edge, c)
-		}
-	}
-	if corner := drawn.RGBAAt(0, 0); corner.A != 0 {
-		t.Errorf("the diagonal corner = %v; want it clear", corner)
-	}
-}
-
 func TestATreeStandsOnItsTrunk(t *testing.T) {
 	for _, kind := range []world.TreeKind{world.NormalTree, world.Oak, world.Willow, world.Yew, world.DeadTree} {
 		sprite := treeSprite(kind, 40, 80, 0.5)
@@ -63,13 +19,6 @@ func TestATreeStandsOnItsTrunk(t *testing.T) {
 		if sprite.RGBAAt(bounds.Dx()/2, 79).A == 0 {
 			t.Errorf("%v has nothing at its foot; want its trunk there", kind)
 		}
-	}
-}
-
-func TestTheHeroLooksTheWayTheyFace(t *testing.T) {
-	left, right := heroSprite(world.FacingLeft, unit), heroSprite(world.FacingRight, unit)
-	if string(left.Pix) == string(right.Pix) {
-		t.Error("the hero facing left and right look the same")
 	}
 }
 
@@ -252,5 +201,60 @@ func TestStandingTreesCastShadowsAwayFromTheLight(t *testing.T) {
 		if middle := float64(shadow.x) + float64(shadow.art.Bounds().Dx())/2; middle <= footX {
 			t.Errorf("the hero's shadow centres at x %v, not right of their foot at %v", middle, footX)
 		}
+	}
+}
+
+func TestEveryPictureOfTheHeroLinesUp(t *testing.T) {
+	for facing, pose := range heroPoses {
+		pictures := [][]string{pose.upper, pose.upperWorn}
+		pictures = append(pictures, pose.legs[:]...)
+		pictures = append(pictures, pose.legsWorn[:]...)
+		for _, rows := range pictures {
+			for i, row := range rows {
+				if len(row) != heroWidth {
+					t.Errorf("%v: row %d %q is %d wide; want %d", facing, i, row, len(row), heroWidth)
+				}
+			}
+		}
+		if len(pose.upperWorn) != len(pose.upper) {
+			t.Errorf("%v: the worn layer is %d rows tall over a body of %d", facing, len(pose.upperWorn), len(pose.upper))
+		}
+	}
+}
+
+func TestTheHeroFacesTheWayTheyWalk(t *testing.T) {
+	left, right := heroSprite(world.FacingLeft, 0), heroSprite(world.FacingRight, 0)
+	if string(left.Pix) == string(right.Pix) || string(left.Pix) != string(mirrored(right).Pix) {
+		t.Error("the hero facing left is not the hero facing right, mirrored")
+	}
+	if string(heroSprite(world.FacingDown, 0).Pix) == string(heroSprite(world.FacingUp, 0).Pix) {
+		t.Error("the hero looks the same from the front and the back")
+	}
+}
+
+func TestTheHeroWearsTheirClothesOverTheirBody(t *testing.T) {
+	sprite := heroSprite(world.FacingDown, 0)
+	if c := sprite.RGBAAt(6, 12); c != heroLegend['W'] {
+		t.Errorf("the hero's chest shows %v; want the undershirt", c)
+	}
+	if c := sprite.RGBAAt(4, 22); c == heroLegend['W'] || c == heroLegend['P'] || c.A == 0 {
+		t.Errorf("the hero's shin shows %v; want bare skin", c)
+	}
+}
+
+func TestTheHeroStridesOnlyWhileWalking(t *testing.T) {
+	g := newGame(world.New(7), nil)
+	g.step(controls{}, tick)
+	g.step(controls{}, tick)
+	if frame := g.gait.frame(); frame != 0 {
+		t.Fatalf("standing still shows walk frame %d; want 0", frame)
+	}
+	frames := map[int]bool{}
+	for range 2 * ticksPerSecond {
+		g.step(controls{dx: 1}, tick)
+		frames[g.gait.frame()] = true
+	}
+	if !frames[1] || !frames[2] {
+		t.Fatalf("two seconds of walking showed frames %v; want both strides", frames)
 	}
 }

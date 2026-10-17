@@ -74,6 +74,7 @@ type game struct {
 	world *world.World
 	music soundtrack.Player
 	view  camera
+	gait  gait
 	art   *sprites
 	scene []placed
 	// shadows are laid on the ground through shade, an image of the screen, so that where they
@@ -122,7 +123,8 @@ func (g *game) step(c controls, dt time.Duration) error {
 	}
 	x, z := g.world.Hero().Position()
 	g.view.follow(x, z, dt.Seconds())
-	g.scene, g.shadows = arrange(g.world, g.view.snapped(), g.art)
+	g.gait.follow(x, z)
+	g.scene, g.shadows = arrange(g.world, g.view.snapped(), g.art, g.gait.frame())
 	return nil
 }
 

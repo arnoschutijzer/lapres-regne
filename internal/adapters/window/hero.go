@@ -1,0 +1,297 @@
+package window
+
+import (
+	"image"
+	"image/color"
+	"math"
+
+	"lapresregne/internal/world"
+)
+
+// The hero is drawn by hand as a slender base body, with what they wear laid over it as separate
+// layers, so gear can later cover or replace parts without restyling the body. Each picture is
+// heroWidth pixels wide; the body's rows run from the top of the head to the soles of the feet.
+// Letters are colors from heroLegend; dots are clear.
+const heroWidth = 13
+
+var heroLegend = map[byte]color.RGBA{
+	'o': rgb(0x0a0710), // outline
+	'e': rgb(0x0a0710), // eyes
+	'H': rgb(0x4a3026), // hair in the light
+	'h': rgb(0x2a1b18), // hair in shade
+	'a': rgb(0xc89070), // skin in the light
+	'b': rgb(0x9a6248), // skin
+	'c': rgb(0x643c2e), // skin in shade
+	'w': rgb(0x9a94a2), // undershirt in the light
+	'W': rgb(0x6c6878), // undershirt
+	'v': rgb(0x3e3a4a), // undershirt in shade
+	'p': rgb(0x3a4060), // shorts in the light
+	'P': rgb(0x262a40), // shorts
+	'q': rgb(0x141626), // shorts in shade
+}
+
+// Each facing has an upper body, from the head to the hands, and legs standing and in two strides.
+type heroPose struct {
+	upper, upperWorn []string
+	legs, legsWorn   [3][]string
+}
+
+var (
+	frontUpper = []string{
+		".....ooo.....",
+		"....oHHHo....",
+		"...oHHHhho...",
+		"...oHHhhho...",
+		"...oHaabho...",
+		"...oaebeco...",
+		"...oabbbco...",
+		"....obbco....",
+		"....oabo.....",
+		"..oabbbbbco..",
+		".oabbbbbbbco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".obobbbbboco.",
+		"..oobbbbboo..",
+	}
+	backUpper = []string{
+		".....ooo.....",
+		"....oHHHo....",
+		"...oHHHhho...",
+		"...oHHhhho...",
+		"...oHHhhho...",
+		"...oHhhhho...",
+		"...obhhhco...",
+		"....obbco....",
+		"....oabo.....",
+		"..oabbbbbco..",
+		".oabbbbbbbco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".oaobbbbboco.",
+		".obobbbbboco.",
+		"..oobbbbboo..",
+	}
+	// The undershirt has short sleeves over the shoulders; the shorts reach the top of the legs.
+	frontUpperWorn = []string{
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		"...wWWWWWv...",
+		"..wwWWWWWvv..",
+		"..w.WWWWW.v..",
+		"....wWWWv....",
+		"....wWWWv....",
+		"....wWWWv....",
+		"....vvvvv....",
+		"....pPPPq....",
+		"....pPPPq....",
+		"....pPPPq....",
+	}
+	frontLegs = [3][]string{{
+		"...obbobbo...",
+		"...obbobco...",
+		"...obbobco...",
+		"...oabobco...",
+		"...obbobco...",
+		"...obbobco...",
+		"...obbobco...",
+		"...obbobco...",
+		"..oaabobcco..",
+		"..ooooooooo..",
+	}, {
+		"...obbobbo...",
+		"...obbobco...",
+		"...obbobco...",
+		"...oabobco...",
+		"...obbobco...",
+		"...obbobco...",
+		"...obbobco...",
+		"..oaabobco...",
+		"..oooo.bcco..",
+		".......oooo..",
+	}, {
+		"...obbobbo...",
+		"...obbobco...",
+		"...obbobco...",
+		"...oabobco...",
+		"...obbobco...",
+		"...obbobco...",
+		"...obbobco...",
+		"...obbobcco..",
+		"..oaabooooo..",
+		"..oooo.......",
+	}}
+	frontLegsWorn = [3][]string{
+		{"....pP.Pq....", "....pq.Pq...."},
+		{"....pP.Pq....", "....pq.Pq...."},
+		{"....pP.Pq....", "....pq.Pq...."},
+	}
+	sideUpper = []string{
+		".....ooo.....",
+		"....oHHHo....",
+		"...oHHHHho...",
+		"...oHHhhbao..",
+		"...oHhbbebo..",
+		"...ohbbbbo...",
+		"....obbbco...",
+		".....obco....",
+		".....obbo....",
+		"....oabbco...",
+		"....oabbco...",
+		"....oabbco...",
+		"....oabbco...",
+		"....oabbco...",
+		"....oabbco...",
+		"....oabbco...",
+		"....obabco...",
+		"....obbbco...",
+		"....obbbco...",
+	}
+	sideUpperWorn = []string{
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".............",
+		".....wWWv....",
+		".....wWWv....",
+		".....wWWv....",
+		".....wWWv....",
+		".....wWWv....",
+		".....wWWv....",
+		".....vvvv....",
+		".....pPPq....",
+		".....pPPq....",
+		".....pPPq....",
+	}
+	sideLegs = [3][]string{{
+		"....obbbo....",
+		"....obbco....",
+		"....obbco....",
+		"....oabco....",
+		"....obbco....",
+		"....obbco....",
+		"....obbco....",
+		"....obbco....",
+		"....obbbbo...",
+		"....oooooo...",
+	}, {
+		"....obbbo....",
+		"...ocbobbo...",
+		"...ocbobbo...",
+		"...ocb.obbo..",
+		"..ocbo..obo..",
+		"..ocbo..obo..",
+		"..ocbo..obo..",
+		"..ocbo..obo..",
+		".occbo..obbo.",
+		".ooooo..oooo.",
+	}, {
+		"....obbbo....",
+		"...obbocbo...",
+		"...obbocbo...",
+		"...obb.ocbo..",
+		"..obbo..oco..",
+		"..obbo..oco..",
+		"..obbo..oco..",
+		"..obbo..oco..",
+		".obbbo..occo.",
+		".ooooo..oooo.",
+	}}
+	sideLegsWorn = [3][]string{
+		{".....pPq....."},
+		{".....pPq....."},
+		{".....pPq....."},
+	}
+)
+
+var heroPoses = map[world.Facing]heroPose{
+	world.FacingDown:  {frontUpper, frontUpperWorn, frontLegs, frontLegsWorn},
+	world.FacingUp:    {backUpper, frontUpperWorn, frontLegs, frontLegsWorn},
+	world.FacingRight: {sideUpper, sideUpperWorn, sideLegs, sideLegsWorn},
+}
+
+// heroStride is how far the hero walks for each stride of their walk, in world units: one step of
+// each foot.
+const heroStride = 1.1
+
+// heroSprite draws the hero facing one way in one frame of their walk: 0 standing, then 1 and 2
+// for each foot forward. Their feet are at the bottom centre. Facing left mirrors facing right.
+func heroSprite(facing world.Facing, frame int) *image.RGBA {
+	pose := heroPoses[facing]
+	if facing == world.FacingLeft {
+		pose = heroPoses[world.FacingRight]
+	}
+	legs := pose.legs[frame]
+	sprite := image.NewRGBA(image.Rect(0, 0, heroWidth, len(pose.upper)+len(legs)))
+	none := func(int) color.RGBA { return color.RGBA{} }
+	lay(sprite, pose.upper, 0, 0, none, heroLegend)
+	lay(sprite, legs, 0, len(pose.upper), none, heroLegend)
+	lay(sprite, pose.upperWorn, 0, 0, none, heroLegend)
+	lay(sprite, pose.legsWorn[frame], 0, len(pose.upper), none, heroLegend)
+	if facing == world.FacingLeft {
+		return mirrored(sprite)
+	}
+	return sprite
+}
+
+// mirrored flips a sprite left to right.
+func mirrored(sprite *image.RGBA) *image.RGBA {
+	bounds := sprite.Bounds()
+	flipped := image.NewRGBA(bounds)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			flipped.SetRGBA(bounds.Max.X-1-x+bounds.Min.X, y, sprite.RGBAAt(x, y))
+		}
+	}
+	return flipped
+}
+
+// gait follows how far the hero has walked, to pick the frame of their walk.
+type gait struct {
+	lastX, lastZ float64
+	walked       float64
+	moving       bool
+	started      bool
+}
+
+// follow notes where the hero stands now.
+func (g *gait) follow(x, z float64) {
+	if g.started {
+		distance := (x-g.lastX)*(x-g.lastX) + (z-g.lastZ)*(z-g.lastZ)
+		g.moving = distance > 1e-8
+		if g.moving {
+			g.walked += math.Sqrt(distance)
+		}
+	}
+	g.lastX, g.lastZ, g.started = x, z, true
+}
+
+// frame is the frame of the walk to draw: standing while still, else each foot forward in turn.
+func (g *gait) frame() int {
+	if !g.moving {
+		return 0
+	}
+	if int(g.walked/(heroStride/2))%2 == 0 {
+		return 1
+	}
+	return 2
+}

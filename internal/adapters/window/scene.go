@@ -62,7 +62,7 @@ type placed struct {
 type sprites struct {
 	trees   map[treeLook]*image.RGBA
 	stump   *image.RGBA
-	heroes  map[world.Facing]*image.RGBA
+	heroes  map[heroLook]*image.RGBA
 	shadows map[image.Point]*image.RGBA
 }
 
@@ -74,7 +74,7 @@ type treeLook struct {
 }
 
 func newSprites() *sprites {
-	return &sprites{trees: map[treeLook]*image.RGBA{}, stump: stumpSprite(), heroes: map[world.Facing]*image.RGBA{}, shadows: map[image.Point]*image.RGBA{}}
+	return &sprites{trees: map[treeLook]*image.RGBA{}, stump: stumpSprite(), heroes: map[heroLook]*image.RGBA{}, shadows: map[image.Point]*image.RGBA{}}
 }
 
 // heightSquash is how far up the screen a point rises for each unit it stands above the ground,
@@ -104,16 +104,23 @@ func (s *sprites) tree(t world.Tree) *image.RGBA {
 	return s.trees[look]
 }
 
-func (s *sprites) hero(facing world.Facing) *image.RGBA {
-	if _, ok := s.heroes[facing]; !ok {
-		s.heroes[facing] = heroSprite(facing, unit)
+// heroLook is what tells one picture of the hero from another.
+type heroLook struct {
+	facing world.Facing
+	frame  int
+}
+
+func (s *sprites) hero(facing world.Facing, frame int) *image.RGBA {
+	look := heroLook{facing, frame}
+	if _, ok := s.heroes[look]; !ok {
+		s.heroes[look] = heroSprite(facing, frame)
 	}
-	return s.heroes[facing]
+	return s.heroes[look]
 }
 
 // arrange places every sprite the camera shows, the farthest first, so nearer sprites cover them,
-// and the shadows they cast on the ground.
-func arrange(w *world.World, view camera, art *sprites) (scene, shadows []placed) {
+// and the shadows they cast on the ground. heroFrame is the frame of the hero's walk.
+func arrange(w *world.World, view camera, art *sprites, heroFrame int) (scene, shadows []placed) {
 	onScreen := func(left, top int, sprite *image.RGBA) bool {
 		bounds := sprite.Bounds()
 		return left <= screenWidth && top <= screenHeight && left+bounds.Dx() >= 0 && top+bounds.Dy() >= 0
@@ -155,7 +162,7 @@ func arrange(w *world.World, view camera, art *sprites) (scene, shadows []placed
 		}
 	}
 	x, z := w.Hero().Position()
-	put(art.hero(w.Hero().Facing()), x, z, nil)
+	put(art.hero(w.Hero().Facing(), heroFrame), x, z, nil)
 	cast(11, 5, x, z)
 	sort.SliceStable(scene, func(i, j int) bool { return scene[i].depth < scene[j].depth })
 	return scene, shadows
