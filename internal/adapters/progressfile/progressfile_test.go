@@ -74,23 +74,9 @@ func TestAnUnreadableFileIsReportedAndKept(t *testing.T) {
 	}
 }
 
-func TestAVersionOneSaveCarriesItsLogCountAsNormalLogs(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "progress.json")
-	os.WriteFile(path, []byte(`{"version": 1, "seed": 7, "savedAt": "2026-10-16T21:00:00Z", "hero": {"x": 2.75, "z": 0},
-		"woodcutting": {"xp": 50}, "logs": 2, "stumps": [{"gx": 1, "gz": 0, "regrowMillis": 4000}]}`), 0o600)
-	loaded, saved, err := (&File{Path: path}).Load()
-	if err != nil || !saved {
-		t.Fatalf("load = %v, %v; want the old save", saved, err)
-	}
-	want := []world.Slot{{Item: world.Logs, Filled: true}, {Item: world.Logs, Filled: true}}
-	if !reflect.DeepEqual(loaded.Inventory, want) || loaded.Skills[world.Woodcutting] != 50 || loaded.X != 2.75 || len(loaded.Stumps) != 1 {
-		t.Fatalf("loaded = %+v, want two normal logs and the rest of the old save", loaded)
-	}
-}
-
 func TestAnUnknownItemIsReported(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "progress.json")
-	os.WriteFile(path, []byte(`{"version": 2, "seed": 7, "inventory": ["oak", "magic"]}`), 0o600)
+	os.WriteFile(path, []byte(`{"version": 1, "seed": 7, "inventory": ["oak logs", "magic logs"]}`), 0o600)
 	if _, _, err := (&File{Path: path}).Load(); err == nil {
 		t.Fatal("an unknown item must be reported")
 	}
@@ -98,21 +84,9 @@ func TestAnUnknownItemIsReported(t *testing.T) {
 
 func TestAnUnknownSkillIsReported(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "progress.json")
-	os.WriteFile(path, []byte(`{"version": 3, "seed": 7, "skills": {"woodcutting": {"xp": 50}, "juggling": {"xp": 10}}}`), 0o600)
+	os.WriteFile(path, []byte(`{"version": 1, "seed": 7, "skills": {"woodcutting": {"xp": 50}, "juggling": {"xp": 10}}}`), 0o600)
 	if _, _, err := (&File{Path: path}).Load(); err == nil {
 		t.Fatal("an unknown skill must be reported")
-	}
-}
-
-func TestASaveFromBeforeZoomingOpensOnTheForestView(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "progress.json")
-	os.WriteFile(path, []byte(`{"version": 2, "seed": 7, "hero": {"x": 1, "z": 2}, "inventory": []}`), 0o600)
-	file := &File{Path: path}
-	if _, saved, err := file.Load(); err != nil || !saved {
-		t.Fatalf("load = %v, %v; want the old save", saved, err)
-	}
-	if file.View != (View{}) {
-		t.Fatalf("view = %+v; want the forest view facing north", file.View)
 	}
 }
 
@@ -124,5 +98,13 @@ func TestASkillWithoutASpellingIsRefusedRatherThanSaved(t *testing.T) {
 	}
 	if _, err := os.Stat(path); err == nil {
 		t.Fatal("a refused save must leave no file behind")
+	}
+}
+
+func TestASaveOfAnotherLayoutIsReported(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "progress.json")
+	os.WriteFile(path, []byte(`{"version": 2, "seed": 7}`), 0o600)
+	if _, _, err := (&File{Path: path}).Load(); err == nil {
+		t.Fatal("a save of another layout must be reported")
 	}
 }

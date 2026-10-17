@@ -26,15 +26,12 @@ type View struct {
 	Yaw  float64
 }
 
-// version marks the file layout so later layouts can still read older saves. Version 1
-// counted logs; version 2 lists the inventory slot by slot, naming each item and leaving ""
-// for an empty slot; version 3 keeps the experience of every skill by name.
-const version = 3
+// version marks the file layout; a file of any other layout is refused.
+const version = 1
 
-// itemNames spell each item in the file, independent of how the domain names them. Logs keep
-// the names of their trees from before items were generic.
+// itemNames spell each item in the file, independent of how the domain names them.
 var itemNames = map[world.Item]string{
-	world.Logs: "normal", world.OakLogs: "oak", world.WillowLogs: "willow", world.YewLogs: "yew",
+	world.Logs: "logs", world.OakLogs: "oak logs", world.WillowLogs: "willow logs", world.YewLogs: "yew logs",
 }
 
 // skillNames spell each skill in the file, independent of how the domain names them.
@@ -48,12 +45,8 @@ type progressJSON struct {
 	SavedAt time.Time            `json:"savedAt"`
 	Hero    heroJSON             `json:"hero"`
 	Skills  map[string]skillJSON `json:"skills"`
-	// Woodcutting is the woodcutting experience of version 1 and 2 saves.
-	Woodcutting *skillJSON `json:"woodcutting,omitempty"`
-	// Camera is absent from saves made before the view could zoom, which open on the forest view.
-	Camera cameraJSON `json:"camera"`
-	// Logs is the log count of version 1 saves.
-	Logs      int         `json:"logs,omitempty"`
+	Camera  cameraJSON           `json:"camera"`
+	// Inventory lists the inventory slot by slot, naming each item and leaving "" for an empty slot.
 	Inventory []string    `json:"inventory"`
 	Stumps    []stumpJSON `json:"stumps"`
 }
@@ -61,8 +54,7 @@ type progressJSON struct {
 type heroJSON struct {
 	X float64 `json:"x"`
 	Z float64 `json:"z"`
-	// Storey is absent while the hero stands on the ground floor, as in saves made before maps had
-	// floors.
+	// Storey is absent while the hero stands on the ground floor.
 	Storey int `json:"storey,omitempty"`
 }
 
@@ -93,7 +85,7 @@ func (f *File) Load() (world.Snapshot, bool, error) {
 	if err := json.Unmarshal(data, &saved); err != nil {
 		return world.Snapshot{}, false, fmt.Errorf("read %s: %w", f.Path, err)
 	}
-	if saved.Version < 1 || saved.Version > version {
+	if saved.Version != version {
 		return world.Snapshot{}, false, fmt.Errorf("read %s: unknown version %d", f.Path, saved.Version)
 	}
 	snapshot := world.Snapshot{
@@ -101,10 +93,6 @@ func (f *File) Load() (world.Snapshot, bool, error) {
 		SavedAt: saved.SavedAt,
 	}
 	f.View = View{Zoom: saved.Camera.Zoom, Yaw: saved.Camera.Yaw}
-	// Versions 1 and 2 kept woodcutting, the only skill then, on its own.
-	if saved.Woodcutting != nil {
-		snapshot.Skills = map[string]float64{world.Woodcutting: saved.Woodcutting.XP}
-	}
 	for name, skill := range saved.Skills {
 		known, ok := skillNamed(name)
 		if !ok {
@@ -114,10 +102,6 @@ func (f *File) Load() (world.Snapshot, bool, error) {
 			snapshot.Skills = make(map[string]float64)
 		}
 		snapshot.Skills[known] = skill.XP
-	}
-	// Version 1 counted logs before they had kinds; they were all normal logs.
-	for range saved.Logs {
-		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Item: world.Logs, Filled: true})
 	}
 	for _, name := range saved.Inventory {
 		if name == "" {
