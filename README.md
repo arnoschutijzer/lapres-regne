@@ -117,7 +117,21 @@ heights
 00122
 ```
 
-Walls, fences, gates and graves block the way, a bridge's rails keep the hero
+Stand furniture and landmarks on the map with an `objects` grid laid over the
+terrain, using `.` for none. A fixture covering several tiles repeats its
+letter on each, and tiles of the same kind side by side join into one, such as
+a long table.
+
+```text
+objects
+..tt.
+```
+
+| Object | Meaning |
+| ------ | ------- |
+| `t`    | table   |
+
+Walls, fences, gates, graves and fixtures block the way, a bridge's rails keep the hero
 out of the water beside it, and nothing beyond the map's edges can be walked on. Clicking the ground or a tree walks round whatever
 blocks the way, or as close as the hero can get. Progress keeps the map's name,
 so your position and stumps return only to the map they were saved on.

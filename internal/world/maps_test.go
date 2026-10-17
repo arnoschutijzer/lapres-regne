@@ -428,3 +428,37 @@ func TestWalkingFromABridgeIntoTheRiverGoesOffItsEnd(t *testing.T) {
 		t.Fatalf("position = %v, %v; want the hero round the bridge's end at 11, 3", x, z)
 	}
 }
+
+func TestAFixtureStandsOnItsTile(t *testing.T) {
+	m := courtyard()
+	m.Fixtures = []world.PlacedFixture{{Col: 3, Row: 1, Kind: world.Table}}
+	w := world.NewOnMap(7, m)
+	if fixture, ok := w.FixtureAt(3.5*world.TileSize, 1.5*world.TileSize); !ok || fixture != world.Table {
+		t.Fatalf("fixture at tile 3, 1 = %v, %v; want the table", fixture, ok)
+	}
+	if _, ok := w.FixtureAt(1.5*world.TileSize, 1.5*world.TileSize); ok {
+		t.Fatal("no fixture must stand on an empty tile")
+	}
+}
+
+func TestFixturesStopTheHero(t *testing.T) {
+	m := courtyard()
+	m.Fixtures = []world.PlacedFixture{{Col: 3, Row: 1, Kind: world.Table}}
+	w := world.NewOnMap(7, m)
+	w.Advance(1, 0, 2*time.Second, false)
+	if x, _ := w.Hero().Position(); x > 3*world.TileSize {
+		t.Fatalf("x = %v; want the hero stopped by the table to the east", x)
+	}
+}
+
+func TestWalkingToAPointBeyondAFixtureGoesAroundIt(t *testing.T) {
+	m := courtyard()
+	m.StartCol = 1
+	m.Fixtures = []world.PlacedFixture{{Col: 2, Row: 1, Kind: world.Table}}
+	w := world.NewOnMap(7, m)
+	w.WalkTo(7, 3)
+	walkFor(w, 10*time.Second)
+	if x, z := w.Hero().Position(); x != 7 || z != 3 {
+		t.Fatalf("position = %v, %v; want the hero round the table at 7, 3", x, z)
+	}
+}

@@ -43,6 +43,8 @@ type Map struct {
 	Name   string
 	Ground [][]Ground
 	Trees  []PlantedTree
+	// Fixtures lists the furniture and landmarks standing on the map's tiles.
+	Fixtures []PlacedFixture
 	// StartCol and StartRow are the tile the hero starts on.
 	StartCol, StartRow int
 	// Areas names the part of the map each tile belongs to, row by row as Ground, such as a castle
@@ -85,6 +87,7 @@ type terrain struct {
 	buildings []Building
 	rooms     map[cell]int
 	trees     map[cell]TreeKind
+	fixtures  map[cell]Fixture
 	// cover is the canopy over each tile, row by row.
 	cover [][]float64
 	// heights is the level of each tile, row by row, and highest the highest level.
@@ -93,7 +96,7 @@ type terrain struct {
 }
 
 func newTerrain(m Map) *terrain {
-	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, trees: make(map[cell]TreeKind), cover: make([][]float64, len(m.Ground))}
+	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
 	for _, levels := range m.Heights {
 		for _, level := range levels {
 			t.highest = max(t.highest, level)
@@ -119,6 +122,9 @@ func newTerrain(m Map) *terrain {
 		if _, ok := t.tile(tree.Col, tree.Row); ok {
 			t.cover[tree.Row][tree.Col] = treeTopCover
 		}
+	}
+	for _, fixture := range m.Fixtures {
+		t.fixtures[cell{fixture.Col, fixture.Row}] = fixture.Kind
 	}
 	t.findBuildings()
 	return t

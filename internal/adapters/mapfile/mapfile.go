@@ -36,6 +36,14 @@
 //
 //	heights
 //	00122
+//
+// An objects grid, laid over the terrain, stands furniture and landmarks on its tiles, each blocking
+// the way, with . for none:
+//
+//	t  table
+//
+//	objects
+//	..t..
 package mapfile
 
 import (
@@ -75,6 +83,11 @@ var tiles = map[rune]tile{
 	'H': {ground: world.Bridge},
 }
 
+// fixtures are what the characters of the objects grid stand for.
+var fixtures = map[rune]world.Fixture{
+	't': world.Table,
+}
+
 // Load reads the map in the file at path. A map without a name is named after its file.
 func Load(path string) (world.Map, error) {
 	file, err := os.Open(path)
@@ -95,6 +108,8 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 	grid, hasTerrain, hasStart := "", false, false
 	// areas names each letter of the areas grid.
 	areas := map[rune]string{}
+	// objectRows counts the rows of the objects grid read so far.
+	objectRows := 0
 	for number := 1; lines.Scan(); number++ {
 		line := strings.TrimRight(lines.Text(), " \t\r")
 		switch {
@@ -130,6 +145,18 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 				row = append(row, int(char-'0'))
 			}
 			m.Heights = append(m.Heights, row)
+		case grid == "objects":
+			for col, char := range []rune(line) {
+				if char == '.' {
+					continue
+				}
+				fixture, known := fixtures[char]
+				if !known {
+					return world.Map{}, fmt.Errorf("line %d: unknown object %q", number, char)
+				}
+				m.Fixtures = append(m.Fixtures, world.PlacedFixture{Col: col, Row: objectRows, Kind: fixture})
+			}
+			objectRows++
 		case grid == "areas":
 			row := make([]string, 0, len(line))
 			for _, char := range []rune(line) {
@@ -142,7 +169,7 @@ func read(lines *bufio.Scanner, name string) (world.Map, error) {
 			m.Areas = append(m.Areas, row)
 		case line == "terrain":
 			grid, hasTerrain = line, true
-		case line == "areas" || line == "heights":
+		case line == "areas" || line == "heights" || line == "objects":
 			grid = line
 		default:
 			setting, value, _ := strings.Cut(line, " ")

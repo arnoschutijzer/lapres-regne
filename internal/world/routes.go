@@ -44,9 +44,12 @@ func (c cell) middle() point {
 	return point{(float64(c.gx) + 0.5) * TileSize, (float64(c.gz) + 0.5) * TileSize}
 }
 
-// open tells whether the hero may stand on a tile.
+// open tells whether the hero may stand on a tile: nothing blocking is built or stands on it.
 func (t *terrain) open(c cell) bool {
 	ground, ok := t.tile(c.gx, c.gz)
+	if fixture, stands := t.fixtures[c]; stands && fixture.Blocks() {
+		return false
+	}
 	return ok && !ground.Blocks()
 }
 

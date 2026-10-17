@@ -197,6 +197,11 @@ type builtTile struct {
 	walled bool
 	// beside is what lies on the tiles to the north, east, south and west.
 	beside [4]world.Ground
+	// fixture is the furniture or landmark standing on the tile, if furnished, and alike marks
+	// the sides where the same kind stands beside it, so a long table or a pew reads as one.
+	fixture   world.Fixture
+	furnished bool
+	alike     [4]bool
 }
 
 // windowed tells whether a wall tile is a straight stretch of a building's wall, with a floor
@@ -240,8 +245,10 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 	}
 	for i := range a.tiles {
 		col, row := a.col+i%a.cols, a.row+i/a.cols
-		ground, onMap := f.GroundAt((float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize)
-		a.tiles[i] = builtTile{ground: ground, onMap: onMap}
+		middleX, middleZ := (float64(col)+0.5)*world.TileSize, (float64(row)+0.5)*world.TileSize
+		ground, onMap := f.GroundAt(middleX, middleZ)
+		fixture, furnished := f.FixtureAt(middleX, middleZ)
+		a.tiles[i] = builtTile{ground: ground, onMap: onMap, fixture: fixture, furnished: furnished}
 	}
 	for i := range a.tiles {
 		tile := &a.tiles[i]
@@ -250,6 +257,9 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 			beside := a.at(col+step[0], row+step[1]).ground
 			tile.beside[side] = beside
 			tile.walled = tile.walled || isWall(beside)
+			if other := a.at(col+step[0], row+step[1]); tile.furnished && other.furnished && other.fixture == tile.fixture {
+				tile.alike[side] = true
+			}
 			switch tile.ground {
 			case world.Wall, world.Battlement:
 				tile.joined[side] = isWall(beside) || beside == world.Door || beside == world.Gate
@@ -408,7 +418,8 @@ func (a *builtArea) shade(x, z float64) float64 {
 	return shade
 }
 
-// drawStructures draws the walls, doors, fences, gates and graves standing on the surveyed tiles.
+// drawStructures draws the walls, doors, fences, gates, graves and fixtures standing on the
+// surveyed tiles.
 func (r *renderer) drawStructures(c *forestCanvas) {
 	a := &r.built
 	for i, tile := range a.tiles {
@@ -440,6 +451,9 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 			drawGrave(c, x, z, r.world.Random(col, row, 41))
 		case world.Bridge:
 			drawBridgeRails(c, x, z, tile.beside)
+		}
+		if tile.furnished {
+			drawFixture(c, x, z, tile)
 		}
 	}
 }

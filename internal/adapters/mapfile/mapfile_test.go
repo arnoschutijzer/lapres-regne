@@ -166,3 +166,21 @@ func TestTheHeroWalksOverTheLumbridgeBridge(t *testing.T) {
 		t.Fatalf("x = %v; want the hero over the bridge on the east bank", x)
 	}
 }
+
+func TestAMapFilePlacesItsFixtures(t *testing.T) {
+	loaded, err := Load(write(t, "hall.map", "terrain\n.@...\n_____\n\nobjects\n.....\n.t..t\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []world.PlacedFixture{{Col: 1, Row: 1, Kind: world.Table}, {Col: 4, Row: 1, Kind: world.Table}}
+	if !reflect.DeepEqual(loaded.Fixtures, want) {
+		t.Fatalf("fixtures = %+v, want %+v", loaded.Fixtures, want)
+	}
+}
+
+func TestAnUnknownFixtureIsReported(t *testing.T) {
+	_, err := Load(write(t, "hall.map", "terrain\n.@.\n\nobjects\n.?.\n"))
+	if err == nil || !strings.Contains(err.Error(), "line 5") {
+		t.Fatalf("error = %v, want the unknown fixture reported on line 5", err)
+	}
+}

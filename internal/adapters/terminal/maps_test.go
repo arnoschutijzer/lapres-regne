@@ -463,3 +463,35 @@ func TestABridgeIsDeckedInBoardsAndRailedOverTheWater(t *testing.T) {
 		t.Error("the bridge must be railed in planks")
 	}
 }
+
+// hall is a stone-floored hall with the hero in its middle and fixtures of a kind standing on
+// the tile two north of them.
+func hall(kind world.Fixture) *world.World {
+	ground := make([][]world.Ground, 30)
+	for row := range ground {
+		ground[row] = make([]world.Ground, 40)
+		for col := range ground[row] {
+			ground[row][col] = world.Floor
+		}
+	}
+	return world.NewOnMap(7, world.Map{
+		Name: "Hall", Ground: ground, StartCol: 20, StartRow: 15,
+		Fixtures: []world.PlacedFixture{{Col: 20, Row: 13, Kind: kind}},
+	})
+}
+
+// inkAbove is the ink drawn where a point at height y above the middle of the tile two north of
+// the hero shows on the canvas.
+func inkAbove(c *forestCanvas, y float64) int {
+	x, screenY, _ := c.project(20.5*world.TileSize, y, 13.5*world.TileSize)
+	return c.pixels[int(screenY)*c.width+int(x)].ink
+}
+
+func TestATableStandsOnItsTileInWood(t *testing.T) {
+	r := newRenderer(hall(world.Table), "L’Après-Règne")
+	r.zoom = zoom{current: 6}
+	c := r.render(160, 90, 0)
+	if ink := inkAbove(c, tableHeight); ink != plankInk {
+		t.Fatalf("ink on the table's top = %d, want its wooden planks", ink)
+	}
+}
