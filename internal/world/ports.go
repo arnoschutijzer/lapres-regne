@@ -53,6 +53,8 @@ type Snapshot struct {
 	Skills map[string]float64
 	// Inventory lists the inventory slot by slot, gaps included.
 	Inventory []Slot
+	// Bank lists the piles in the bank in order.
+	Bank []Stack
 	// Respawns holds, by skill, the resources the skill used up that are yet to come back.
 	Respawns map[string][]Respawn
 	SavedAt  time.Time

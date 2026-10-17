@@ -15,6 +15,7 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 		Storey:    w.storey,
 		Skills:    w.hero.experience(),
 		Inventory: w.hero.inventory.Slots(),
+		Bank:      w.bank.Stacks(),
 		Respawns:  map[string][]Respawn{},
 		SavedAt:   now,
 	}
@@ -27,9 +28,9 @@ func (w *World) Keep(progress Progress, now time.Time) error {
 	return nil
 }
 
-// Resume builds a world from a seed and the saved progress. The hero's skills and inventory travel
-// to any world; their position and the resources used up return only to the world they were saved
-// in, with the time away since saving counted toward respawning.
+// Resume builds a world from a seed and the saved progress. The hero's skills, inventory and bank
+// travel to any world; their position and the resources used up return only to the world they were
+// saved in, with the time away since saving counted toward respawning.
 func Resume(seed uint64, progress Progress, now time.Time) (*World, error) {
 	return resume(New(seed), progress, now)
 }
@@ -47,6 +48,11 @@ func resume(w *World, progress Progress, now time.Time) (*World, error) {
 	}
 	for index, slot := range snapshot.Inventory[:min(len(snapshot.Inventory), InventorySize)] {
 		w.hero.inventory.slots[index] = slot
+	}
+	for _, stack := range snapshot.Bank {
+		if stack.Count > 0 {
+			w.bank.stacks = append(w.bank.stacks, stack)
+		}
 	}
 	if snapshot.Seed != w.seed || snapshot.Map != w.mapName {
 		return w, nil

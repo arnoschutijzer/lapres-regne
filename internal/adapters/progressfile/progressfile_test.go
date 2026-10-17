@@ -16,6 +16,7 @@ func TestSavedProgressLoadsBackUnchanged(t *testing.T) {
 	snapshot := world.Snapshot{
 		Seed: 7, Map: "Lumbridge", X: 4.95, Z: -1.65, Storey: 2, Skills: map[string]float64{world.Woodcutting: 112.5},
 		Inventory: []world.Slot{{Item: world.OakLogs, Filled: true}, {}, {Item: world.WillowLogs, Filled: true}, {Item: world.YewLogs, Filled: true}},
+		Bank:      []world.Stack{{Item: world.YewLogs, Count: 40}, {Item: world.Logs, Count: 3}},
 		Respawns:  map[string][]world.Respawn{world.Woodcutting: {{GX: 1, GZ: 0, In: 41*time.Second + 250*time.Millisecond}, {GX: -2, GZ: 3, In: 8400 * time.Millisecond}}},
 		SavedAt:   time.Date(2026, 10, 16, 21, 0, 0, 0, time.UTC),
 	}
@@ -103,5 +104,13 @@ func TestASaveOfAnotherLayoutIsReported(t *testing.T) {
 	os.WriteFile(path, []byte(`{"version": 2, "seed": 7}`), 0o600)
 	if _, _, err := (&File{Path: path}).Load(); err == nil {
 		t.Fatal("a save of another layout must be reported")
+	}
+}
+
+func TestAnUnknownBankedItemIsReported(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "progress.json")
+	os.WriteFile(path, []byte(`{"version": 1, "seed": 7, "bank": [{"item": "magic logs", "count": 2}]}`), 0o600)
+	if _, _, err := (&File{Path: path}).Load(); err == nil {
+		t.Fatal("an unknown banked item must be reported")
 	}
 }

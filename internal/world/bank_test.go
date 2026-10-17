@@ -103,3 +103,28 @@ func TestAFullInventoryWithdrawsNothing(t *testing.T) {
 		t.Fatalf("message = %q, want the hero told there is no room", w.Message())
 	}
 }
+
+func TestTheBankIsKeptBetweenSessionsAndTravelsToAnyWorld(t *testing.T) {
+	banked := []world.Stack{{Item: world.YewLogs, Count: 40}, {Item: world.Logs, Count: 3}}
+	// Saved in another world, the bank still comes along.
+	progress := &memoryProgress{snapshot: world.Snapshot{Seed: 1, Bank: banked, SavedAt: quitAt}, saved: true}
+	w, err := world.Resume(7, progress, quitAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stacks := w.Bank().Stacks(); !reflect.DeepEqual(stacks, banked) {
+		t.Fatalf("stacks = %v, want %v", stacks, banked)
+	}
+	w.Keep(progress, quitAt)
+	if !reflect.DeepEqual(progress.snapshot.Bank, banked) {
+		t.Fatalf("kept bank = %v, want %v", progress.snapshot.Bank, banked)
+	}
+}
+
+func TestResumingSkipsEmptyStacks(t *testing.T) {
+	progress := &memoryProgress{snapshot: world.Snapshot{Seed: 7, Bank: []world.Stack{{Item: world.Logs, Count: 0}, {Item: world.OakLogs, Count: 2}}}, saved: true}
+	w, _ := world.Resume(7, progress, quitAt)
+	if stacks := w.Bank().Stacks(); !reflect.DeepEqual(stacks, []world.Stack{{Item: world.OakLogs, Count: 2}}) {
+		t.Fatalf("stacks = %v, want only the oak logs", stacks)
+	}
+}

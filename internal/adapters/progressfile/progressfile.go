@@ -38,6 +38,8 @@ type progressJSON struct {
 	Skills  map[string]skillJSON `json:"skills"`
 	// Inventory lists the inventory slot by slot, naming each item and leaving "" for an empty slot.
 	Inventory []string `json:"inventory"`
+	// Bank lists the piles in the bank in order, naming each item; absent in saves from before the bank.
+	Bank []stackJSON `json:"bank"`
 	// Respawns lists, by skill, the resources the skill used up that are yet to come back.
 	Respawns map[string][]respawnJSON `json:"respawns"`
 }
@@ -47,6 +49,11 @@ type heroJSON struct {
 	Z float64 `json:"z"`
 	// Storey is absent while the hero stands on the ground floor.
 	Storey int `json:"storey,omitempty"`
+}
+
+type stackJSON struct {
+	Item  string `json:"item"`
+	Count int    `json:"count"`
 }
 
 type skillJSON struct {
@@ -99,6 +106,13 @@ func (f File) Load() (world.Snapshot, bool, error) {
 		}
 		snapshot.Inventory = append(snapshot.Inventory, world.Slot{Item: item, Filled: true})
 	}
+	for _, stack := range saved.Bank {
+		item, known := itemNamed(stack.Item)
+		if !known {
+			return world.Snapshot{}, false, fmt.Errorf("read %s: unknown item %q", f.Path, stack.Item)
+		}
+		snapshot.Bank = append(snapshot.Bank, world.Stack{Item: item, Count: stack.Count})
+	}
 	for name, respawns := range saved.Respawns {
 		known, ok := skillNamed(name)
 		if !ok {
@@ -122,6 +136,7 @@ func (f File) Save(snapshot world.Snapshot) error {
 		Hero:      heroJSON{X: snapshot.X, Z: snapshot.Z, Storey: snapshot.Storey},
 		Skills:    map[string]skillJSON{},
 		Inventory: []string{},
+		Bank:      []stackJSON{},
 		Respawns:  map[string][]respawnJSON{},
 	}
 	for skill, xp := range snapshot.Skills {
@@ -144,6 +159,9 @@ func (f File) Save(snapshot world.Snapshot) error {
 			name = itemNames[slot.Item]
 		}
 		saved.Inventory = append(saved.Inventory, name)
+	}
+	for _, stack := range snapshot.Bank {
+		saved.Bank = append(saved.Bank, stackJSON{Item: itemNames[stack.Item], Count: stack.Count})
 	}
 	for skill, respawns := range snapshot.Respawns {
 		name, known := skillNames[skill]
