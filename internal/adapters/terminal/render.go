@@ -718,7 +718,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 	}
 	// The bank covers the top left corner in the same way.
-	bankRight := min(bankWidth, cols)
+	bankRight := min(bankWidth(bankColumns(cols)), cols)
 	if r.bankShown && !r.bankOpen {
 		for row := range min(panelHeight, rows) {
 			for col := range bankRight {
@@ -872,7 +872,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	}
 	r.panelShown = r.inventoryOpen
 	if r.bankOpen {
-		lines := bankPanel(r.world.Bank())
+		lines := bankPanel(r.world.Bank(), bankColumns(cols))
 		panel := strings.Join(lines, "\n")
 		if full || !r.bankShown || panel != r.lastBank {
 			for i, line := range lines[:min(len(lines), rows)] {

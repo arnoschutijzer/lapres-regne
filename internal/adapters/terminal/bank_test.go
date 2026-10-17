@@ -29,19 +29,48 @@ func TestOpeningTheBankShowsTheInventoryToDepositFrom(t *testing.T) {
 }
 
 func TestAnEmptyBankSaysSo(t *testing.T) {
-	if lines := bankPanel(world.Bank{}); !strings.Contains(strings.Join(lines, ""), "empty") || len(lines) != panelHeight {
+	if lines := bankPanel(world.Bank{}, bankMaxColumns); !strings.Contains(strings.Join(lines, ""), "empty") || len(lines) != panelHeight {
 		t.Fatalf("lines = %q, want %d lines saying the bank is empty", lines, panelHeight)
 	}
 }
 
-func TestTheBankPanelListsEachStackWithItsCount(t *testing.T) {
-	w := withLogs(t, 3)
-	for slot := range 3 {
+// banking deposits every log the hero carries.
+func banking(t *testing.T, logs int) *world.World {
+	t.Helper()
+	w := withLogs(t, logs)
+	for slot := range logs {
 		w.Deposit(slot)
 	}
-	lines := bankPanel(w.Bank())
-	if !strings.Contains(lines[slotLine], icon(world.Logs)) || !strings.Contains(lines[slotLine], "logs") || !strings.HasSuffix(lines[slotLine], "   3") {
-		t.Fatalf("first stack line = %q, want the logs icon, name and a count of 3", lines[slotLine])
+	return w
+}
+
+func TestTheBankShowsEachStackAsAnIconUnderItsCount(t *testing.T) {
+	w := banking(t, 3)
+	lines := bankPanel(w.Bank(), bankMaxColumns)
+	// The first slot's count sits above its icon, both a cell into the slot.
+	if want := strings.Repeat(" ", slotIndent+1) + countTint(3) + "3   "; !strings.HasPrefix(lines[slotLine], want) {
+		t.Fatalf("count line = %q, want it to start %q", lines[slotLine], want)
+	}
+	if want := strings.Repeat(" ", slotIndent+1) + icon(world.Logs); !strings.HasPrefix(lines[slotLine+1], want) {
+		t.Fatalf("icon line = %q, want it to start %q", lines[slotLine+1], want)
+	}
+}
+
+func TestTheBankGridIsEightAcrossWhenThereIsRoom(t *testing.T) {
+	cases := map[int]int{100: 8, 62: 8, 61: 7, 40: 3}
+	for cols, want := range cases {
+		if got := bankColumns(cols); got != want {
+			t.Errorf("bankColumns(%d) = %d, want %d", cols, got, want)
+		}
+		if bankWidth(bankColumns(cols))+panelWidth >= cols {
+			t.Errorf("at %d columns the bank must leave a gap before the inventory", cols)
+		}
+	}
+}
+
+func TestCountsAreTintedByTheirSize(t *testing.T) {
+	if countTint(99_999) != countYellow || countTint(100_000) != countWhite || countTint(10_000_000) != countGreen {
+		t.Fatal("counts must be yellow, white from 100K and green from 10M")
 	}
 }
 
@@ -100,26 +129,24 @@ func TestWhileTheBankIsOpenXDepositsInsteadOfDropping(t *testing.T) {
 }
 
 func TestStackAtFindsTheClickedStackInTheOpenBank(t *testing.T) {
-	w := withLogs(t, 1)
-	w.Deposit(0)
+	w := banking(t, 1)
 	r := newRenderer(w, NewCamera(0, 0), "L’Après-Règne")
 	r.toggleBank()
 	r.frame(100, 30, 0)
-	// The first stack sits on the panel's fourth line, the fifth row of the screen.
-	if stack, ok := r.stackAt(1, 5); !ok || stack != 0 {
-		t.Fatalf("stackAt(1, 5) = %d, %v; want the first stack", stack, ok)
+	// The first stack's count sits on the panel's fourth line, the fifth row of the screen, and its
+	// icon below; its slot spans five cells from the panel's indent.
+	for _, cell := range [][2]int{{slotIndent + 1, 5}, {slotIndent + bankPitch, 6}} {
+		if stack, ok := r.stackAt(cell[0], cell[1]); !ok || stack != 0 {
+			t.Errorf("stackAt(%d, %d) = %d, %v; want the first stack", cell[0], cell[1], stack, ok)
+		}
 	}
-	if _, ok := r.stackAt(bankWidth, 5); !ok {
-		t.Error("the stack's line must be clickable to the panel's right edge")
-	}
-	if _, ok := r.stackAt(bankWidth+1, 5); ok {
-		t.Error("a click beside the panel must not pick a stack")
-	}
-	if _, ok := r.stackAt(1, 6); ok {
-		t.Error("a line with no stack must not pick one")
+	for _, cell := range [][2]int{{slotIndent, 5}, {slotIndent + bankPitch + 1, 5}, {slotIndent + 1, 7}, {slotIndent + 1, 4}} {
+		if _, ok := r.stackAt(cell[0], cell[1]); ok {
+			t.Errorf("stackAt(%d, %d) must not pick a stack", cell[0], cell[1])
+		}
 	}
 	r.toggleBank()
-	if _, ok := r.stackAt(1, 5); ok {
+	if _, ok := r.stackAt(slotIndent+1, 5); ok {
 		t.Error("a closed bank has no stacks to click")
 	}
 }
