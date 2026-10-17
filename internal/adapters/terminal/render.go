@@ -42,11 +42,53 @@ type renderer struct {
 	gait      gait
 	// lastSeconds is when the last frame was rendered, so the gait can follow the time between frames.
 	lastSeconds float64
+	// palette is the color of each ink: the forest's own, then the colors of the map's models.
+	palette [][3]int
+	// modelInks are the inks of each model's faces, in their order.
+	modelInks map[*world.Model][]int
 }
 
 // newRenderer opens the view at the camera's zoom and yaw, so a resumed session starts where it was left.
-func newRenderer(world *world.World, title string) *renderer {
-	return &renderer{world: world, title: title, zoom: zoom{current: float64(world.Zoom())}, turn: turning{current: world.Yaw()}}
+func newRenderer(forest *world.World, title string) *renderer {
+	r := &renderer{world: forest, title: title, zoom: zoom{current: float64(forest.Zoom())}, turn: turning{current: forest.Yaw()}}
+	r.palette = append([][3]int(nil), forestPalette[:]...)
+	r.modelInks = make(map[*world.Model][]int)
+	for _, placed := range forest.Models() {
+		if _, known := r.modelInks[placed.Model]; known {
+			continue
+		}
+		inks := make([]int, len(placed.Model.Faces))
+		for i, face := range placed.Model.Faces {
+			inks[i] = r.inkOf(face.Color)
+		}
+		r.modelInks[placed.Model] = inks
+	}
+	return r
+}
+
+// maxInks is how many inks a braille cell's ink can name.
+const maxInks = 256
+
+// inkOf is the ink of a color a model is painted in: one of its own, added to the palette the
+// first time, or the nearest model ink once the palette is full.
+func (r *renderer) inkOf(color world.Color) int {
+	rgb := [3]int{int(color.R), int(color.G), int(color.B)}
+	nearest, distance := -1, math.MaxInt
+	for ink := len(forestPalette); ink < len(r.palette); ink++ {
+		known := r.palette[ink]
+		d := (known[0]-rgb[0])*(known[0]-rgb[0]) + (known[1]-rgb[1])*(known[1]-rgb[1]) + (known[2]-rgb[2])*(known[2]-rgb[2])
+		if d == 0 {
+			return ink
+		}
+		if d < distance {
+			nearest, distance = ink, d
+		}
+	}
+	if len(r.palette) < maxInks {
+		r.palette = append(r.palette, rgb)
+		return len(r.palette) - 1
+	}
+	return nearest
 }
 
 type forestPixel struct {
@@ -324,6 +366,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	ground.Wait()
 	if f.Mapped() {
 		r.drawStructures(c)
+		r.drawModels(c)
 		r.drawRoofs(c)
 	}
 	r.drawScatter(c, left, right, back, front)
@@ -506,48 +549,65 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
 			bits, ink := 0, 0
-			var votes [len(forestPalette)]int
-			var coverage [len(forestPalette)]int
-			var light [len(forestPalette)]float64
+			// The cell's eight pixels hold at most eight inks: tally each one's dots, the pixels it
+			// covers and their light.
+			var tally [8]struct {
+				ink, votes, coverage int
+				light                float64
+			}
+			inks := 0
 			figure := false
 			for dy := range 4 {
 				for dx := range 2 {
 					x, y := col*2+dx, row*4+dy
 					p := c.pixels[y*c.width+x]
-					if p.light > 0 {
-						coverage[p.ink]++
-						light[p.ink] += p.light
+					lit, dotted := p.light > 0, p.light > (bayer[y%4][x%4]+0.5)/16
+					if !lit && !dotted {
+						continue
+					}
+					at := 0
+					for at < inks && tally[at].ink != p.ink {
+						at++
+					}
+					if at == inks {
+						tally[at].ink = p.ink
+						inks++
+					}
+					if lit {
+						tally[at].coverage++
+						tally[at].light += p.light
 						figure = figure || figureInk(p.ink)
 					}
-					if p.light > (bayer[y%4][x%4]+0.5)/16 {
+					if dotted {
 						bits |= 1 << brailleDot[dy][dx]
-						votes[p.ink]++
+						tally[at].votes++
 					}
 				}
 			}
 			best := 0
-			for i, count := range votes {
+			for _, counted := range tally[:inks] {
 				// The hero, their axe and flying chips stay visible over anything else in the cell.
-				score := count
-				if foremost(i) && count > 0 {
+				score := counted.votes
+				if foremost(counted.ink) && score > 0 {
 					score += 64
 				}
-				if prominent(i) {
+				if prominent(counted.ink) {
 					score *= 2
 				}
-				if score > best {
-					ink, best = i, score
+				// Ties go to the lower ink, as when every ink was weighed in turn.
+				if score > best || score == best && score > 0 && counted.ink < ink {
+					ink, best = counted.ink, score
 				}
 			}
 			current[col] = forestCell{bits: uint8(bits), ink: uint8(ink), paper: background}
 			// A faint material color reinforces broad surfaces while the ordered dots carry their shading.
-			for material, count := range coverage {
-				if count >= 6 {
+			for _, counted := range tally[:inks] {
+				if material := counted.ink; counted.coverage >= 6 {
 					strength := 0.18
 					if prominent(material) || material == 2 || material == 3 || material == 4 || material >= 11 && material <= 16 {
 						strength = 0.35
 					}
-					current[col].paper = mix(background, forestPalette[material], strength*light[material]/float64(count))
+					current[col].paper = mix(background, r.palette[material], strength*counted.light/float64(counted.coverage))
 					break
 				}
 			}
@@ -586,7 +646,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 			for ; col < end; col++ {
 				cell := current[col]
 				previous[col] = cell
-				color, glyph := forestPalette[cell.ink], rune(0x2800+int(cell.bits))
+				color, glyph := r.palette[cell.ink], rune(0x2800+int(cell.bits))
 				paper := cell.paper
 				if cell.solid {
 					color, glyph = cell.color, quadrants[cell.bits]

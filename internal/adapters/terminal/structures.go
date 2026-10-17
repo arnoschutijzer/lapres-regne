@@ -19,10 +19,11 @@ const (
 	shadowFloorInk
 )
 
-// prominent marks the inks of structures, which count double when a braille cell picks its color,
-// so walls, fences and doors keep their color among the ground around them when zoomed out.
+// prominent marks the inks of structures and models, which count double when a braille cell picks
+// its color, so walls, fences, doors and furniture keep their color among the ground around them
+// when zoomed out.
 func prominent(ink int) bool {
-	return ink == stoneInk || ink == shadedStoneInk || ink == ironInk || ink == plankInk || furnishing(ink)
+	return ink == stoneInk || ink == shadedStoneInk || ink == ironInk || ink == plankInk || furnishing(ink) || ink >= len(forestPalette)
 }
 
 // inShadow is the ink a patch of ground takes in a structure's shadow: a cooler, darker color, as a
@@ -207,6 +208,8 @@ type builtTile struct {
 	fixture   world.Fixture
 	furnished bool
 	alike     [4]bool
+	// shaped marks a tile a model stands over, which shapes its fixture instead.
+	shaped bool
 	// edges is what stands along the tile's west and north edges and diagonally across it, and
 	// sides what stands along each of its sides, north, east, south and west.
 	edges world.TileEdges
@@ -267,6 +270,7 @@ func (a *builtArea) survey(f *world.World, left, right, back, front float64) {
 		fixture, furnished := f.FixtureAt(middleX, middleZ)
 		a.tiles[i] = builtTile{ground: ground, onMap: onMap, fixture: fixture, furnished: furnished, edges: f.EdgesAt(middleX, middleZ)}
 	}
+	a.modelled(f.Models())
 	for i := range a.tiles {
 		tile := &a.tiles[i]
 		col, row := a.col+i%a.cols, a.row+i/a.cols
@@ -513,7 +517,7 @@ func (r *renderer) drawStructures(c *forestCanvas) {
 			drawBridgeRails(c, x, z, tile.beside)
 		}
 		a.drawEdges(c, col, row, x, z, r.world.Random(col, row, 45))
-		if tile.furnished {
+		if tile.furnished && !tile.shaped {
 			c.standOn(x+world.TileSize/2, z+world.TileSize/2)
 			drawFixture(c, x, z, tile, r.world.Random(col, row, 44))
 		}

@@ -275,3 +275,50 @@ func TestAnXInTheTerrainPlantsADeadTree(t *testing.T) {
 		t.Fatalf("trees = %+v, want %+v", loaded.Trees, want)
 	}
 }
+
+func TestAMapFileStandsTheModelsItsModelsFilePlaces(t *testing.T) {
+	folder := t.TempDir()
+	if err := os.WriteFile(filepath.Join(folder, "hall.models"), []byte(`// A wedge of a table.
+model table
+point -1 0 -0.5
+point 1 0 -0.5
+point 0 0.8 0.5
+face 0 1 2 785032
+
+place table 1 0 2 1
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(folder, "hall.map")
+	if err := os.WriteFile(path, []byte("models hall.models\n\nterrain\n@__\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := &world.Model{
+		Points: []world.Point{{X: -1, Y: 0, Z: -0.5}, {X: 1, Y: 0, Z: -0.5}, {X: 0, Y: 0.8, Z: 0.5}},
+		Faces:  []world.ModelFace{{A: 0, B: 1, C: 2, Color: world.Color{R: 0x78, G: 0x50, B: 0x32}}},
+	}
+	want := []world.PlacedModel{{Col: 1, Row: 0, Cols: 2, Rows: 1, Model: table}}
+	if !reflect.DeepEqual(loaded.Models, want) {
+		t.Fatalf("models = %+v, want %+v", loaded.Models, want)
+	}
+}
+
+func TestMistakesInAModelsFileAreReportedWithTheirLine(t *testing.T) {
+	for _, mistake := range []struct{ text, want string }{
+		{"model a\npoint 0 0\n", "hall.models line 2"},
+		{"model a\npoint 0 0 0\nface 0 1 2 785032\n", "hall.models line 3"},
+		{"place b 0 0 1 1\n", "hall.models line 1"},
+	} {
+		folder := t.TempDir()
+		os.WriteFile(filepath.Join(folder, "hall.models"), []byte(mistake.text), 0o600)
+		path := filepath.Join(folder, "hall.map")
+		os.WriteFile(path, []byte("models hall.models\n\nterrain\n@__\n"), 0o600)
+		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), mistake.want) {
+			t.Errorf("models %q: error = %v, want one containing %q", mistake.text, err, mistake.want)
+		}
+	}
+}

@@ -58,6 +58,8 @@ type Map struct {
 	Roofs [][]Roofing
 	// Edges are the walls, fences and doorways standing along the edges between tiles.
 	Edges Edges
+	// Models are the shapes of fixtures as the game models them, each over the tiles it stands on.
+	Models []PlacedModel
 }
 
 // LevelHeight is how much higher each level of a map's heights lies than the last, in world units.
@@ -114,10 +116,11 @@ type terrain struct {
 	highest int
 	roofs   [][]Roofing
 	edges   Edges
+	models  []PlacedModel
 }
 
 func newTerrain(m Map) *terrain {
-	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, roofs: m.Roofs, edges: m.Edges, trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
+	t := &terrain{ground: m.Ground, areas: m.Areas, heights: m.Heights, roofs: m.Roofs, edges: m.Edges, models: m.Models, trees: make(map[cell]TreeKind), fixtures: make(map[cell]Fixture), cover: make([][]float64, len(m.Ground))}
 	for _, levels := range m.Heights {
 		for _, level := range levels {
 			t.highest = max(t.highest, level)

@@ -13,6 +13,10 @@ type vec struct{ x, y, z float64 }
 func (a vec) mul(s float64) vec { return vec{a.x * s, a.y * s, a.z * s} }
 func (a vec) dot(b vec) float64 { return a.x*b.x + a.y*b.y + a.z*b.z }
 func (a vec) unit() vec         { return a.mul(1 / math.Sqrt(a.dot(a))) }
+func (a vec) sub(b vec) vec     { return vec{a.x - b.x, a.y - b.y, a.z - b.z} }
+func (a vec) cross(b vec) vec {
+	return vec{a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x}
+}
 
 func (c *forestCanvas) shadow(tree world.Tree) {
 	c.standOn(tree.X+tree.Height*0.55, tree.Z+tree.Height*0.3)

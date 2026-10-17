@@ -177,6 +177,24 @@ objects
 A fountain, well, haystack or signpost filling a square of four tiles stands as one
 where they meet.
 
+A `models <file>` setting shapes fixtures as the game models them, from a
+models file beside the map. Each model lists its points, in world units about
+the middle of the ground it stands on with y upward, then its triangles between
+three points by index, each in a colour as six hex digits; a `place` line
+stands a model over a block of tiles, by its north-west tile and how many tiles
+it spans across and down. A modelled fixture is drawn as its model, lit face by
+face, in its own colours.
+
+```text
+model table
+point -1 0 -0.5
+point 1 0 -0.5
+point 0 0.8 0.5
+face 0 1 2 785032
+
+place table 1 0 2 1
+```
+
 Chairs and thrones turn their backs on the table they stand at; other
 fixtures back onto a wall beside them, and a row of pews faces along the
 church.
