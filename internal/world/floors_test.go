@@ -202,3 +202,24 @@ func TestClimbingSoundsTheStaircaseClimbed(t *testing.T) {
 		t.Fatalf("climbs = %v, want only the climb up the staircase sounded", sounds.climbs)
 	}
 }
+
+func TestABuildingRisesAsManyFloorsAsStandAboveItsRooms(t *testing.T) {
+	m := lodge(world.Wall)
+	first := make([][]world.Ground, len(m.Ground))
+	for row := range first {
+		first[row] = make([]world.Ground, len(m.Ground[row]))
+	}
+	first[2][3] = world.Boards
+	m.Upstairs = []world.UpperFloor{{Ground: first}}
+	buildings := world.NewOnMap(7, m).Buildings()
+	if len(buildings) != 1 || buildings[0].Above != 1 {
+		t.Fatalf("buildings = %+v, want the lodge rising a floor above its ground floor", buildings)
+	}
+}
+
+func TestABuildingWithNoFloorAboveRisesNoHigher(t *testing.T) {
+	buildings := world.NewOnMap(7, lodge(world.Wall)).Buildings()
+	if len(buildings) != 1 || buildings[0].Above != 0 {
+		t.Fatalf("buildings = %+v, want the lodge with no floor above its ground floor", buildings)
+	}
+}

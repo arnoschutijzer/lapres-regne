@@ -477,10 +477,10 @@ func (a *builtArea) shade(x, z float64) float64 {
 	for _, roof := range a.roofs {
 		ridge := roof.ridge()
 		// A roof's shadow falls no nearer than its eaves throw it, and no farther than its ridge.
-		if x < roof.x0+sunX*eaves || x > roof.x1+sunX*ridge || z < roof.z0+sunZ*eaves || z > roof.z1+sunZ*ridge {
+		if x < roof.x0+sunX*roof.eaves() || x > roof.x1+sunX*ridge || z < roof.z0+sunZ*roof.eaves() || z > roof.z1+sunZ*ridge {
 			continue
 		}
-		for height := eaves; height <= ridge; height += 0.2 {
+		for height := roof.eaves(); height <= ridge; height += 0.2 {
 			if roof.covers(x-sunX*height, height, z-sunZ*height) {
 				return castShadow
 			}
@@ -500,12 +500,9 @@ func (a *builtArea) shade(x, z float64) float64 {
 func (r *renderer) drawStructures(c *forestCanvas, a *builtArea) {
 	for i, tile := range a.tiles {
 		col, row := a.col+i%a.cols, a.row+i/a.cols
-		if !tile.onMap {
-			continue
-		}
-		if tile.covered {
-			// Only walls along the edges where a covered tile meets an uncovered one show, from
-			// outside.
+		if !tile.onMap || tile.covered {
+			// Walls still stand along the edges of a tile beyond a floor's edge, or under a floor
+			// drawn above where they meet an uncovered tile, seen from outside.
 			a.drawEdges(c, col, row, float64(col)*world.TileSize, float64(row)*world.TileSize, r.world.Random(col, row, 45))
 			continue
 		}

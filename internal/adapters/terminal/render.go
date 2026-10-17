@@ -325,6 +325,12 @@ func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
 		-toward*0.69 - y*0.72
 }
 
+// screen is the canvas pixel showing a point of the world at a height, wherever is being drawn.
+func (c *forestCanvas) screen(x, y, z float64) (float64, float64) {
+	across, toward := c.toView(x, z)
+	return float64(c.width)/2 + across*c.scale, float64(c.height)*0.57 + (toward*0.72-(y-c.eye)*0.69)*c.scale
+}
+
 // ground is the world position of the ground shown at the canvas pixel x, y.
 func (c *forestCanvas) ground(x, y float64) (float64, float64) {
 	point := c.under[int(y)*c.width+int(x)]
@@ -372,15 +378,15 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	cameraX, cameraZ := f.Camera()
 	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
 	c.turnTo(r.turn.current)
-	storey := f.Storey()
-	c.elevation, c.highest, c.lift = f.Elevation, f.Highest()+float64(storey)*world.StoreyHeight, 0
-	c.surface, c.floor = nil, nil
+	storey, shown := f.Storey(), r.shownStoreys()
+	c.elevation, c.highest, c.lift = f.Elevation, f.Highest()+float64(shown)*world.StoreyHeight, 0
+	c.surface, c.floor, c.clearing = nil, nil, clearing{}
 	if !f.Mapped() {
 		// The endless forest's hills level out by the rivers, which are sampled below.
 		c.elevation = func(x, z float64) float64 { return f.ElevationAmid(r.rivers.at(z), x, z) }
 	}
-	if storey > 0 {
-		// The ground shows the floors up to the hero's, each over the floors below it.
+	if shown > 0 {
+		// The ground shows the floors drawn, each over the floors below it.
 		c.surface = func(x, z float64) float64 {
 			if shown, ok := r.shownFloor(x, z); ok {
 				return f.ElevationOn(shown, x, z)
@@ -393,6 +399,12 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	if len(c.pixels) != c.width*c.height {
 		c.pixels = make([]forestPixel, c.width*c.height)
 		c.under = make([]groundPoint, c.width*c.height)
+	}
+	if f.Mapped() {
+		// The hero shows through the buildings, roofs and floors in front of them.
+		c.floor = r.floorOf(storey)
+		c.clearing = c.around(f.Hero().Position())
+		c.floor = nil
 	}
 	// The world area to draw holds the view, with room for trees and grass that reach into it,
 	// reaching farther off where the ground falls away below the camera and nearer where it rises.
@@ -423,12 +435,18 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	// A map's water lies in its tiles, so only the endless forest samples its rivers.
 	if f.Mapped() {
 		r.built.survey(f, 0, left, right, back, front)
-		r.upstairs = r.upstairs[:0]
-		for floor := 1; floor <= storey; floor++ {
+		for len(r.upstairs) < shown {
 			r.upstairs = append(r.upstairs, builtArea{})
+		}
+		r.upstairs = r.upstairs[:shown]
+		for floor := 1; floor <= shown; floor++ {
 			r.upstairs[floor-1].survey(f, floor, left, right, back, front)
 		}
+		// Whatever stands on a floor under another drawn above it is hidden.
 		r.built.cover(r.upstairs)
+		for i := range r.upstairs {
+			r.upstairs[i].cover(r.upstairs[i+1:])
+		}
 	} else {
 		r.rivers.sample(f, back, front, left, right, 1/c.scale)
 	}
@@ -448,10 +466,6 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	ground.Wait()
 	c.doorways = c.doorways[:0]
 	if f.Mapped() {
-		// The hero shows through the buildings and roofs in front of them.
-		c.floor = r.floorOf(storey)
-		c.clearing = c.around(f.Hero().Position())
-		c.floor = nil
 		r.drawStructures(c, &r.built)
 		r.drawModels(c, &r.built, f.Models())
 		for i := range r.upstairs {
@@ -856,13 +870,40 @@ func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 	}
 }
 
-// shownFloor is the highest floor above the ground, up to the hero's, floored at a world position,
-// or false where the ground shows.
-func (r *renderer) shownFloor(x, z float64) (int, bool) {
-	for floor := len(r.upstairs); floor > 0; floor-- {
-		if _, ok := r.world.GroundOn(floor, x, z); ok {
-			return floor, true
+// shownStoreys is how many floors above the ground are drawn: every one while the hero stands in
+// the open, but only up to the hero's own while they stand indoors or under a floor above, which
+// would hide them.
+func (r *renderer) shownStoreys() int {
+	f := r.world
+	if !f.Mapped() {
+		return 0
+	}
+	if f.Indoors() {
+		return f.Storey()
+	}
+	x, z := f.Hero().Position()
+	for above := f.Storey() + 1; above < f.Storeys(); above++ {
+		if _, ok := f.GroundOn(above, x, z); ok {
+			return f.Storey()
 		}
+	}
+	return f.Storeys() - 1
+}
+
+// shownFloor is the highest floor above the ground drawn floored at a world position, or false
+// where the ground shows. A floor above the hero's is left out round the hero where it stands in
+// front of them, so they show through it.
+func (r *renderer) shownFloor(x, z float64) (int, bool) {
+	c := &r.canvas
+	for floor := len(r.upstairs); floor > 0; floor-- {
+		if _, ok := r.world.GroundOn(floor, x, z); !ok {
+			continue
+		}
+		height := r.world.ElevationOn(floor, x, z)
+		if px, py := c.screen(x, height, z); floor > r.world.Storey() && c.hides(int(px), int(py), vec{x, height, z}) {
+			continue
+		}
+		return floor, true
 	}
 	return 0, false
 }

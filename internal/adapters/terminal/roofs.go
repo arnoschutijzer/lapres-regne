@@ -36,6 +36,8 @@ type roof struct {
 	// alongX marks a ridge running east to west.
 	alongX  bool
 	roofing world.Roofing
+	// raised is how far above its walls' eaves the roof rests, on the highest floor of its building.
+	raised float64
 }
 
 // roofOver shapes the roof of a building, reaching from the outer faces of its walls with an
@@ -50,20 +52,23 @@ func roofOver(b world.Building) roof {
 	x0, z0 := float64(b.Col)*world.TileSize+outside, float64(b.Row)*world.TileSize+outside
 	x1 := float64(b.Col+b.Cols)*world.TileSize - outside
 	z1 := float64(b.Row+b.Rows)*world.TileSize - outside
-	return roof{x0, z0, x1, z1, x1-x0 >= z1-z0, b.Roof}
+	return roof{x0, z0, x1, z1, x1-x0 >= z1-z0, b.Roof, float64(b.Above) * world.StoreyHeight}
 }
+
+// eaves is the height the roof rests at above the ground.
+func (r roof) eaves() float64 { return eaves + r.raised }
 
 // ridge is the height of the roof's ridge above the ground.
 func (r roof) ridge() float64 {
 	if r.alongX {
-		return eaves + (r.z1-r.z0)/2*pitch
+		return r.eaves() + (r.z1-r.z0)/2*pitch
 	}
-	return eaves + (r.x1-r.x0)/2*pitch
+	return r.eaves() + (r.x1-r.x0)/2*pitch
 }
 
 // covers tells whether the roof fills the point at height y above x, z.
 func (r roof) covers(x, y, z float64) bool {
-	if x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1 || y < eaves {
+	if x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1 || y < r.eaves() {
 		return false
 	}
 	// The roof's surface rises from the eaves toward the ridge, a slope's width in.
@@ -71,7 +76,7 @@ func (r roof) covers(x, y, z float64) bool {
 	if r.alongX {
 		toEaves = min(z-r.z0, r.z1-z)
 	}
-	return y <= eaves+toEaves*pitch
+	return y <= r.eaves()+toEaves*pitch
 }
 
 // drawRoofs roofs every building, unless the hero is indoors: then all roofs are lifted, so the
@@ -93,6 +98,7 @@ func (r roof) draw(c *forestCanvas) {
 	case world.ClayTiles:
 		ink, pattern = clayInk, surface(clayTiles)
 	}
+	eaves := r.eaves()
 	rise := r.ridge() - eaves
 	if r.alongX {
 		run, length := (r.z1-r.z0)/2, r.x1-r.x0

@@ -124,3 +124,70 @@ func TestAModelOnTheFloorTheHeroClimbedToIsDrawnAStoreyUp(t *testing.T) {
 		t.Fatalf("%d of 25 pixels of the table's top a storey up, want its model drawn on the first floor", found)
 	}
 }
+
+// openTower is the tower with a floor of boards above it and no roof, as Lumbridge Castle's keep
+// stands open to the sky, with the hero on a tile of its ground floor.
+func openTower(col, row int) *world.World {
+	m := towerMap(1)
+	m.Roofs = make([][]world.Roofing, len(m.Ground))
+	for r := range m.Roofs {
+		m.Roofs[r] = make([]world.Roofing, len(m.Ground[r]))
+		for c := range m.Roofs[r] {
+			m.Roofs[r][c] = world.Unroofed
+		}
+	}
+	m.StartCol, m.StartRow = col, row
+	return world.NewOnMap(7, m)
+}
+
+func TestAFloorAboveShowsItsWallsFromOutside(t *testing.T) {
+	m := towerMap(1)
+	m.StartCol, m.StartRow = 20, 18
+	_, c := closeView(world.NewOnMap(7, m))
+	c.lift = 0
+	// The first floor's south wall runs along z 28, a storey up.
+	if found := inkNear(c, 39, world.StoreyHeight+1.5, 28.36, stoneInks...); found < 10 {
+		t.Fatalf("%d of 25 pixels of stone up the first floor's south wall, want it standing a storey up", found)
+	}
+}
+
+func TestARoofRestsOnTheHighestFloorOfItsBuilding(t *testing.T) {
+	m := towerMap(1)
+	m.StartCol, m.StartRow = 20, 18
+	r := newRenderer(world.NewOnMap(7, m), "L’Après-Règne")
+	r.zoom = zoom{current: 3}
+	c := r.render(160, 60, 0)
+	c.lift = 0
+	if found := inkNear(c, 41, world.StoreyHeight+eaves+1.5, 24, slateInk, shadedSlateInk); found < 10 {
+		t.Fatalf("%d of 25 pixels of slate over the first floor, want the roof resting on it", found)
+	}
+}
+
+func TestAnOpenTopFloorShowsFromOutside(t *testing.T) {
+	_, c := closeView(openTower(20, 18))
+	c.lift = 0
+	if found := inkNear(c, 39, world.StoreyHeight, 21, boardsInk, inShadow(boardsInk)); found < 10 {
+		t.Fatalf("%d of 25 pixels of boards a storey up, want the open first floor seen from outside", found)
+	}
+}
+
+func TestAFloorAboveHidesWhileTheHeroStandsUnderIt(t *testing.T) {
+	_, c := closeView(openTower(20, 11))
+	c.lift = 0
+	if found := inkNear(c, 39, 0, 21, floorInk, inShadow(floorInk)); found < 10 {
+		t.Fatalf("%d of 25 pixels of flagstones under the first floor, want the floor above hidden", found)
+	}
+}
+
+func TestTheHeroShowsThroughAFloorAboveInFrontOfThem(t *testing.T) {
+	_, c := closeView(openTower(20, 8))
+	hero := 0
+	for _, p := range c.pixels {
+		if foremost(p.ink) && p.light > 0 {
+			hero++
+		}
+	}
+	if hero < 20 {
+		t.Fatalf("%d pixels of the hero behind the tower, want them showing through its first floor", hero)
+	}
+}

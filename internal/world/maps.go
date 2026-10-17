@@ -88,6 +88,9 @@ type Building struct {
 	// Edged marks a building walled along the edges of its rooms' tiles: it spans just those
 	// tiles, its walls standing along their outer edges.
 	Edged bool
+	// Above is how many floors stand above the building's ground floor, over any of its rooms;
+	// its roof rests on the highest.
+	Above int
 }
 
 // Roofing is what a building's roof is laid with.
@@ -362,6 +365,13 @@ func NewOnMap(seed uint64, m Map) *World {
 		upper := newTerrain(Map{Ground: floor.Ground, Edges: floor.Edges, Fixtures: floor.Fixtures, Models: floor.Models})
 		upper.aloft = true
 		w.floors = append(w.floors, upper)
+	}
+	for room, building := range w.terrain.rooms {
+		for storey, upper := range w.floors {
+			if ground, _ := upper.tile(room.gx, room.gz); ground != Grass {
+				w.terrain.buildings[building].Above = max(w.terrain.buildings[building].Above, storey+1)
+			}
+		}
 	}
 	w.hero.passable = w.passable
 	w.hero.x, w.hero.z = (float64(m.StartCol)+0.5)*TileSize, (float64(m.StartRow)+0.5)*TileSize
