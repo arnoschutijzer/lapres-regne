@@ -22,14 +22,49 @@ func TestATreeStandsOnItsTrunk(t *testing.T) {
 	}
 }
 
-func TestTheCameraMapsTheScreenBackOntoTheGround(t *testing.T) {
-	view := camera{3, -2}
-	sx, sy := view.toScreen(5.5, 1.25)
-	if x, z := view.toWorld(sx, sy); math.Abs(x-5.5) > 1e-9 || math.Abs(z-1.25) > 1e-9 {
-		t.Fatalf("toWorld(toScreen(5.5, 1.25)) = %v, %v", x, z)
+func TestTheScreenMapsBackOntoTheGroundOverHills(t *testing.T) {
+	g := newGame(world.New(7), nil)
+	g.step(controls{}, tick)
+	// Every point of ground, raised by its height, shows at the screen point it maps back from.
+	for _, point := range []image.Point{{40, 30}, {240, 135}, {400, 240}, {100, 200}} {
+		x, z, ok := g.groundAt(point.X, point.Y)
+		if !ok {
+			t.Fatalf("no ground shows at %v", point)
+		}
+		sx, sy := g.view.toScreen(x, z, terraced(g.world.Elevation(x, z)))
+		if math.Abs(sx-float64(point.X)-0.5) > 0.6 || math.Abs(sy-float64(point.Y)-0.5) > 1.5 {
+			t.Errorf("the ground at %v maps to %.1f, %.1f, which shows at %.1f, %.1f", point, x, z, sx, sy)
+		}
 	}
-	if sx, sy := view.toScreen(3, -2); sx != screenWidth/2 || sy != screenHeight/2 {
-		t.Fatalf("the camera's own point shows at %v, %v; want the screen's centre", sx, sy)
+}
+
+func TestHillsAreRaisedAboveTheValleys(t *testing.T) {
+	w := world.New(7)
+	// Find a column where the ground rises, and check a raised point shows higher up the screen
+	// than flat ground would put it.
+	for x := 0.0; x < 200; x += 3 {
+		for z := 0.0; z < 200; z += 3 {
+			if h := w.Elevation(x, z); h > 3 {
+				_, flat := project(x, z, 0)
+				_, raised := project(x, z, h)
+				if raised >= flat-3*unit*heightSquash*heightScale {
+					t.Fatalf("ground %.1f high shows at %.1f, flat ground at %.1f", h, raised, flat)
+				}
+				return
+			}
+		}
+	}
+	t.Skip("no hill near the start")
+}
+
+func TestSlopesTurnedToTheLightAreBrighter(t *testing.T) {
+	// The light falls from the left, so ground rising toward the right faces it and ground rising
+	// toward the left turns away from it.
+	if facing, away := relief(1, 0), relief(-1, 0); facing <= 0 || away >= 0 {
+		t.Errorf("a slope facing the light lifts by %v and one facing away by %v", facing, away)
+	}
+	if flat := relief(0, 0); math.Abs(flat) > 1e-9 {
+		t.Errorf("flat ground lifts by %v; want none", flat)
 	}
 }
 
@@ -65,7 +100,10 @@ func TestClickingTheGroundWalksThere(t *testing.T) {
 		if _, onTree := treeAt(g.scene, sx, screenHeight/2); onTree {
 			continue
 		}
-		targetX, _ := g.view.snapped().toWorld(float64(sx)+0.5, screenHeight/2+0.5)
+		targetX, _, ok := g.groundAt(sx, screenHeight/2)
+		if !ok {
+			continue
+		}
 		g.step(controls{click: true, pointing: true, cursorX: sx, cursorY: screenHeight / 2}, tick)
 		for range 5 * ticksPerSecond {
 			g.step(controls{}, tick)
@@ -108,7 +146,7 @@ func TestTheGroundShowsTheRiver(t *testing.T) {
 	// Walk south along x 0 until the ground is a river.
 	for z := 0.0; z < 400; z += 0.5 {
 		if distance, width := w.River(0, z); distance < width/2 {
-			c, _ := groundPixel(w, 0, int(z*unit*depthSquash))
+			c, _ := groundColor(w, 0, z, 0, 0, 0)
 			for _, blue := range waterTones {
 				if c == blue {
 					return
@@ -122,7 +160,7 @@ func TestTheGroundShowsTheRiver(t *testing.T) {
 
 func TestTheSameGroundIsPaintedEveryTime(t *testing.T) {
 	w := world.New(7)
-	if string(paintChunk(w, 2, -1).Pix) != string(paintChunk(w, 2, -1).Pix) {
+	if string(paintChunk(w, 2, -1).image.Pix) != string(paintChunk(w, 2, -1).image.Pix) {
 		t.Fatal("painting one chunk twice gives two pictures")
 	}
 }
@@ -161,7 +199,7 @@ func TestStandingTreesCastShadowsAwayFromTheLight(t *testing.T) {
 		t.Fatalf("%d shadows lie on the ground; want the trees' and the hero's", len(g.shadows))
 	}
 	x, z := g.world.Hero().Position()
-	footX, _ := g.view.snapped().toScreen(x, z)
+	footX, _ := g.view.toScreen(x, z, terraced(g.world.Elevation(x, z)))
 	for _, shadow := range g.shadows {
 		if shadow.depth != z {
 			continue
@@ -284,7 +322,7 @@ func TestTheFloorIsStrewnWithLitterAndRareCrimson(t *testing.T) {
 	found := map[color.RGBA]bool{}
 	for cy := -3; cy <= 3; cy++ {
 		for cx := -3; cx <= 3; cx++ {
-			chunk := paintChunk(w, cx, cy)
+			chunk := paintChunk(w, cx, cy).image
 			for i := 0; i < len(chunk.Pix); i += 4 {
 				found[color.RGBA{chunk.Pix[i], chunk.Pix[i+1], chunk.Pix[i+2], 255}] = true
 			}
@@ -316,5 +354,14 @@ func TestTheFogDriftsInPatches(t *testing.T) {
 	}
 	if share := float64(misty) / (fogPeriod * fogPeriod); share < 0.1 || share > 0.6 {
 		t.Errorf("fog covers %.0f%% of its tile; want drifts with clear ground between", share*100)
+	}
+}
+
+func TestTheGroundRisesInLedges(t *testing.T) {
+	// Within a ledge the shown height barely climbs; across into the next it steps up sharply.
+	within := terraced(ledge*2.9) - terraced(ledge*2.1)
+	across := terraced(ledge*3.05) - terraced(ledge*2.95)
+	if within >= across || across < ledge*0.7 {
+		t.Errorf("the ground climbs %v within a ledge and %v across into the next; want a sheer step", within, across)
 	}
 }

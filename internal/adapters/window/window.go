@@ -84,10 +84,11 @@ type game struct {
 	// overlap they stay one flat shade.
 	shadows []placed
 	shade   *ebiten.Image
-	// drawn holds each sprite's art once it has been sent to the graphics card, and chunks the
-	// painted ground near the camera.
-	drawn  map[*image.RGBA]*ebiten.Image
-	chunks map[image.Point]*ebiten.Image
+	// drawn holds each sprite's art once it has been sent to the graphics card; chunks holds the
+	// painted ground near the camera, and grounds those chunks sent to the graphics card.
+	drawn   map[*image.RGBA]*ebiten.Image
+	chunks  map[image.Point]*groundChunk
+	grounds map[image.Point]*ebiten.Image
 	// The atmosphere's pictures, sent to the graphics card once.
 	vignette, shafts   *ebiten.Image
 	ashGlow, emberGlow *ebiten.Image
@@ -97,12 +98,13 @@ type game struct {
 func newGame(w *world.World, music soundtrack.Player) *game {
 	x, z := w.Hero().Position()
 	return &game{
-		world:  w,
-		music:  music,
-		view:   camera{x, z},
-		art:    newSprites(),
-		drawn:  map[*image.RGBA]*ebiten.Image{},
-		chunks: map[image.Point]*ebiten.Image{},
+		world:   w,
+		music:   music,
+		view:    camera{x, z, terraced(w.ElevationOn(w.Storey(), x, z))},
+		art:     newSprites(),
+		drawn:   map[*image.RGBA]*ebiten.Image{},
+		chunks:  map[image.Point]*groundChunk{},
+		grounds: map[image.Point]*ebiten.Image{},
 	}
 }
 
@@ -120,19 +122,21 @@ func (g *game) step(c controls, dt time.Duration) error {
 	if c.click && c.pointing {
 		if tree, ok := treeAt(g.scene, c.cursorX, c.cursorY); ok {
 			g.world.Approach(tree)
-		} else {
-			g.world.WalkTo(g.view.snapped().toWorld(float64(c.cursorX)+0.5, float64(c.cursorY)+0.5))
+		} else if x, z, ok := g.groundAt(c.cursorX, c.cursorY); ok {
+			g.world.WalkTo(x, z)
 		}
 	}
 	g.world.Advance(c.dx, c.dz, dt, c.sprint)
 	if c.pointing {
-		g.world.AimAt(g.view.snapped().toWorld(float64(c.cursorX)+0.5, float64(c.cursorY)+0.5))
+		if x, z, ok := g.groundAt(c.cursorX, c.cursorY); ok {
+			g.world.AimAt(x, z)
+		}
 	}
 	x, z := g.world.Hero().Position()
-	g.view.follow(x, z, dt.Seconds())
+	g.view.follow(x, z, terraced(g.world.ElevationOn(g.world.Storey(), x, z)), dt.Seconds())
 	g.seconds += dt.Seconds()
 	g.gait.follow(x, z)
-	g.scene, g.shadows = arrange(g.world, g.view.snapped(), g.art, g.gait.frame())
+	g.scene, g.shadows = arrange(g.world, g.view, g.art, g.gait.frame())
 	return nil
 }
 
@@ -175,7 +179,7 @@ func (g *game) drawAtmosphere(screen *ebiten.Image) {
 		g.ashGlow = ebiten.NewImageFromImage(moteImage(ashTones))
 		g.emberGlow = ebiten.NewImageFromImage(moteImage(emberTones))
 	}
-	originX, originY := g.view.snapped().origin()
+	originX, originY := g.view.origin()
 	for i, layer := range fogLayers {
 		startX, startY := fogOffset(layer, originX, originY, g.seconds)
 		for y := startY; y < screenHeight; y += fogPeriod {
@@ -218,29 +222,51 @@ func (g *game) drawSprite(target *ebiten.Image, p placed) {
 	target.DrawImage(sprite, options)
 }
 
+// chunk is the painted chunk of ground at a place, counted in chunks, painting it the first time.
+func (g *game) chunk(at image.Point) *groundChunk {
+	painted, ok := g.chunks[at]
+	if !ok {
+		painted = paintChunk(g.world, at.X, at.Y)
+		g.chunks[at] = painted
+	}
+	return painted
+}
+
+// groundAt is the world point of the ground shown at a point of the screen, read back from the
+// painted ground, so it holds on hills and in gullies.
+func (g *game) groundAt(sx, sy int) (x, z float64, ok bool) {
+	originX, originY := g.view.origin()
+	px, py := originX+sx, originY+sy
+	at := image.Pt(floorDiv(px, chunkSize), floorDiv(py, chunkSize))
+	return g.chunk(at).pointAt(at.X*chunkSize, mod(px, chunkSize), mod(py, chunkSize))
+}
+
 // drawGround draws the chunks of ground the camera shows, painting any not painted yet, and lets go
 // of those it has left behind.
 func (g *game) drawGround(screen *ebiten.Image) {
-	originX, originY := g.view.snapped().origin()
+	originX, originY := g.view.origin()
 	first := image.Pt(floorDiv(originX, chunkSize), floorDiv(originY, chunkSize))
 	last := image.Pt(floorDiv(originX+screenWidth, chunkSize), floorDiv(originY+screenHeight, chunkSize))
-	for at, chunk := range g.chunks {
+	for at := range g.chunks {
 		if at.X < first.X-1 || at.X > last.X+1 || at.Y < first.Y-1 || at.Y > last.Y+1 {
-			chunk.Deallocate()
+			if ground, ok := g.grounds[at]; ok {
+				ground.Deallocate()
+				delete(g.grounds, at)
+			}
 			delete(g.chunks, at)
 		}
 	}
 	for cy := first.Y; cy <= last.Y; cy++ {
 		for cx := first.X; cx <= last.X; cx++ {
 			at := image.Pt(cx, cy)
-			chunk, ok := g.chunks[at]
+			ground, ok := g.grounds[at]
 			if !ok {
-				chunk = ebiten.NewImageFromImage(paintChunk(g.world, cx, cy))
-				g.chunks[at] = chunk
+				ground = ebiten.NewImageFromImage(g.chunk(at).image)
+				g.grounds[at] = ground
 			}
 			options := &ebiten.DrawImageOptions{}
 			options.GeoM.Translate(float64(cx*chunkSize-originX), float64(cy*chunkSize-originY))
-			screen.DrawImage(chunk, options)
+			screen.DrawImage(ground, options)
 		}
 	}
 }

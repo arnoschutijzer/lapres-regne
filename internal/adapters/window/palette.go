@@ -30,6 +30,8 @@ var (
 	floorTones = tones{rgb(0x060607), rgb(0x0e0d0d), rgb(0x181512), rgb(0x231e17), rgb(0x302919), rgb(0x433820)}
 	// mossTones are the moss and dying grass that patch the floor.
 	mossTones = tones{rgb(0x080b09), rgb(0x10150f), rgb(0x192014), rgb(0x242d18), rgb(0x33401c), rgb(0x4a5424)}
+	// faceTones are the bare earth of a ledge's face, darkening toward its foot.
+	faceTones = tones{rgb(0x040303), rgb(0x0b0907), rgb(0x16110c), rgb(0x221a12), rgb(0x2f2418), rgb(0x3e3020)}
 	// bankTones are the trodden mud along a river.
 	bankTones  = tones{rgb(0x070708), rgb(0x0f0e0e), rgb(0x1a1715), rgb(0x26211c)}
 	waterTones = tones{rgb(0x030506), rgb(0x070c0f), rgb(0x0d161a), rgb(0x162429), rgb(0x24383a), rgb(0x5f7470)}
