@@ -357,7 +357,7 @@ const (
 	boldPaper     = 0.55
 	boldStrongest = 0.85
 	boldRim       = 0.15
-	boldCoverage  = 3
+	boldCoverage  = 1
 )
 
 func (Bold) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
