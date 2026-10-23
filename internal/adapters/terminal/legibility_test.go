@@ -23,7 +23,7 @@ func terminalGlyphs(frame string) []paintedGlyph {
 	row, column := 1, 1
 	for len(frame) > 0 {
 		if strings.HasPrefix(frame, "\x1b[") {
-			end := strings.IndexAny(frame[2:], "mHJK")
+			end := strings.IndexAny(frame[2:], "mHJKhl")
 			if end < 0 {
 				break
 			}

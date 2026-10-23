@@ -658,3 +658,13 @@ func TestDotsStandOutFromPaperTintedInTheirColor(t *testing.T) {
 		t.Fatalf("dot %v on paper %v, want it pushed further from the paper than %v", pushed, paper, dot)
 	}
 }
+
+func TestFramesArriveWhole(t *testing.T) {
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
+	for _, size := range [][2]int{{100, 30}, {100, 30}, {20, 5}} {
+		frame := r.frame(size[0], size[1], 0)
+		if !strings.HasPrefix(frame, synchronizedStart) || !strings.HasSuffix(frame, synchronizedEnd) {
+			t.Errorf("a %d x %d frame is sent as it is drawn; want it held until whole, so it never shows half drawn", size[0], size[1])
+		}
+	}
+}

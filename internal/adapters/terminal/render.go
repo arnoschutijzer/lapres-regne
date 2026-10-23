@@ -667,14 +667,21 @@ func (r *renderer) slotAt(column, row int) (int, bool) {
 	return slotRow*panelColumns + (panelColumn-slotIndent)/slotPitch, true
 }
 
+// synchronizedStart and synchronizedEnd bracket a frame so the terminal shows it only once it has
+// arrived whole, never half drawn over the last; terminals that cannot ignore them.
+const (
+	synchronizedStart = "\x1b[?2026h"
+	synchronizedEnd   = "\x1b[?2026l"
+)
+
 func (r *renderer) frame(width, height int, seconds float64) string {
 	var out strings.Builder
-	out.WriteString("\x1b[H\x1b[0m" + paperOf(background) + foreground(textInk))
+	out.WriteString(synchronizedStart + "\x1b[H\x1b[0m" + paperOf(background) + foreground(textInk))
 	if width < 40 || height < 14 {
 		r.screenWidth = 0
 		message := "Resize to 40 x 14. Q quits."
 		out.WriteString("\x1b[2J" + message[:min(width, len(message))])
-		return out.String()
+		return out.String() + synchronizedEnd
 	}
 	cols, rows := min(width, maxForestColumns), min(height-3, 90)
 	c := r.render(cols, rows, seconds)
@@ -850,7 +857,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		fmt.Fprintf(&out, "\x1b[%d;1H\x1b[2K%s%s", height, foreground(textInk), status[:min(width-1, len(status))])
 		r.lastStatus = status
 	}
-	return out.String()
+	return out.String() + synchronizedEnd
 }
 
 // groundColumn lights the ground seen down one canvas column: grass, canopy shade, pools of
