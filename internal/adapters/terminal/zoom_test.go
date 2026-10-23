@@ -43,3 +43,10 @@ func TestAPanStepCrossesTheSameColumnsAtAnyZoom(t *testing.T) {
 		t.Fatalf("a pan step crosses %v columns in the forest and %v up close, want %v", forestColumns, closeUpColumns, panColumns)
 	}
 }
+
+func TestTheViewHoldsStillWhileTheZoomEasesItsLastFractionOfAPixel(t *testing.T) {
+	settling, settled := zoom{current: 2.004}, zoom{current: 2}
+	if settling.scale() != settled.scale() {
+		t.Fatalf("scale = %v a fraction of a pixel from zoom 2, want zoom 2's %v", settling.scale(), settled.scale())
+	}
+}

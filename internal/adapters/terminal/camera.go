@@ -110,6 +110,20 @@ func (c *Camera) follow(x, z float64, dt time.Duration) {
 	c.z += (z + c.panZ - c.z) * blend
 }
 
+// shownCamera is where the view is drawn from: the camera's place, but whole canvas pixels across
+// and rows down from where it eases toward, so the view holds still while the camera eases the
+// last fractions of a pixel onto the hero.
+func (r *renderer) shownCamera(c *forestCanvas) (float64, float64) {
+	x, z := r.world.Hero().Position()
+	x, z = x+r.camera.panX, z+r.camera.panZ
+	sin, cos := c.yawSin, c.yawCos
+	dx, dz := r.camera.x-x, r.camera.z-z
+	acrossStep, towardStep := 1/c.scale, 1/(c.scale*c.tiltSin)
+	across := math.Round((dx*cos+dz*sin)/acrossStep) * acrossStep
+	toward := math.Round((-dx*sin+dz*cos)/towardStep) * towardStep
+	return x + across*cos - toward*sin, z + across*sin + toward*cos
+}
+
 // follow eases the camera toward the hero.
 func (r *renderer) follow(dt time.Duration) {
 	x, z := r.world.Hero().Position()

@@ -26,8 +26,12 @@ func (z *zoom) step(target int, dt time.Duration) {
 	}
 }
 
+// zoomShown is the finest change of zoom the view shows: a 48th of a step, which moves the edge of
+// the widest view about a pixel, so the ease's last fractions of a pixel leave the view still.
+const zoomShown = 1.0 / 48
+
 func (z *zoom) scale() float64 {
-	return forestScale * math.Pow(zoomStep, z.current)
+	return forestScale * math.Pow(zoomStep, math.Round(z.current/zoomShown)*zoomShown)
 }
 
 // panColumns is how many terminal columns the view slides for one sideways scroll step.

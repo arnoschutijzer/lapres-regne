@@ -75,3 +75,11 @@ func TestTheHeroShowsTheirFaceToTheTurnedCamera(t *testing.T) {
 		t.Error("a hero facing away from the turned camera must show only the back of their head")
 	}
 }
+
+func TestTheViewHoldsStillWhileTheTurnEasesItsLastFractionOfAPixel(t *testing.T) {
+	yaw := 5 * math.Pi / 2 / quarterTurn
+	settling, settled := turning{current: yaw + 0.0008, target: yaw}, turning{current: yaw, target: yaw}
+	if settling.shown() != settled.shown() {
+		t.Fatalf("yaw shown = %v a fraction of a pixel from %v, want %v", settling.shown(), yaw, settled.shown())
+	}
+}
