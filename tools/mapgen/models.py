@@ -138,7 +138,8 @@ class ObjectDefinition:
 
 
 class Model:
-    """A model's points (x, y down, z) and triangles, each with a colour or a texture."""
+    """A model's points (x, y down, z) and triangles, each with a colour or a texture, and how it is
+    rendered: 0 smooth, 1 flat, 2 hidden."""
 
     def __init__(self, data):
         if data[-2] == 0xFF and data[-1] == 0xFD:
@@ -217,15 +218,19 @@ class Model:
         z_at = pos
         self.read_points(Reader(data, flags_at), Reader(data, x_at), Reader(data, y_at), Reader(data, z_at), vertices)
         colors, flags, alpha = Reader(data, colors_at), Reader(data, texture_flags_at), Reader(data, alpha_at)
-        self.colors, self.textures, self.alphas = [], [], []
+        self.colors, self.textures, self.alphas, self.render_types = [], [], [], []
         for _ in range(faces):
             color = colors.u16()
-            texture = -1
-            if textured == 1 and flags.u8() & 2:
-                texture, color = color, 127
+            texture, render_type = -1, 0
+            if textured == 1:
+                flag = flags.u8()
+                render_type = flag & 1
+                if flag & 2:
+                    texture, color = color, 127
             self.colors.append(color)
             self.textures.append(texture)
             self.alphas.append(alpha.u8() if transparent == 1 else 0)
+            self.render_types.append(render_type)
         self.read_faces(Reader(data, indices_at), Reader(data, kinds_at), faces)
 
     def decode_new(self, data, footer, version):
@@ -257,11 +262,13 @@ class Model:
         z_at = pos
         self.read_points(Reader(data, flags_at), Reader(data, x_at), Reader(data, y_at), Reader(data, z_at), vertices)
         colors, alpha, texture_ids = Reader(data, colors_at), Reader(data, alpha_at), Reader(data, texture_ids_at)
-        self.colors, self.textures, self.alphas = [], [], []
+        kinds = Reader(data, pos_render)
+        self.colors, self.textures, self.alphas, self.render_types = [], [], [], []
         for _ in range(faces):
             self.colors.append(colors.u16())
             self.alphas.append(alpha.u8() if transparent == 1 else 0)
             self.textures.append(texture_ids.u16() - 1 if textured == 1 else -1)
+            self.render_types.append(kinds.u8() if render_types == 1 else 0)
         self.read_faces(Reader(data, indices_at), Reader(data, kinds_at), faces)
 
 
@@ -344,8 +351,11 @@ def placed_mesh(cache, palette, definition, kind, degrees, height_scale, push=0)
             y = y * definition.scale[1] / 128 - definition.offset[1]
             z = z * definition.scale[2] / 128 + definition.offset[2]
             points.append((x / 64, -y / 64 * height_scale, -z / 64))
-        for (a, b, c), colour, texture, alpha in zip(model.faces, model.colors, model.textures, model.alphas):
-            if alpha >= 254:
+        for (a, b, c), colour, texture, alpha, render_type in zip(
+                model.faces, model.colors, model.textures, model.alphas, model.render_types):
+            # The game draws neither clear faces nor untextured faces rendered hidden, which models
+            # lay over their own surfaces.
+            if alpha >= 254 or texture < 0 and render_type == 2:
                 continue
             if texture >= 0:
                 rgb = palette.texture(retexture.get(texture, texture))
