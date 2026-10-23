@@ -191,3 +191,33 @@ func TestTheHeroShowsThroughAFloorAboveInFrontOfThem(t *testing.T) {
 		t.Fatalf("%d pixels of the hero behind the tower, want them showing through its first floor", hero)
 	}
 }
+
+// stilts is the tower's first floor standing over open grass, its ground floor and walls taken
+// away, with the hero in the open south of it.
+func stilts() *world.World {
+	m := towerMap(1)
+	for row := range m.Ground {
+		m.Ground[row] = make([]world.Ground, len(m.Ground[row]))
+		m.Edges.West[row] = make([]world.Ground, len(m.Edges.West[row]))
+		m.Edges.North[row] = make([]world.Ground, len(m.Edges.North[row]))
+	}
+	m.Fixtures = nil
+	m.StartCol, m.StartRow = 20, 18
+	return world.NewOnMap(7, m)
+}
+
+func TestTheGroundShowsUnderAFloorAbove(t *testing.T) {
+	_, c := closeView(stilts())
+	c.lift = 0
+	// The first floor's front edge runs along z 28, a storey above the grass at x 38, clear of the
+	// hero; the foot of the first floor's wall stands along it.
+	x, edge, _ := c.project(38, world.StoreyHeight, 28)
+	_, foot, _ := c.project(38, 0, 28)
+	_, open, _ := c.project(38, 0, 30)
+	grass := c.pixels[int(open)*c.width+int(x)].light
+	for y := int(edge) + 5; y < int(foot)-1; y++ {
+		if p := c.pixels[y*c.width+int(x)]; p.light < grass/2 {
+			t.Fatalf("pixel %d, %d under the floor has light %.2f, want the grass beneath it lit as the grass in front (%.2f)", int(x), y, p.light, grass)
+		}
+	}
+}

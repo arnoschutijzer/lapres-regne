@@ -876,6 +876,16 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 // time, and each step draws only the ground that rises on screen above what nearer steps drew, so
 // nearer hills hide whatever lies behind them.
 func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
+	r.march(c, x, seconds, false)
+	if c.surface != nil {
+		// The floors shown above the ground are marched again over it, so the ground shows under
+		// their edges rather than a wall of ground hanging from them down to it.
+		r.march(c, x, seconds, true)
+	}
+}
+
+// march lights one canvas column of the ground, or with floors of the floors shown above it only.
+func (r *renderer) march(c *forestCanvas, x int, seconds float64, floors bool) {
 	quiet := c.quiet()
 	across := (float64(x) - float64(c.width)/2) / c.scale
 	step := 1 / (c.tiltSin * c.scale)
@@ -885,11 +895,21 @@ func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 	far := (-0.57*float64(c.height)/c.scale-c.tiltCos*c.eye)/c.tiltSin - step
 	// top is the highest row drawn so far; the march draws upward from it.
 	top := c.height
-	type sample struct{ x, z, height, toward, y float64 }
+	type sample struct {
+		x, z, height, toward, y float64
+		// raised marks a sample on a floor above the ground.
+		raised bool
+	}
 	at := func(toward float64) sample {
 		wx, wz := c.fromView(across, toward)
-		height := c.surfaceAt(wx, wz) - c.eye
-		return sample{wx, wz, height, toward, float64(c.height)*0.57 + (toward*c.tiltSin-height*c.tiltCos)*c.scale}
+		ground := c.heightAt(wx, wz)
+		height, raised := ground, false
+		if floors {
+			height = c.surfaceAt(wx, wz)
+			raised = height > ground
+		}
+		height -= c.eye
+		return sample{wx, wz, height, toward, float64(c.height)*0.57 + (toward*c.tiltSin-height*c.tiltCos)*c.scale, raised}
 	}
 	previous := at(near)
 	for toward := near - step; toward >= far && top > 0; toward -= step {
@@ -904,8 +924,13 @@ func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 				previous.height + (current.height-previous.height)*u,
 				previous.toward + (current.toward-previous.toward)*u,
 				float64(y),
+				true,
 			}
-			ink, light := r.groundLight(c, point.x, point.z, point.height+c.eye, seconds)
+			// The floors' march leaves the rows between a floor and the ground to the ground's.
+			if floors && !(previous.raised && current.raised) {
+				continue
+			}
+			ink, light := r.groundLight(c, point.x, point.z, point.height+c.eye, floors, seconds)
 			c.pixels[y*c.width+x] = forestPixel{-point.toward*c.tiltCos - point.height*c.tiltSin, light * quiet, ink, 0, 0}
 			c.under[y*c.width+x] = groundPoint{point.x, point.z}
 		}
@@ -1130,8 +1155,9 @@ func (r *renderer) flightAt(column, row int) (world.Flight, bool) {
 	return world.Flight{Col: col, Row: tileRow, Kind: fixture}, true
 }
 
-// groundLight is the ink and light of the ground at a world position, lying at a height.
-func (r *renderer) groundLight(c *forestCanvas, wx, wz, height, seconds float64) (ink int, light float64) {
+// groundLight is the ink and light of the ground at a world position, lying at a height, or with
+// floors of the floor shown above it there.
+func (r *renderer) groundLight(c *forestCanvas, wx, wz, height float64, floors bool, seconds float64) (ink int, light float64) {
 	f := r.world
 	cover, pools := f.Cover(wx, wz), f.Noise(wx/9, wz/9, 81)
 	n := f.Noise(wx*0.65, wz*0.65, 19)
@@ -1154,7 +1180,7 @@ func (r *renderer) groundLight(c *forestCanvas, wx, wz, height, seconds float64)
 	if f.Mapped() {
 		ground, onMap := f.GroundAt(wx, wz)
 		built := &r.built
-		if shown, ok := r.shownFloor(wx, wz); ok {
+		if shown, ok := r.shownFloor(wx, wz); floors && ok {
 			ground, _ = f.GroundOn(shown, wx, wz)
 			built = &r.upstairs[shown-1]
 		}
@@ -1199,6 +1225,10 @@ func (r *renderer) groundLight(c *forestCanvas, wx, wz, height, seconds float64)
 	} else if bank {
 		ink, light = 7, 0.32+n*0.25
 	}
+	if floors {
+		// Floors lie level.
+		return ink, light
+	}
 	return ink, light * c.slopeLight(wx, wz, height)
 }
 
@@ -1209,7 +1239,7 @@ func (c *forestCanvas) slopeLight(x, z, height float64) float64 {
 		return 1
 	}
 	const reach = 0.3
-	normal := vec{height - c.surfaceAt(x+reach, z), reach, height - c.surfaceAt(x, z+reach)}.unit()
+	normal := vec{height - c.heightAt(x+reach, z), reach, height - c.heightAt(x, z+reach)}.unit()
 	return max(0.2, 1+2*(sunlight(normal)/sunlight(vec{0, 1, 0})-1))
 }
 
