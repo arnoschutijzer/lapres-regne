@@ -326,9 +326,7 @@ func grain(x, y int) float64 {
 	return float64(h) / (1 << 32)
 }
 
-// Etched draws the dither's colored dots on its tinted paper, jittered as stippling scatters them,
-// and marks each edge where something stands in front of what lies behind it with a line glyph
-// along the edge, in the color of what stands in front.
+// Etched draws the dither's colored dots on its tinted paper, jittered as stippling scatters them.
 type Etched struct{}
 
 func (Etched) Name() string { return "etch" }
@@ -337,130 +335,8 @@ func (Etched) Name() string { return "etch" }
 const etchJitter = 0.5
 
 func (Etched) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
-	drawn := dottedCell(c, palette, col, row, jittered)
-	if drawn.solid {
-		return drawn
-	}
-	// Grass blades stand in front of the ground everywhere: marking them would hatch every meadow.
-	if mark, ink := edgeMark(c, col, row); mark != 0 && ink != 1 && ink != shadowGrassInk {
-		drawn.mark, drawn.ink = mark, uint8(ink)
-	}
-	return drawn
+	return dottedCell(c, palette, col, row, jittered)
 }
 
 // jittered blends the ordered dither's threshold with scattered grain.
 func jittered(x, y int) float64 { return (1-etchJitter)*ordered(x, y) + etchJitter*grain(x, y) }
-
-// edgeMark is the line glyph along the edge crossing the cell, if one does, and the ink of what
-// stands in front at it: | or a slash where the edge runs upright or aslant, and where it runs
-// level, ‾, - or _ as it crosses the cell's head, middle or foot.
-func edgeMark(c *forestCanvas, col, row int) (rune, int) {
-	// across and down sum which way the canvas falls away behind the edge at each pixel it crosses.
-	across, down := 0, 0
-	crossed, level := 0, 0
-	gap := c.etchGap()
-	var inks [8]int
-	var counts [8]int
-	kinds := 0
-	for dy := range 4 {
-		for dx := range 2 {
-			x, y := col*2+dx, row*4+dy
-			sx, sy := c.stepBehind(x-1, y, x+1, y, gap), c.stepBehind(x, y-1, x, y+1, gap)
-			if sx == 0 && sy == 0 {
-				continue
-			}
-			across, down = across+sx, down+sy
-			crossed++
-			level += dy
-			front := c.frontmost(x, y)
-			at := 0
-			for at < kinds && inks[at] != front {
-				at++
-			}
-			if at == kinds {
-				inks[at] = front
-				kinds++
-			}
-			counts[at]++
-		}
-	}
-	// A mark needs an edge that runs on through the cell: scattered steps among leaves and grass
-	// tufts that turn every way are left to the dots.
-	sideways, upDown := abs(across), abs(down)
-	if sideways+upDown < max(etchCoherence, crossed) {
-		return 0, 0
-	}
-	most := 0
-	for at := range kinds {
-		if counts[at] > counts[most] {
-			most = at
-		}
-	}
-	ink := inks[most]
-	switch {
-	// Steps sideways cross an upright edge, steps up or down a level one.
-	case sideways > 2*upDown:
-		return '|', ink
-	case upDown > 2*sideways:
-		// level is the sum of the crossed pixels' rows; their mean picks the glyph's height.
-		switch mean := float64(level) / float64(crossed); {
-		case mean < 1:
-			return '‾', ink
-		case mean > 2:
-			return '_', ink
-		default:
-			return '-', ink
-		}
-	case across*down > 0:
-		return '/', ink
-	default:
-		return '\\', ink
-	}
-}
-
-// etchCoherence is how many steps of an edge through a cell must agree in their direction for the
-// cell to be marked; and the agreeing steps must be at least as many as the pixels they cross.
-const etchCoherence = 2
-
-// etchPixels is how many canvas pixels of depth the edge of a mark must step back at least, so
-// zoomed out, where each pixel spans more of the world, only tall things standing well in front
-// are marked rather than every bulge of a crown.
-const etchPixels = 8
-
-// etchGap is how far, in world units, the canvas must step back for an edge to be marked.
-func (c *forestCanvas) etchGap() float64 { return max(outlineGap, etchPixels/c.scale) }
-
-// stepBehind is 1 when the canvas at x2, y2 lies more than gap behind that at x1, y1, -1 when it
-// lies more than gap in front, and 0 otherwise or past the canvas's sides.
-func (c *forestCanvas) stepBehind(x1, y1, x2, y2 int, gap float64) int {
-	if x1 < 0 || y1 < 0 || x2 >= c.width || y2 >= c.height {
-		return 0
-	}
-	near, far := c.pixels[y1*c.width+x1], c.pixels[y2*c.width+x2]
-	switch step := far.depth - near.depth; {
-	case near.light <= 0 || far.light <= 0:
-		return 0
-	case step > gap:
-		return 1
-	case step < -gap:
-		return -1
-	}
-	return 0
-}
-
-// frontmost is the ink of the nearest pixel at or beside x, y.
-func (c *forestCanvas) frontmost(x, y int) int {
-	best := c.pixels[y*c.width+x]
-	for _, step := range [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
-		nx, ny := x+step[0], y+step[1]
-		if nx < 0 || ny < 0 || nx >= c.width || ny >= c.height {
-			continue
-		}
-		if p := c.pixels[ny*c.width+nx]; p.light > 0 && p.depth < best.depth {
-			best = p
-		}
-	}
-	return best.ink
-}
-
-func abs(n int) int { return max(n, -n) }

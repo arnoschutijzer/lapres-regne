@@ -235,68 +235,11 @@ func TestStippledFramesDrawBrailleOnParchment(t *testing.T) {
 	}
 }
 
-// standing is a canvas cols by rows cells wide and high, lit evenly by one ink, where the pixels
-// for which front holds stand far in front of the rest.
-func standing(cols, rows, ink int, front func(x, y int) bool) *forestCanvas {
-	c := evenCanvas(cols, rows, ink, 0.6)
-	c.scale = detailScale
-	for y := range c.height {
-		for x := range c.width {
-			if front(x, y) {
-				c.pixels[y*c.width+x].depth = -5
-			}
-		}
-	}
-	return c
-}
-
-func TestEtchMarksAnEdgeWithAGlyphAlongIt(t *testing.T) {
-	cases := []struct {
-		name  string
-		front func(x, y int) bool
-		col   int
-		row   int
-		want  rune
-	}{
-		{"a left side", func(x, y int) bool { return x < 4 }, 1, 1, '|'},
-		{"an edge along the cell's foot", func(x, y int) bool { return y < 8 }, 1, 1, '_'},
-		{"an edge across the cell's middle", func(x, y int) bool { return y < 6 }, 1, 1, '-'},
-		{"an edge along the cell's head", func(x, y int) bool { return y >= 4 }, 1, 1, '‾'},
-		{"a rising slope", func(x, y int) bool { return x+y < 8 }, 1, 1, '/'},
-		{"a falling slope", func(x, y int) bool { return y < x+3 }, 1, 1, '\\'},
-	}
-	for _, tc := range cases {
-		cell := Etched{}.cell(standing(3, 3, 2, tc.front), forestPalette[:], tc.col, tc.row)
-		if cell.mark != tc.want {
-			t.Errorf("%s draws %q; want %q", tc.name, cell.mark, tc.want)
-		}
-	}
-}
-
-func TestEtchMarksTheEdgeInTheColorOfWhatStandsInFront(t *testing.T) {
-	c := standing(3, 3, 1, func(x, y int) bool { return x < 4 })
-	for i := range c.pixels {
-		if c.pixels[i].depth < 0 {
-			c.pixels[i].ink = 4
-		}
-	}
-	if cell := (Etched{}).cell(c, forestPalette[:], 1, 1); cell.ink != 4 {
-		t.Errorf("the edge of bark in front of grass is drawn in ink %d; want the bark's 4", cell.ink)
-	}
-}
-
-func TestEtchLeavesGrassBladesToTheDots(t *testing.T) {
-	c := standing(3, 3, 1, func(x, y int) bool { return x < 4 })
-	if cell := (Etched{}).cell(c, forestPalette[:], 1, 1); cell.mark != 0 {
-		t.Errorf("grass standing in front of grass draws %q; want no mark", cell.mark)
-	}
-}
-
 func TestEtchStipplesOpenGroundInItsOwnColor(t *testing.T) {
 	c := evenCanvas(3, 3, 1, 0.6)
 	cell := Etched{}.cell(c, forestPalette[:], 1, 1)
-	if cell.mark != 0 || cell.bits == 0 {
-		t.Fatalf("open grass draws mark %q and dots %08b; want dots without a mark", cell.mark, cell.bits)
+	if cell.bits == 0 {
+		t.Fatal("open grass draws no dots")
 	}
 	if cell.ink != 1 {
 		t.Errorf("open grass dots take ink %d; want the grass's own 1", cell.ink)
@@ -313,16 +256,4 @@ func TestEtchScattersDotsUnlikeTheOrderedDither(t *testing.T) {
 		}
 	}
 	t.Error("etched dots fall exactly where the ordered dither's do; want them jittered")
-}
-
-func TestEtchedFramesDrawGlyphsAmongTheDots(t *testing.T) {
-	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
-	r.style = Etched{}
-	frame := r.frame(100, 30, 0)
-	if !strings.ContainsFunc(frame, func(glyph rune) bool { return glyph > 0x2800 && glyph <= 0x28ff }) {
-		t.Error("an etched frame draws no braille dots")
-	}
-	if !strings.ContainsAny(frame, "/\\|-_‾") {
-		t.Error("an etched frame draws no edge glyphs")
-	}
 }

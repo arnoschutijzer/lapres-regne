@@ -136,8 +136,6 @@ type forestCell struct {
 	// inked draws the braille dots in color rather than in the palette's ink.
 	inked        bool
 	color, paper [3]int
-	// mark is a glyph drawn in place of the braille dots, in their ink on their paper.
-	mark rune
 	// veil dims the forest under an overlay, in sixteenths; an overlay's glyph replaces the forest's
 	// braille and shows its ink at veil sixteenths of full strength.
 	veil  uint8
@@ -793,9 +791,6 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 				}
 				if cell.inked {
 					color = cell.color
-				}
-				if cell.mark != 0 {
-					glyph = cell.mark
 				}
 				if cell.glyph != 0 {
 					color, paper, glyph = mix(background, color, float64(cell.veil)/16), background, cell.glyph
