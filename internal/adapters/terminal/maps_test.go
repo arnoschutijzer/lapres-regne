@@ -822,3 +822,12 @@ func TestAShutDoorLeavesTheJudgmentOfTheHeroHiddenAsCast(t *testing.T) {
 		t.Fatalf("hidden = %v after the door shut, but the rays cast afresh say %v", kept, cast)
 	}
 }
+
+func TestTheZoomedOutViewHoldsStillFromOneFrameToTheNext(t *testing.T) {
+	r := newRenderer(lakeside(), NewCamera(0, 0), "L’Après-Règne")
+	before := slices.Clone(r.render(100, 27, 1).pixels)
+	// Grass sways and ripples drift by less than a pixel in a frame this far out.
+	if after := r.render(100, 27, 1.03).pixels; !slices.Equal(after, before) {
+		t.Fatal("the zoomed-out view changes within a frame's time; want grass and water to hold still until they move a whole pixel")
+	}
+}

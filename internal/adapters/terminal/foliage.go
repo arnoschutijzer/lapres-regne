@@ -468,6 +468,10 @@ func (r *renderer) drawGrass(c *forestCanvas, left, right, back, front, seconds 
 				height = 1.2 + chance*1.5
 			}
 			sway := math.Sin(seconds*1.5+x*0.4+z*0.3) * 0.16
+			// Zoomed out, a sway of less than a pixel would only flicker, so the blades hold still.
+			if 0.16*c.scale < 1 {
+				sway = 0
+			}
 			light := 0.46 + f.Random(gx, gz, 34)*0.4
 			c.line(x, 0, z, x+sway*0.5, height*0.6, z, light*0.8, 1)
 			c.line(x+sway*0.5, height*0.6, z, x+sway+0.16, height, z+0.08, light, 1)

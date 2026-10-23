@@ -1225,7 +1225,10 @@ func (r *renderer) groundLight(c *forestCanvas, wx, wz, height float64, floors b
 	}
 	if water {
 		ink, light = 5, 0.28+n*0.3
-		if wave(wz*2.6+wx*0.8-seconds*1.8+n*1.3) > 0.91 {
+		// Ripples drift a whole pixel at a time, as drifting by fractions of one only flickers.
+		pixel := 2.6 / c.scale
+		drift := math.Floor(seconds*1.8/pixel) * pixel
+		if wave(wz*2.6+wx*0.8-drift+n*1.3) > 0.91 {
 			ink, light = 6, 0.8
 		}
 	} else if bank {
