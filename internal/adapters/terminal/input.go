@@ -28,6 +28,8 @@ const (
 	nextStack
 	withdrawStack
 	nextStyle
+	raiseCamera
+	lowerCamera
 )
 
 type keyEvent struct {
@@ -116,6 +118,10 @@ func keyAction(key int) action {
 		return nextStack
 	case 'v', 'V':
 		return nextStyle
+	case 'r', 'R':
+		return raiseCamera
+	case 'f', 'F':
+		return lowerCamera
 	}
 	return none
 }

@@ -81,7 +81,7 @@ func TestATreeOnAHillStandsOnItsTop(t *testing.T) {
 	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	c := &forestCanvas{width: 120, height: 120, x: 1000, scale: 3.6, elevation: func(float64, float64) float64 { return 3 }}
 	c.turnTo(0)
-	c.tiltTo(tilt)
+	c.tiltTo(openingTilt)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)

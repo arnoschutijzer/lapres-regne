@@ -52,7 +52,9 @@ type renderer struct {
 	menuTarget int
 	zoom       zoom
 	turn       turning
-	gait       gait
+	// tilting eases the view toward the camera's tilt as turn does toward its yaw.
+	tilting turning
+	gait    gait
 	// lastSeconds is when the last frame was rendered, so the gait can follow the time between frames.
 	lastSeconds float64
 	// palette is the color of each ink: the forest's own, then the colors of the map's models.
@@ -76,7 +78,7 @@ type renderer struct {
 // where it was left.
 func newRenderer(forest *world.World, camera *Camera, title string) *renderer {
 	camera.lookAt(forest.Hero().Position())
-	r := &renderer{world: forest, camera: camera, title: title, zoom: zoom{current: float64(camera.Zoom())}, turn: turning{current: camera.Yaw()}, style: Dithered{}}
+	r := &renderer{world: forest, camera: camera, title: title, zoom: zoom{current: float64(camera.Zoom())}, turn: turning{current: camera.Yaw()}, tilting: turning{current: camera.Tilt()}, style: Dithered{}}
 	r.palette = append([][3]int(nil), forestPalette[:]...)
 	r.modelInks = make(map[*world.Model][]int)
 	for storey := range forest.Storeys() {
@@ -304,10 +306,6 @@ func (c *forestCanvas) standOn(x, z float64) {
 	c.lift = c.heightAt(x, z)
 }
 
-// tilt is how steeply the camera looks down on the ground, in radians above the horizon: 0 looks
-// along it, π/2 straight down.
-const tilt = 0.8067
-
 // tiltTo sets the canvas's tilt.
 func (c *forestCanvas) tiltTo(tilt float64) {
 	c.tiltSin, c.tiltCos = math.Sincos(tilt)
@@ -464,7 +462,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	cameraX, cameraZ := r.camera.x, r.camera.z
 	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
 	c.turnTo(r.turn.current)
-	c.tiltTo(tilt)
+	c.tiltTo(r.tilting.current)
 	storey, shown := f.Storey(), r.shownStoreys()
 	c.elevation, c.highest, c.lift = f.Elevation, f.Highest()+float64(shown)*world.StoreyHeight, 0
 	c.surface, c.floor, c.clearing = nil, nil, clearing{}

@@ -81,7 +81,7 @@ func displayColours(display fireworksDisplay) (colours map[int]bool, widest int)
 	for since := 0.05; since < display.duration(); since += 0.1 {
 		c := &forestCanvas{width: 400, height: 300, scale: forestScale}
 		c.turnTo(0)
-		c.tiltTo(tilt)
+		c.tiltTo(openingTilt)
 		c.pixels = make([]forestPixel, c.width*c.height)
 		for i := range c.pixels {
 			c.pixels[i].depth = math.Inf(1)

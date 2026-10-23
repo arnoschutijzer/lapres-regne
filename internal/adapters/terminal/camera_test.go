@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"lapresregne/internal/world"
 )
 
 func settle(c *Camera, x, z float64) {
@@ -103,5 +105,34 @@ func TestPanningFollowsTheTurnedView(t *testing.T) {
 	settle(c, 0, 0)
 	if math.Abs(c.x-2) > 1e-6 || math.Abs(c.z) > 1e-6 {
 		t.Fatalf("camera = (%v, %v) after panning up, want 2 units east of the hero", c.x, c.z)
+	}
+}
+
+func TestTheCameraTiltsWithinRuneScapesRange(t *testing.T) {
+	c := NewCamera(0, 0)
+	if c.Tilt() != openingTilt {
+		t.Fatalf("tilt = %v for a new camera, want the opening %v", c.Tilt(), openingTilt)
+	}
+	c.tiltBy(tiltSteps * 2)
+	if math.Abs(c.Tilt()-383*2*math.Pi/2048) > 1e-9 {
+		t.Fatalf("tilt = %v raised all the way, want Old School RuneScape's highest, 383 of 2048 steps", c.Tilt())
+	}
+	c.tiltBy(-tiltSteps * 2)
+	if math.Abs(c.Tilt()-128*2*math.Pi/2048) > 1e-9 {
+		t.Fatalf("tilt = %v lowered all the way, want Old School RuneScape's lowest, 128 of 2048 steps", c.Tilt())
+	}
+	c.TiltTo(1)
+	c.tiltBy(1)
+	if c.Tilt() <= 1 {
+		t.Fatalf("tilt = %v raised one step from 1, want it steeper", c.Tilt())
+	}
+}
+
+func TestTheViewLooksDownAtTheCamerasTilt(t *testing.T) {
+	camera := NewCamera(0, 0)
+	camera.TiltTo(highestTilt)
+	c := newRenderer(world.New(7), camera, "L’Après-Règne").render(100, 27, 0)
+	if math.Abs(c.viewer().y-math.Sin(highestTilt)) > 1e-9 {
+		t.Fatalf("the view looks down along %+v, want the camera's tilt %v", c.viewer(), highestTilt)
 	}
 }

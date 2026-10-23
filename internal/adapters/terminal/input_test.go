@@ -144,3 +144,13 @@ func TestVSwitchesTheStyle(t *testing.T) {
 		t.Fatalf("event = %+v, want V to switch the style", event)
 	}
 }
+
+func TestRAndFTiltTheCameraUpAndDown(t *testing.T) {
+	var d keyDecoder
+	if event := d.feed('r'); event.action != raiseCamera {
+		t.Fatalf("event = %+v, want R to raise the camera", event)
+	}
+	if event := d.feed('f'); event.action != lowerCamera {
+		t.Fatalf("event = %+v, want F to lower the camera", event)
+	}
+}

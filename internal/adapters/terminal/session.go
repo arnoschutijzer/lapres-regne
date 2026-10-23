@@ -228,6 +228,14 @@ func (s *Session) Run(world *world.World, camera *Camera, looks *Looks, music so
 			}
 			return false
 		}
+		if event.action == raiseCamera || event.action == lowerCamera {
+			if event.action == raiseCamera {
+				camera.tiltBy(1)
+			} else {
+				camera.tiltBy(-1)
+			}
+			return false
+		}
 		if event.action == nextStyle {
 			if !event.repeat {
 				looks.next()
@@ -305,6 +313,7 @@ func (s *Session) Run(world *world.World, camera *Camera, looks *Looks, music so
 			view.follow(dt)
 			view.zoom.step(camera.Zoom(), dt)
 			view.turn.step(camera.Yaw(), dt)
+			view.tilting.step(camera.Tilt(), dt)
 			if x, z, ok := view.groundAt(cursorColumn, cursorRow); ok {
 				world.AimAt(x, z)
 			}

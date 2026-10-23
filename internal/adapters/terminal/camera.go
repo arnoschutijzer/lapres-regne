@@ -11,6 +11,16 @@ const closeUpZoom = 12
 // quarterTurn is how many of the camera's turning steps make a quarter turn.
 const quarterTurn = 24
 
+// The camera tilts as Old School RuneScape's does, from lowestTilt, 128 of the 2048 steps in a full
+// turn above the horizon, up to highestTilt, 383 of them, in tiltSteps steps. It opens at
+// openingTilt until the player tilts it.
+const (
+	lowestTilt  = 128 * 2 * math.Pi / 2048
+	highestTilt = 383 * 2 * math.Pi / 2048
+	openingTilt = 0.8067
+	tiltSteps   = 12
+)
+
 // Camera is the view onto the world: it follows the hero, looks away from them while panned until
 // they walk, turns about the upright axis and zooms between the forest view and a close-up.
 type Camera struct {
@@ -19,13 +29,15 @@ type Camera struct {
 	panX, panZ float64
 	// yaw is how far the camera has turned about the upright axis, in radians.
 	yaw float64
+	// tilt is how steeply the camera looks down on the ground, in radians above the horizon.
+	tilt float64
 	// zoom is how many steps the camera has moved in from the forest view toward a close-up.
 	zoom int
 }
 
 // NewCamera opens the view at a zoom and yaw, as kept from an earlier session.
 func NewCamera(zoom int, yaw float64) *Camera {
-	c := &Camera{yaw: yaw}
+	c := &Camera{yaw: yaw, tilt: openingTilt}
 	c.zoomBy(zoom)
 	return c
 }
@@ -36,6 +48,21 @@ func (c *Camera) Zoom() int { return c.zoom }
 // Yaw is how far the camera has turned about the upright axis, in radians. At 0 north is up the
 // screen; at π/2 east is.
 func (c *Camera) Yaw() float64 { return c.yaw }
+
+// Tilt is how steeply the camera looks down on the ground, in radians above the horizon: 0 would look
+// along it, π/2 straight down.
+func (c *Camera) Tilt() float64 { return c.tilt }
+
+// TiltTo tilts the camera to a tilt, as kept from an earlier session, kept within the range Old
+// School RuneScape allows.
+func (c *Camera) TiltTo(tilt float64) {
+	c.tilt = min(highestTilt, max(lowestTilt, tilt))
+}
+
+// tiltBy raises the camera by steps, or lowers it for negative steps.
+func (c *Camera) tiltBy(steps int) {
+	c.TiltTo(c.tilt + float64(steps)*(highestTilt-lowestTilt)/tiltSteps)
+}
 
 // zoomBy moves the camera steps closer, or farther for negative steps, between the forest view
 // and the close-up.

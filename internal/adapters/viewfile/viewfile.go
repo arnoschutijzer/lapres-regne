@@ -14,11 +14,13 @@ type File struct {
 	Path string
 }
 
-// View is the camera's zoom, in steps in from the forest view, its yaw about the upright axis, in
-// radians, and the name of the style the world is drawn in; empty for the default style.
+// View is the camera's zoom, in steps in from the forest view, its yaw about the upright axis and
+// its tilt above the horizon, in radians, and the name of the style the world is drawn in; a tilt
+// of 0 and an empty style stand for the defaults.
 type View struct {
 	Zoom  int     `json:"zoom"`
 	Yaw   float64 `json:"yaw"`
+	Tilt  float64 `json:"tilt,omitempty"`
 	Style string  `json:"style,omitempty"`
 }
 
