@@ -32,8 +32,8 @@
 - Composition root: `main.go` (`run`, `startMusic`)
 - Domain: `internal/world` (terrain, maps, character, movement), `internal/soundtrack` (shuffle, history, fades)
 - Ports: `internal/soundtrack/ports.go` (`Samples`, `Decoder`, `Player`), `internal/world/ports.go` (`Sounds`, `Progress`)
-- Inbound adapters: `internal/adapters/window` (`window.go`, the default), `internal/adapters/terminal` (`session.go`, `input.go`, with `--terminal`)
-- Outbound adapters: `internal/adapters/window` (`scene.go`, `art.go`), `internal/adapters/terminal` (`render.go`, `foliage.go`), `internal/adapters/songfiles`, `internal/adapters/speaker`, `internal/adapters/progressfile`, `internal/adapters/viewfile`, `internal/adapters/mapfile`
+- Inbound adapters: `internal/adapters/terminal` (`session.go`, `input.go`)
+- Outbound adapters: `internal/adapters/terminal` (`render.go`, `foliage.go`), `internal/adapters/songfiles`, `internal/adapters/speaker`, `internal/adapters/progressfile`, `internal/adapters/viewfile`, `internal/adapters/mapfile`
 
 ## Commands
 - Unit tests: `go test ./internal/...`
