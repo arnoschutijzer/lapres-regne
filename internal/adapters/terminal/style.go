@@ -351,8 +351,8 @@ func (Bold) Name() string { return "bold" }
 
 // boldPaper is how strongly the flat block under the dots shows its material's color in full light
 // at the zoom where trees show their detail, strengthened farther out as the dither's paper is, up
-// to boldStrongest; boldRim is how strongly its rim does, and boldCoverage how many of a cell's eight pixels a material
-// must cover to lay its block.
+// to boldStrongest; boldRim is how strongly its rim does, and boldCoverage how many of a cell's
+// eight pixels a material must cover to lay its block.
 const (
 	boldPaper     = 0.55
 	boldStrongest = 0.85
@@ -360,17 +360,36 @@ const (
 	boldCoverage  = 1
 )
 
+// boldFaintestGround is how strongly the ground's dots show when zoomed all the way out, easing to
+// full strength from the zoom where trees show their detail, so blocks stand out of a quiet ground
+// when the view takes in a lot; boldDimmestShade is the dimmest shade a block takes there, so trees
+// in deep shade still read as shapes.
+const (
+	boldFaintestGround = 0.4
+	boldDimmestShade   = 0.4
+)
+
 func (Bold) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 	drawn := dottedCell(c, palette, col, row, ordered)
 	if drawn.solid {
 		return drawn
 	}
+	// How far the view is zoomed out, from 0 at the zoom where trees show their detail to 1 all the
+	// way out.
+	out := c.underlay() - 1
 	block := boldBlock(c, col, row)
 	if block.coverage < boldCoverage || groundInk(block.ink) {
+		dot := palette[drawn.ink]
+		if drawn.paper != background {
+			dot = standOut(dot, drawn.paper)
+		}
+		drawn.inked = true
+		drawn.color = mix(background, dot, 1-(1-boldFaintestGround)*out)
 		return drawn
 	}
 	// A few flat shades keep the block solid, never so dim that it sinks into the ground.
 	shade := max(1, float64(int(block.light*pixelShades+0.5))) / pixelShades
+	shade = max(shade, boldDimmestShade*out)
 	strength := min(boldStrongest, boldPaper*c.underlay()) * shade
 	if block.rim {
 		strength = boldRim
