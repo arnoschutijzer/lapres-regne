@@ -461,6 +461,7 @@ func leafBounds(kind world.TreeKind) (width, height, lowest int) {
 	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	c := &forestCanvas{width: 120, height: 120, x: 1000, scale: 3.6}
 	c.turnTo(0)
+	c.tiltTo(tilt)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)
@@ -541,6 +542,7 @@ func TestTheHeroShowsTheirFaceOnlyWhenFacingTheViewer(t *testing.T) {
 func ellipsoidWidth(yaw float64) int {
 	c := &forestCanvas{width: 120, height: 120, scale: 10}
 	c.turnTo(0)
+	c.tiltTo(tilt)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)
@@ -565,6 +567,7 @@ func barkAcross(kind world.TreeKind, scale float64) int {
 	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	c := &forestCanvas{width: 400, height: 400, x: 1000, scale: scale}
 	c.turnTo(0)
+	c.tiltTo(tilt)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)
@@ -603,6 +606,7 @@ func TestTheDetailedHeroStaysAFewStepsFromTheForestView(t *testing.T) {
 func TestOnlyTreesThatReachTheCanvasAreDrawn(t *testing.T) {
 	c := &forestCanvas{width: 200, height: 120, scale: forestScale}
 	c.turnTo(0)
+	c.tiltTo(tilt)
 	tree := world.Tree{Height: 6, Radius: 2.4, Trunk: 0.25}
 	inView, farLeft, belowWithCrownInView := tree, tree, tree
 	farLeft.X = -60

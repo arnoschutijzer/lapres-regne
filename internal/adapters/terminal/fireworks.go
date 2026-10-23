@@ -101,7 +101,7 @@ func drawDisplay(c *forestCanvas, d fireworksDisplay, level int, since, heroX, h
 	// toward or away from the viewer; the bursts shrink to fit above the head, though never below
 	// a few pixels.
 	_, headY, _ := c.project(heroX, 1.6, heroZ)
-	tallest := ((d.above[1]+1)*0.69 + d.depth/2*0.72) * c.scale
+	tallest := ((d.above[1]+1)*c.tiltCos + d.depth/2*c.tiltSin) * c.scale
 	reach = max(6/c.scale, min(reach, 0.9*headY/tallest))
 	between := func(span [2]float64, u float64) float64 { return reach * (span[0] + (span[1]-span[0])*u) }
 	for i := range d.bursts {

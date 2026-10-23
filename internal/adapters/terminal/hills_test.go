@@ -50,8 +50,10 @@ func TestNearerHillsHideTheGroundBehindThem(t *testing.T) {
 		if behind > -4 && behind < -2 {
 			ridge++
 		}
-		// Ground up to 6 * 0.69 / 0.72 behind the ridge lies hidden from the viewer.
-		if behind <= -4 && behind > -4-6*0.69/0.72 {
+		// Ground up to 6 / tan(tilt) behind the ridge lies hidden from the viewer, less the depth of
+		// the row where the ridge's top edge falls.
+		hidden := 6*c.tiltCos/c.tiltSin - 1/(c.tiltSin*c.scale)
+		if behind <= -4 && behind > -4-hidden {
 			t.Fatalf("pixel row %d shows ground %.2f north of the camera, hidden behind the ridge", y, -behind)
 		}
 	}
@@ -79,6 +81,7 @@ func TestATreeOnAHillStandsOnItsTop(t *testing.T) {
 	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
 	c := &forestCanvas{width: 120, height: 120, x: 1000, scale: 3.6, elevation: func(float64, float64) float64 { return 3 }}
 	c.turnTo(0)
+	c.tiltTo(tilt)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)

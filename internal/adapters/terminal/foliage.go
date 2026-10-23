@@ -21,7 +21,7 @@ func (a vec) cross(b vec) vec {
 func (c *forestCanvas) shadow(tree world.Tree) {
 	c.standOn(tree.X+tree.Height*0.55, tree.Z+tree.Height*0.3)
 	x, y, _ := c.project(tree.X+tree.Height*0.55, 0, tree.Z+tree.Height*0.3)
-	rx, ry := tree.Radius*c.scale*1.3, tree.Radius*c.scale*0.72
+	rx, ry := tree.Radius*c.scale*1.3, tree.Radius*c.scale*c.tiltSin
 	for py := max(0, int(y-ry)); py <= min(c.height-1, int(y+ry)); py++ {
 		for px := max(0, int(x-rx)); px <= min(c.width-1, int(x+rx)); px++ {
 			u, v := (float64(px)-x)/rx, (float64(py)-y)/ry
@@ -51,9 +51,9 @@ func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px,
 		reach = math.Max(rx, rz)
 	}
 	boundX := reach * c.scale
-	boundY := math.Sqrt(ry*ry*0.69*0.69+reach*reach*0.72*0.72) * c.scale
-	// The view ray (0, 0.72, 0.69) in the ellipsoid's own frame, scaled by its radii.
-	dx, dy, dz := -0.69*sin/rx, 0.72/ry, 0.69*cos/rz
+	boundY := math.Sqrt(ry*ry*c.tiltCos*c.tiltCos+reach*reach*c.tiltSin*c.tiltSin) * c.scale
+	// The view ray (0, tiltSin, tiltCos) in the ellipsoid's own frame, scaled by its radii.
+	dx, dy, dz := -c.tiltCos*sin/rx, c.tiltSin/ry, c.tiltCos*cos/rz
 	a := dx*dx + dy*dy + dz*dz
 	// No point of the surface is nearer than this, so a pixel already holding something nearer is
 	// skipped before any ray casting.
@@ -64,7 +64,7 @@ func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px,
 				continue
 			}
 			u, v := (float64(px)-sx)/c.scale, (float64(py)-sy)/c.scale
-			ox, oy, oz := (u*cos-0.72*v*sin)/rx, -0.69*v/ry, (u*sin+0.72*v*cos)/rz
+			ox, oy, oz := (u*cos-c.tiltSin*v*sin)/rx, -c.tiltCos*v/ry, (u*sin+c.tiltSin*v*cos)/rz
 			b := 2 * (ox*dx + oy*dy + oz*dz)
 			d := ox*ox + oy*oy + oz*oz - 1
 			discriminant := b*b - 4*a*d
@@ -79,8 +79,8 @@ func ellipsoid(c *forestCanvas, x, y, z, rx, ry, rz, yaw float64, visit func(px,
 			lx, ly, lz := (ox+t*dx)/rx, (oy+t*dy)/ry, (oz+t*dz)/rz
 			normal := vec{lx*ownCos + lz*ownSin, ly, -lx*ownSin + lz*ownCos}.unit()
 			// The surface point across and toward the viewer, turned back into the world.
-			across, toward := u, v*0.72+t*0.69
-			point := vec{across*viewCos - toward*viewSin, -v*0.69 + t*0.72, across*viewSin + toward*viewCos}
+			across, toward := u, v*c.tiltSin+t*c.tiltCos
+			point := vec{across*viewCos - toward*viewSin, -v*c.tiltCos + t*c.tiltSin, across*viewSin + toward*viewCos}
 			visit(px, py, depth-t, point, normal)
 		}
 	}

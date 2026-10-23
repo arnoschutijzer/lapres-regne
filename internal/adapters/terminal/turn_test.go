@@ -46,6 +46,7 @@ func TestGroundAtFollowsTheTurnedView(t *testing.T) {
 func TestTheSunStaysPutAsTheCameraTurns(t *testing.T) {
 	c := &forestCanvas{width: 120, height: 120, scale: 10}
 	c.turnTo(math.Pi / 2)
+	c.tiltTo(tilt)
 	c.pixels = make([]forestPixel, c.width*c.height)
 	for i := range c.pixels {
 		c.pixels[i].depth = math.Inf(1)

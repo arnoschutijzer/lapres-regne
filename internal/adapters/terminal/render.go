@@ -213,6 +213,9 @@ type forestCanvas struct {
 	// yaw turns the world about the upright axis through x, z; at 0 north is up the canvas.
 	// yawSin and yawCos keep its sine and cosine for the many points projected each frame.
 	yaw, yawSin, yawCos float64
+	// tiltSin and tiltCos are the sine and cosine of the camera's tilt, how steeply it looks down
+	// on the ground.
+	tiltSin, tiltCos float64
 	// drawing is the standing tree being drawn, counting from 1 into the frame's trees; 0 for
 	// anything else.
 	drawing int
@@ -299,6 +302,15 @@ func (c *forestCanvas) standOn(x, z float64) {
 		return
 	}
 	c.lift = c.heightAt(x, z)
+}
+
+// tilt is how steeply the camera looks down on the ground, in radians above the horizon: 0 looks
+// along it, π/2 straight down.
+const tilt = 0.8067
+
+// tiltTo sets the canvas's tilt.
+func (c *forestCanvas) tiltTo(tilt float64) {
+	c.tiltSin, c.tiltCos = math.Sincos(tilt)
 }
 
 // turnTo sets the canvas's yaw.
@@ -395,14 +407,14 @@ func (c *forestCanvas) project(x, y, z float64) (float64, float64, float64) {
 	across, toward := c.toView(x, z)
 	y += c.lift - c.eye
 	return float64(c.width)/2 + across*c.scale,
-		float64(c.height)*0.57 + (toward*0.72-y*0.69)*c.scale,
-		-toward*0.69 - y*0.72
+		float64(c.height)*0.57 + (toward*c.tiltSin-y*c.tiltCos)*c.scale,
+		-toward*c.tiltCos - y*c.tiltSin
 }
 
 // screen is the canvas pixel showing a point of the world at a height, wherever is being drawn.
 func (c *forestCanvas) screen(x, y, z float64) (float64, float64) {
 	across, toward := c.toView(x, z)
-	return float64(c.width)/2 + across*c.scale, float64(c.height)*0.57 + (toward*0.72-(y-c.eye)*0.69)*c.scale
+	return float64(c.width)/2 + across*c.scale, float64(c.height)*0.57 + (toward*c.tiltSin-(y-c.eye)*c.tiltCos)*c.scale
 }
 
 // ground is the world position of the ground shown at the canvas pixel x, y.
@@ -414,7 +426,7 @@ func (c *forestCanvas) ground(x, y float64) (float64, float64) {
 // viewer is the direction from the ground toward the viewer, in the world.
 func (c *forestCanvas) viewer() vec {
 	sin, cos := c.yawSin, c.yawCos
-	return vec{-0.69 * sin, 0.72, 0.69 * cos}
+	return vec{-c.tiltCos * sin, c.tiltSin, c.tiltCos * cos}
 }
 
 // mayShow tells whether any part of a tree can reach the canvas, judged by generous bounds around
@@ -452,6 +464,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	cameraX, cameraZ := r.camera.x, r.camera.z
 	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
 	c.turnTo(r.turn.current)
+	c.tiltTo(tilt)
 	storey, shown := f.Storey(), r.shownStoreys()
 	c.elevation, c.highest, c.lift = f.Elevation, f.Highest()+float64(shown)*world.StoreyHeight, 0
 	c.surface, c.floor, c.clearing = nil, nil, clearing{}
@@ -498,7 +511,7 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	sort.Slice(trees, func(i, j int) bool {
 		_, towardI := c.toView(trees[i].X, trees[i].Z)
 		_, towardJ := c.toView(trees[j].X, trees[j].Z)
-		return towardI*0.69+trees[i].Height*0.72 > towardJ*0.69+trees[j].Height*0.72
+		return towardI*c.tiltCos+trees[i].Height*c.tiltSin > towardJ*c.tiltCos+trees[j].Height*c.tiltSin
 	})
 	// A map's water lies in its tiles, so only the endless forest samples its rivers.
 	if f.Mapped() {
@@ -867,18 +880,18 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 	quiet := c.quiet()
 	across := (float64(x) - float64(c.width)/2) / c.scale
-	step := 1 / (0.72 * c.scale)
+	step := 1 / (c.tiltSin * c.scale)
 	// The nearest ground that can show lies below the bottom of the canvas even where it lies
 	// highest, and the farthest lies above the top even where it lies lowest.
-	near := (0.43*float64(c.height)/c.scale+0.69*(c.highest-c.eye))/0.72 + step
-	far := (-0.57*float64(c.height)/c.scale-0.69*c.eye)/0.72 - step
+	near := (0.43*float64(c.height)/c.scale+c.tiltCos*(c.highest-c.eye))/c.tiltSin + step
+	far := (-0.57*float64(c.height)/c.scale-c.tiltCos*c.eye)/c.tiltSin - step
 	// top is the highest row drawn so far; the march draws upward from it.
 	top := c.height
 	type sample struct{ x, z, height, toward, y float64 }
 	at := func(toward float64) sample {
 		wx, wz := c.fromView(across, toward)
 		height := c.surfaceAt(wx, wz) - c.eye
-		return sample{wx, wz, height, toward, float64(c.height)*0.57 + (toward*0.72-height*0.69)*c.scale}
+		return sample{wx, wz, height, toward, float64(c.height)*0.57 + (toward*c.tiltSin-height*c.tiltCos)*c.scale}
 	}
 	previous := at(near)
 	for toward := near - step; toward >= far && top > 0; toward -= step {
@@ -895,7 +908,7 @@ func (r *renderer) groundColumn(c *forestCanvas, x int, seconds float64) {
 				float64(y),
 			}
 			ink, light := r.groundLight(c, point.x, point.z, point.height+c.eye, seconds)
-			c.pixels[y*c.width+x] = forestPixel{-point.toward*0.69 - point.height*0.72, light * quiet, ink, 0, 0}
+			c.pixels[y*c.width+x] = forestPixel{-point.toward*c.tiltCos - point.height*c.tiltSin, light * quiet, ink, 0, 0}
 			c.under[y*c.width+x] = groundPoint{point.x, point.z}
 		}
 		previous = current
@@ -950,6 +963,7 @@ func (r *renderer) reveal(c *forestCanvas, seconds float64) {
 type hidingView struct {
 	judged                        bool
 	x, z, yawSin, yawCos, highest float64
+	tiltSin                       float64
 	storey, floors, roofs         int
 	col, row, cols, rows          int
 }
@@ -960,7 +974,7 @@ type hidingView struct {
 func (r *renderer) heroHidden(c *forestCanvas) bool {
 	x, z := r.world.Hero().Position()
 	view := hidingView{
-		judged: true, x: x, z: z, yawSin: c.yawSin, yawCos: c.yawCos, highest: c.highest,
+		judged: true, x: x, z: z, yawSin: c.yawSin, yawCos: c.yawCos, highest: c.highest, tiltSin: c.tiltSin,
 		storey: r.world.Storey(), floors: len(r.upstairs), roofs: len(r.built.roofs),
 		col: r.built.col, row: r.built.row, cols: r.built.cols, rows: r.built.rows,
 	}

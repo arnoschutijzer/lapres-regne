@@ -81,7 +81,7 @@ func (b heroBody) eye(side float64) {
 	length := math.Hypot(normalSide, normalForward)
 	normalX, normalZ := normalSide*b.sideX+normalForward*b.forwardX, normalSide*b.sideZ+normalForward*b.forwardZ
 	viewer := b.c.viewer()
-	if (normalX*viewer.x+normalZ*viewer.z)/(0.69*length) < 0.15 {
+	if (normalX*viewer.x+normalZ*viewer.z)/(b.c.tiltCos*length) < 0.15 {
 		return
 	}
 	y, carried := b.carry(1.54, forward)
