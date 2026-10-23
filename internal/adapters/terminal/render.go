@@ -696,7 +696,7 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 	}
 	hint := "  arrows/WASD/IJKL · shift run · E act · Tab bag · B bank · X drop · Q quit"
 	if width >= 81 {
-		hint += " · N/P tracks · V style"
+		hint += " · N/P tracks · V style: " + r.style.Name()
 	}
 	if message := r.world.Message(); message != "" {
 		hint = "  " + message

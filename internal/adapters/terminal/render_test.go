@@ -391,6 +391,14 @@ func TestTheMenuNamesTheTreeAndMessagesShowOnTheHintLine(t *testing.T) {
 	}
 }
 
+func TestTheHintLineNamesTheStyle(t *testing.T) {
+	r := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne")
+	r.style = Bold{}
+	if frame := r.frame(120, 30, 0); !strings.Contains(frame, "V style: bold") {
+		t.Fatal("the hint line must name the style the world is drawn in")
+	}
+}
+
 func TestTheStatusLineNoLongerCountsLogs(t *testing.T) {
 	r := newRenderer(besideTree(), NewCamera(0, 0), "L’Après-Règne")
 	if frame := r.frame(100, 30, 0); strings.Contains(frame, "logs") {
