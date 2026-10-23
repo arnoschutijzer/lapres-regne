@@ -125,6 +125,29 @@ func TestAFloorHasNoGroundWhereItIsOpenToTheAir(t *testing.T) {
 	}
 }
 
+// cornered is the tower with a wall on its first floor rising across the floor's north-west corner
+// tile, column 2, row 1, from that tile's south-west corner to its north-east.
+func cornered() world.Map {
+	m := tower()
+	rising := [][]world.Ground{make([]world.Ground, 3), {world.Grass, world.Grass, world.Wall}}
+	m.Upstairs[0].Edges = world.Edges{Rising: rising}
+	return m
+}
+
+func TestAFloorEndsAtAWallAcrossItsCornerTile(t *testing.T) {
+	w := world.NewOnMap(7, cornered())
+	if ground, ok := w.GroundOn(1, 2.2*world.TileSize, 1.2*world.TileSize); ok {
+		t.Fatalf("ground on the first floor outside the diagonal wall = %v; want none", ground)
+	}
+}
+
+func TestAFloorRunsUpToAWallAcrossItsCornerTile(t *testing.T) {
+	w := world.NewOnMap(7, cornered())
+	if ground, ok := w.GroundOn(1, 2.8*world.TileSize, 1.8*world.TileSize); !ok || ground != world.Boards {
+		t.Fatalf("ground on the first floor inside the diagonal wall = %v, %v; want boards", ground, ok)
+	}
+}
+
 func TestApproachingAStaircaseClimbsItOnArrival(t *testing.T) {
 	m := tower()
 	m.StartCol, m.StartRow = 2, 4

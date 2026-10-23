@@ -52,11 +52,40 @@ func (w *World) GroundOn(storey int, x, z float64) (Ground, bool) {
 	if w.terrain == nil {
 		return 0, false
 	}
-	ground, ok := w.floor(storey).at(x, z)
-	if storey > 0 && ground == Grass {
+	floor := w.floor(storey)
+	ground, ok := floor.at(x, z)
+	if storey > 0 && (ground == Grass || floor.outsideDiagonal(x, z)) {
 		return 0, false
 	}
 	return ground, ok
+}
+
+// outsideDiagonal tells whether a world position lies on the side of a wall or fence running
+// diagonally across its tile where both tiles beside that side are open to the air, so a floor
+// above the ground floor ends at the wall there.
+func (t *terrain) outsideDiagonal(x, z float64) bool {
+	here := tileOf(x, z)
+	u, v := x/TileSize-float64(here.gx), z/TileSize-float64(here.gz)
+	open := func(dx, dz int) bool {
+		ground, ok := t.tile(here.gx+dx, here.gz+dz)
+		return !ok || ground == Grass
+	}
+	edges := t.edgesOf(here)
+	if bars(edges.Rising) {
+		// The wall runs from the south-west corner to the north-east, between the north-west half
+		// and the south-east.
+		if u+v < 1 && open(-1, 0) && open(0, -1) || u+v > 1 && open(1, 0) && open(0, 1) {
+			return true
+		}
+	}
+	if bars(edges.Falling) {
+		// The wall runs from the north-west corner to the south-east, between the north-east half
+		// and the south-west.
+		if u > v && open(1, 0) && open(0, -1) || u < v && open(-1, 0) && open(0, 1) {
+			return true
+		}
+	}
+	return false
 }
 
 // EdgesOn is what stands along the edges of the tile at a world position on a floor.
