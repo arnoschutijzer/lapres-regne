@@ -472,3 +472,101 @@ func standsInFront(c *forestCanvas, x, y int) bool {
 	}
 	return false
 }
+
+// Solid draws every surface in flat color, a few shades to each material, and keeps dither dots
+// for where one shade gives way to the next and where two materials meet within a cell.
+type Solid struct{}
+
+func (Solid) Name() string { return "solid" }
+
+// solidShades is how many flat shades of each material the solid style shows, from solidDarkest of
+// its color in the deepest shade up to all of it in full light, and solidBlend how much of the
+// step between two shades is dithered, so most of a surface shows one shade or the other in solid
+// color.
+const (
+	solidShades  = 4
+	solidDarkest = 0.35
+	solidBlend   = 0.4
+)
+
+// solidSpeck is how many unlit pixels within a cell its surface fills rather than dotting them.
+const solidSpeck = 2
+
+func (Solid) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
+	// out is how far the view is zoomed out, from 0 at the zoom where trees show their detail to 1
+	// all the way out, where the ground quiets as in the bold style.
+	out := c.underlay() - 1
+	var colors [8][3]int
+	var tally [8]struct {
+		color [3]int
+		count int
+	}
+	kinds := 0
+	for dy := range 4 {
+		for dx := range 2 {
+			x, y := col*2+dx, row*4+dy
+			p := c.pixels[y*c.width+x]
+			if p.light > 0 && figureInk(p.ink) {
+				return c.figureCell(col, row)
+			}
+			color := background
+			if p.light > 0 {
+				color = mix(background, palette[p.ink], solidShade(p.light, x, y))
+				if groundInk(p.ink) {
+					color = mix(background, color, 1-(1-boldFaintestGround)*out)
+				}
+			}
+			colors[dy*2+dx] = color
+			at := 0
+			for at < kinds && tally[at].color != color {
+				at++
+			}
+			if at == kinds {
+				tally[at].color = color
+				kinds++
+			}
+			tally[at].count++
+		}
+	}
+	// The most common color fills the cell and the next is dotted over it; any other color takes
+	// whichever of the two lies nearer.
+	first, second := 0, -1
+	for i := 1; i < kinds; i++ {
+		if tally[i].count > tally[first].count {
+			first = i
+		}
+	}
+	for i := range kinds {
+		if i != first && (second < 0 || tally[i].count > tally[second].count) {
+			second = i
+		}
+	}
+	drawn := forestCell{inked: true, paper: tally[first].color, color: tally[first].color}
+	// A pixel or two left unlit within a surface would show as black specks, so the surface fills
+	// them.
+	if second < 0 || tally[second].color == background && tally[second].count <= solidSpeck {
+		return drawn
+	}
+	drawn.color = tally[second].color
+	for dy := range 4 {
+		for dx := range 2 {
+			color := colors[dy*2+dx]
+			if colorDistance(color, drawn.color) < colorDistance(color, drawn.paper) {
+				drawn.bits |= 1 << brailleDot[dy][dx]
+			}
+		}
+	}
+	return drawn
+}
+
+// solidShade is how much of its material's color a lit canvas pixel at x, y shows in its light: the
+// nearest of solidShades, dithered with the next only within solidBlend of the step between them.
+func solidShade(light float64, x, y int) float64 {
+	level := min(1, light) * solidShades
+	lower := math.Floor(level)
+	blend := min(1, max(0, (level-lower-(1-solidBlend)/2)/solidBlend))
+	if blend > ordered(x, y) {
+		lower++
+	}
+	return solidDarkest + (1-solidDarkest)*(min(solidShades, max(1, lower))-1)/(solidShades-1)
+}

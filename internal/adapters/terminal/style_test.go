@@ -322,3 +322,36 @@ func TestBoldFramesDrawBraille(t *testing.T) {
 		t.Error("a bold frame draws no braille dots")
 	}
 }
+
+func TestSolidFillsAnEvenlyLitSurfaceInFlatColor(t *testing.T) {
+	cell := Solid{}.cell(evenCanvas(3, 3, 4, 1), forestPalette[:], 1, 1)
+	if cell.bits != 0 || cell.paper != forestPalette[4] {
+		t.Errorf("bark in full light draws dots %08b on %v; want no dots on its own color %v", cell.bits, cell.paper, forestPalette[4])
+	}
+}
+
+func TestSolidDithersOnlyBetweenShades(t *testing.T) {
+	// Light 0.625 lies halfway between two of the four shades; 0.52 lies just past one.
+	between := Solid{}.cell(evenCanvas(3, 3, 4, 0.625), forestPalette[:], 1, 1)
+	if between.bits == 0 || between.color == between.paper {
+		t.Errorf("bark between two shades draws dots %08b in %v on %v; want two shades dithered", between.bits, between.color, between.paper)
+	}
+	if flat := (Solid{}).cell(evenCanvas(3, 3, 4, 0.52), forestPalette[:], 1, 1); flat.bits != 0 {
+		t.Errorf("bark just past a shade draws dots %08b; want one flat shade", flat.bits)
+	}
+}
+
+func TestSolidDotsTheSecondMaterialInAMixedCell(t *testing.T) {
+	cell := Solid{}.cell(oneCell(4, 1, 33, 1), forestPalette[:], 0, 0)
+	if dots(cell) != 4 || cell.paper == cell.color {
+		t.Errorf("bark over planks draws %d dots in %v on %v; want the half in one material dotted over the other", dots(cell), cell.color, cell.paper)
+	}
+}
+
+func TestSolidFillsAStrayUnlitPixel(t *testing.T) {
+	c := evenCanvas(1, 1, 4, 1)
+	c.pixels[3].light = 0
+	if cell := (Solid{}).cell(c, forestPalette[:], 0, 0); cell.bits != 0 {
+		t.Errorf("bark with one unlit pixel draws dots %08b; want it filled", cell.bits)
+	}
+}
