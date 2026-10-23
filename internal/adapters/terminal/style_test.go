@@ -269,8 +269,9 @@ func TestBoldLaysStandingThingsOnASolidBlockOfTheirColor(t *testing.T) {
 	}
 }
 
-func TestBoldKeepsTheGroundDotted(t *testing.T) {
+func TestBoldKeepsTheGroundDottedCloseUp(t *testing.T) {
 	c := evenCanvas(3, 3, 1, 0.8)
+	c.scale = detailScale
 	bold, dither := Bold{}.cell(c, forestPalette[:], 1, 1), Dithered{}.cell(c, forestPalette[:], 1, 1)
 	if bold.bits != dither.bits || bold.paper != dither.paper {
 		t.Errorf("bold grass draws dots %08b on %v; want the dither's %08b on %v", bold.bits, bold.paper, dither.bits, dither.paper)
@@ -283,6 +284,9 @@ func TestBoldQuietsTheGroundWhenZoomedOut(t *testing.T) {
 	far, near := Bold{}.cell(out, forestPalette[:], 1, 1), Bold{}.cell(close, forestPalette[:], 1, 1)
 	if brightnessOf(far.color) >= brightnessOf(near.color) {
 		t.Errorf("grass dots zoomed out show %v; want fainter than close up, %v", far.color, near.color)
+	}
+	if brightnessOf(far.paper) >= brightnessOf((Dithered{}).cell(out, forestPalette[:], 1, 1).paper) {
+		t.Errorf("grass paper zoomed out is %v; want fainter than the dither's", far.paper)
 	}
 	if want := standOut(forestPalette[1], near.paper); near.color != want {
 		t.Errorf("grass dots close up show %v; want the dither's %v", near.color, want)

@@ -360,13 +360,13 @@ const (
 	boldCoverage  = 1
 )
 
-// boldFaintestGround is how strongly the ground's dots show when zoomed all the way out, easing to
-// full strength from the zoom where trees show their detail, so blocks stand out of a quiet ground
-// when the view takes in a lot; boldDimmestShade is the dimmest shade a block takes there, so trees
-// in deep shade still read as shapes.
+// boldFaintestGround is how strongly the ground's dots and paper show when zoomed all the way out,
+// easing to full strength from the zoom where trees show their detail, so blocks stand out of a
+// quiet ground when the view takes in a lot; boldDimmestShade is the dimmest shade a block takes
+// there, so trees in deep shade still read as shapes.
 const (
 	boldFaintestGround = 0.4
-	boldDimmestShade   = 0.4
+	boldDimmestShade   = 0.5
 )
 
 func (Bold) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
@@ -383,8 +383,10 @@ func (Bold) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 		if drawn.paper != background {
 			dot = standOut(dot, drawn.paper)
 		}
+		quiet := 1 - (1-boldFaintestGround)*out
 		drawn.inked = true
-		drawn.color = mix(background, dot, 1-(1-boldFaintestGround)*out)
+		drawn.color = mix(background, dot, quiet)
+		drawn.paper = mix(background, drawn.paper, quiet)
 		return drawn
 	}
 	// A few flat shades keep the block solid, never so dim that it sinks into the ground.
