@@ -389,6 +389,17 @@ func (Bold) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 		drawn.paper = mix(background, drawn.paper, quiet)
 		return drawn
 	}
+	// A block takes the light of the brightest of its material beside it too, so a cell lying wholly
+	// on a darker stone or a seam of mortar keeps the shade of the face around it.
+	for _, step := range [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
+		beside, below := col+step[0], row+step[1]
+		if beside < 0 || below < 0 || beside >= c.width/2 || below >= c.height/4 {
+			continue
+		}
+		if next := boldBlock(c, beside, below); next.ink == block.ink {
+			block.light = max(block.light, next.light)
+		}
+	}
 	// A few flat shades keep the block solid, never so dim that it sinks into the ground.
 	shade := max(1, float64(int(block.light*pixelShades+0.5))) / pixelShades
 	shade = max(shade, boldDimmestShade*out)
@@ -411,8 +422,9 @@ func groundInk(ink int) bool {
 }
 
 // block is the material laid flat under a cell's dots: the one covering most of its pixels,
-// prominent ones counting double, at their mean light, and whether any of those pixels stands well
-// in front of a neighbour.
+// prominent ones counting double, at the light of the brightest of them, so the stonework's mortar
+// and darker stones leave the shade to the dots, and whether any of those pixels stands well in
+// front of a neighbour.
 type block struct {
 	ink, coverage int
 	light         float64
@@ -438,7 +450,7 @@ func boldBlock(c *forestCanvas, col, row int) block {
 				inks++
 			}
 			tally[at].coverage++
-			tally[at].light += p.light
+			tally[at].light = max(tally[at].light, p.light)
 			tally[at].rim = tally[at].rim || standsInFront(c, x, y)
 		}
 	}
@@ -452,9 +464,7 @@ func boldBlock(c *forestCanvas, col, row int) block {
 			best, score = counted, weight
 		}
 	}
-	if best.coverage > 0 {
-		best.light = min(1, best.light/float64(best.coverage))
-	}
+	best.light = min(1, best.light)
 	return best
 }
 

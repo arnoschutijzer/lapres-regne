@@ -300,6 +300,20 @@ func TestBoldShadesBlocksInFlatBands(t *testing.T) {
 	}
 }
 
+func TestBoldShadesAWallByItsLightNotItsStonework(t *testing.T) {
+	// A stone wall in full light, its middle cell lying wholly on a darker stone.
+	c := evenCanvas(3, 3, stoneInk, 0.9)
+	for y := 4; y < 8; y++ {
+		for x := 2; x < 4; x++ {
+			c.pixels[y*c.width+x].light = 0.9 * 0.72
+		}
+	}
+	darker, lighter := Bold{}.cell(c, forestPalette[:], 1, 1), Bold{}.cell(c, forestPalette[:], 0, 1)
+	if darker.paper != lighter.paper {
+		t.Errorf("a darker stone lies on %v; want the wall's own shade, %v", darker.paper, lighter.paper)
+	}
+}
+
 func TestBoldRimsWhatStandsInFront(t *testing.T) {
 	// Two cells side by side: the left one's bark stands far in front of the right one's.
 	c := evenCanvas(2, 1, 4, 1)
