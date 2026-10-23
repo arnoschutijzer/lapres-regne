@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"math"
+	"slices"
 	"testing"
 	"time"
 
@@ -134,5 +135,18 @@ func TestTheViewLooksDownAtTheCamerasTilt(t *testing.T) {
 	c := newRenderer(world.New(7), camera, "L’Après-Règne").render(100, 27, 0)
 	if math.Abs(c.viewer().y-math.Sin(highestTilt)) > 1e-9 {
 		t.Fatalf("the view looks down along %+v, want the camera's tilt %v", c.viewer(), highestTilt)
+	}
+}
+
+func TestTheViewHoldsStillWhileTheCameraSettlesWithinAPixel(t *testing.T) {
+	w := cottage()
+	x, z := w.Hero().Position()
+	r := newRenderer(w, NewCamera(6, 0.6), "L’Après-Règne")
+	r.camera.lookAt(x, z)
+	settled := slices.Clone(r.render(100, 30, 0).pixels)
+	// The camera eases ever closer to the hero, by far less than a pixel, long after they stop.
+	r.camera.lookAt(x+0.0004, z-0.0003)
+	if moved := r.render(100, 30, 0).pixels; !slices.Equal(moved, settled) {
+		t.Fatal("the view redraws differently as the camera settles within a pixel; want it holding still")
 	}
 }

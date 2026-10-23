@@ -395,6 +395,17 @@ func (c *forestCanvas) toView(x, z float64) (across, toward float64) {
 	return x*cos + z*sin, -x*sin + z*cos
 }
 
+// snapped is the nearest position to x, z that shows the ground a whole canvas pixel across and
+// a whole row down from its neighbours, so the view moves only in whole pixels and holds still
+// while the camera eases the last fractions of a pixel onto the hero.
+func (c *forestCanvas) snapped(x, z float64) (float64, float64) {
+	sin, cos := c.yawSin, c.yawCos
+	acrossStep, towardStep := 1/c.scale, 1/(c.scale*c.tiltSin)
+	across := math.Round((x*cos+z*sin)/acrossStep) * acrossStep
+	toward := math.Round((-x*sin+z*cos)/towardStep) * towardStep
+	return across*cos - toward*sin, across*sin + toward*cos
+}
+
 // fromView turns an offset in the view's frame back into a world position.
 func (c *forestCanvas) fromView(across, toward float64) (x, z float64) {
 	sin, cos := c.yawSin, c.yawCos
@@ -459,10 +470,11 @@ func (c *forestCanvas) line(x1, y1, z1, x2, y2, z2, light float64, ink int) {
 func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	f := r.world
 	c := &r.canvas
-	cameraX, cameraZ := r.camera.x, r.camera.z
-	c.width, c.height, c.x, c.z, c.scale = cols*2, rows*4, cameraX, cameraZ, r.zoom.scale()
+	c.width, c.height, c.scale = cols*2, rows*4, r.zoom.scale()
 	c.turnTo(r.turn.current)
 	c.tiltTo(r.tilting.current)
+	cameraX, cameraZ := c.snapped(r.camera.x, r.camera.z)
+	c.x, c.z = cameraX, cameraZ
 	storey, shown := f.Storey(), r.shownStoreys()
 	c.elevation, c.highest, c.lift = f.Elevation, f.Highest()+float64(shown)*world.StoreyHeight, 0
 	c.surface, c.floor, c.clearing = nil, nil, clearing{}
