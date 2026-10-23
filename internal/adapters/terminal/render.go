@@ -129,6 +129,9 @@ type forestPixel struct {
 	// doorway is the doorway drawn here, counting from 1 into the frame's doorways; 0 for anything
 	// else.
 	doorway int
+	// face is the light falling on the face of a structure or model drawn here, before its surface
+	// patterns it; 0 for anything else.
+	face float64
 }
 
 type forestCell struct {
@@ -225,6 +228,8 @@ type forestCanvas struct {
 	// counting from 1 into them; 0 for anything else.
 	doorways       []world.Doorway
 	drawingDoorway int
+	// drawingFace is the light falling on the face being drawn; 0 while no face is.
+	drawingFace float64
 	// bandFrom and bandTo limit what is plotted to the rows from bandFrom up to bandTo, so bands of
 	// one canvas can be drawn at once; while bandTo is 0 every row is plotted.
 	bandFrom, bandTo int
@@ -442,7 +447,7 @@ func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
 	}
 	i := y*c.width + x
 	if depth <= c.pixels[i].depth {
-		c.pixels[i] = forestPixel{depth, light, ink, c.drawing, c.drawingDoorway}
+		c.pixels[i] = forestPixel{depth, light, ink, c.drawing, c.drawingDoorway, c.drawingFace}
 	}
 }
 
@@ -932,7 +937,7 @@ func (r *renderer) march(c *forestCanvas, x int, seconds float64, floors bool) {
 				continue
 			}
 			ink, light := r.groundLight(c, point.x, point.z, point.height+c.eye, floors, seconds)
-			c.pixels[y*c.width+x] = forestPixel{-point.toward*c.tiltCos - point.height*c.tiltSin, light * quiet, ink, 0, 0}
+			c.pixels[y*c.width+x] = forestPixel{-point.toward*c.tiltCos - point.height*c.tiltSin, light * quiet, ink, 0, 0, 0}
 			c.under[y*c.width+x] = groundPoint{point.x, point.z}
 		}
 		previous = current

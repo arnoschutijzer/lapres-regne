@@ -303,6 +303,9 @@ func TestBoldShadesBlocksInFlatBands(t *testing.T) {
 func TestBoldShadesAWallByItsLightNotItsStonework(t *testing.T) {
 	// A stone wall in full light, its middle cell lying wholly on a darker stone.
 	c := evenCanvas(3, 3, stoneInk, 0.9)
+	for i := range c.pixels {
+		c.pixels[i].face = 0.9
+	}
 	for y := 4; y < 8; y++ {
 		for x := 2; x < 4; x++ {
 			c.pixels[y*c.width+x].light = 0.9 * 0.72
@@ -367,5 +370,24 @@ func TestSolidFillsAStrayUnlitPixel(t *testing.T) {
 	c.pixels[3].light = 0
 	if cell := (Solid{}).cell(c, forestPalette[:], 0, 0); cell.bits != 0 {
 		t.Errorf("bark with one unlit pixel draws dots %08b; want it filled", cell.bits)
+	}
+}
+
+func TestBoldLaysAWallFaceInOneFlatShade(t *testing.T) {
+	_, c := closeView(cottage())
+	papers := map[int]map[[3]int]bool{stoneInk: {}, shadedStoneInk: {}}
+	for row := range c.height / 4 {
+		for col := range c.width / 2 {
+			block := boldBlock(c, col, row)
+			if shades, stone := papers[block.ink]; stone && block.coverage == 8 && !block.rim {
+				shades[Bold{}.cell(c, forestPalette[:], col, row).paper] = true
+			}
+		}
+	}
+	for ink, shades := range papers {
+		t.Logf("ink %d lies on %d shades", ink, len(shades))
+	}
+	if len(papers[shadedStoneInk]) == 0 || len(papers[shadedStoneInk]) > 2 {
+		t.Fatalf("the walls' shaded stone lies on %d shades; want each face flat in one", len(papers[shadedStoneInk]))
 	}
 }

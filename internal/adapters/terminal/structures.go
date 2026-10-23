@@ -107,6 +107,7 @@ func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 	if c.bandTo > 0 {
 		top, bottom = max(top, c.bandFrom), min(bottom, c.bandTo-1)
 	}
+	c.drawingFace = light
 	for py := max(0, top); py <= min(c.height-1, bottom); py++ {
 		for px := max(0, left); px <= min(c.width-1, right); px++ {
 			// The pixel's place on the face, as fractions along u and v.
@@ -131,6 +132,7 @@ func (c *forestCanvas) fill(f face, ink int, pattern surface) {
 			c.plot(px, py, od+s*ud+t*vd-0.01, brightness, pointInk)
 		}
 	}
+	c.drawingFace = 0
 }
 
 // box draws a block standing on the ground from x0, z0 to x1, z1, between heights y0 and y1.
