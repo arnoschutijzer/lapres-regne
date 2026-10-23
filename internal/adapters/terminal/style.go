@@ -340,3 +340,114 @@ func (Etched) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 
 // jittered blends the ordered dither's threshold with scattered grain.
 func jittered(x, y int) float64 { return (1-etchJitter)*ordered(x, y) + etchJitter*grain(x, y) }
+
+// Bold keeps the dither's ordered colored dots but lays whatever stands on the ground over flat
+// blocks of its material's color in a few shades, and rims it in a darker shade where it stands in
+// front of what lies behind it, so trees, walls and figures read as solid shapes with clear edges
+// over the dotted ground.
+type Bold struct{}
+
+func (Bold) Name() string { return "bold" }
+
+// boldPaper is how strongly the flat block under the dots shows its material's color in full light
+// at the zoom where trees show their detail, strengthened farther out as the dither's paper is, up
+// to boldStrongest; boldRim is how strongly its rim does, and boldCoverage how many of a cell's eight pixels a material
+// must cover to lay its block.
+const (
+	boldPaper     = 0.55
+	boldStrongest = 0.85
+	boldRim       = 0.15
+	boldCoverage  = 3
+)
+
+func (Bold) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
+	drawn := dottedCell(c, palette, col, row, ordered)
+	if drawn.solid {
+		return drawn
+	}
+	block := boldBlock(c, col, row)
+	if block.coverage < boldCoverage || groundInk(block.ink) {
+		return drawn
+	}
+	// A few flat shades keep the block solid, never so dim that it sinks into the ground.
+	shade := max(1, float64(int(block.light*pixelShades+0.5))) / pixelShades
+	strength := min(boldStrongest, boldPaper*c.underlay()) * shade
+	if block.rim {
+		strength = boldRim
+	}
+	drawn.paper = mix(background, palette[block.ink], strength)
+	return drawn
+}
+
+// groundInk marks the inks of the ground and what lies flat on it: grass, water, paths, floors and
+// their shadows, which stay dotted so what stands on them reads as a shape.
+func groundInk(ink int) bool {
+	switch ink {
+	case 0, 1, 5, 6, 7, pathInk, floorInk, shadowGrassInk, shadowPathInk, shadowFloorInk, bankInk, boardsInk:
+		return true
+	}
+	return false
+}
+
+// block is the material laid flat under a cell's dots: the one covering most of its pixels,
+// prominent ones counting double, at their mean light, and whether any of those pixels stands well
+// in front of a neighbour.
+type block struct {
+	ink, coverage int
+	light         float64
+	rim           bool
+}
+
+func boldBlock(c *forestCanvas, col, row int) block {
+	var tally [8]block
+	inks := 0
+	for dy := range 4 {
+		for dx := range 2 {
+			x, y := col*2+dx, row*4+dy
+			p := c.pixels[y*c.width+x]
+			if p.light <= 0 {
+				continue
+			}
+			at := 0
+			for at < inks && tally[at].ink != p.ink {
+				at++
+			}
+			if at == inks {
+				tally[at].ink = p.ink
+				inks++
+			}
+			tally[at].coverage++
+			tally[at].light += p.light
+			tally[at].rim = tally[at].rim || standsInFront(c, x, y)
+		}
+	}
+	best, score := block{}, 0
+	for _, counted := range tally[:inks] {
+		weight := counted.coverage
+		if prominent(counted.ink) {
+			weight *= 2
+		}
+		if weight > score {
+			best, score = counted, weight
+		}
+	}
+	if best.coverage > 0 {
+		best.light = min(1, best.light/float64(best.coverage))
+	}
+	return best
+}
+
+// standsInFront tells whether the canvas pixel at x, y stands well in front of a neighbour.
+func standsInFront(c *forestCanvas, x, y int) bool {
+	depth := c.pixels[y*c.width+x].depth
+	for _, step := range [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
+		nx, ny := x+step[0], y+step[1]
+		if nx < 0 || ny < 0 || nx >= c.width || ny >= c.height {
+			continue
+		}
+		if c.pixels[ny*c.width+nx].depth-depth > outlineGap {
+			return true
+		}
+	}
+	return false
+}

@@ -257,3 +257,51 @@ func TestEtchScattersDotsUnlikeTheOrderedDither(t *testing.T) {
 	}
 	t.Error("etched dots fall exactly where the ordered dither's do; want them jittered")
 }
+
+func TestBoldLaysStandingThingsOnASolidBlockOfTheirColor(t *testing.T) {
+	c := evenCanvas(3, 3, 4, 0.8)
+	bold, dither := Bold{}.cell(c, forestPalette[:], 1, 1), Dithered{}.cell(c, forestPalette[:], 1, 1)
+	if bold.bits != dither.bits || bold.ink != dither.ink {
+		t.Errorf("bold bark draws dots %08b in ink %d; want the dither's %08b in %d", bold.bits, bold.ink, dither.bits, dither.ink)
+	}
+	if brightnessOf(bold.paper) <= brightnessOf(dither.paper) {
+		t.Errorf("bold bark lies on %v; want a stronger block than the dither's %v", bold.paper, dither.paper)
+	}
+}
+
+func TestBoldKeepsTheGroundDotted(t *testing.T) {
+	c := evenCanvas(3, 3, 1, 0.8)
+	if bold, dither := (Bold{}).cell(c, forestPalette[:], 1, 1), (Dithered{}).cell(c, forestPalette[:], 1, 1); bold != dither {
+		t.Errorf("bold grass draws %+v; want it as the dither draws it, %+v", bold, dither)
+	}
+}
+
+func TestBoldShadesBlocksInFlatBands(t *testing.T) {
+	darker, lighter := Bold{}.cell(oneCell(4, 0.62, 4, 0.62), forestPalette[:], 0, 0), Bold{}.cell(oneCell(4, 0.66, 4, 0.66), forestPalette[:], 0, 0)
+	if darker.paper != lighter.paper {
+		t.Errorf("nearly equal light lays %v and %v; want one flat shade", darker.paper, lighter.paper)
+	}
+}
+
+func TestBoldRimsWhatStandsInFront(t *testing.T) {
+	// Two cells side by side: the left one's bark stands far in front of the right one's.
+	c := evenCanvas(2, 1, 4, 1)
+	for i := range c.pixels {
+		if i%4 < 2 {
+			c.pixels[i].depth = -5
+		}
+	}
+	rim, inside := Bold{}.cell(c, forestPalette[:], 0, 0), Bold{}.cell(evenCanvas(1, 1, 4, 1), forestPalette[:], 0, 0)
+	if brightnessOf(rim.paper) >= brightnessOf(inside.paper) {
+		t.Errorf("bark at the silhouette lies on %v; want darker than bark within it, %v", rim.paper, inside.paper)
+	}
+}
+
+func TestBoldFramesDrawBraille(t *testing.T) {
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
+	r.style = Bold{}
+	frame := r.frame(100, 30, 0)
+	if !strings.ContainsFunc(frame, func(glyph rune) bool { return glyph > 0x2800 && glyph <= 0x28ff }) {
+		t.Error("a bold frame draws no braille dots")
+	}
+}
