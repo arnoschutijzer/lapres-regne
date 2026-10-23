@@ -232,3 +232,87 @@ func artPixel(c *forestCanvas, left, top int) art {
 	chosen := tally[best]
 	return art{ink: chosen.ink, light: min(1, chosen.light/float64(chosen.coverage)), depth: front, lit: true}
 }
+
+// Stippled draws the world as a pointillist engraving: dark ink dots scattered over parchment,
+// thickest where a material is dark or lies in shadow, an unbroken line of ink where something
+// stands in front of what lies behind it, and the hero in dense ink.
+type Stippled struct{}
+
+func (Stippled) Name() string { return "stipple" }
+
+// parchment is the paper the stipple is drawn on, and stippleInk the color of its dots.
+var (
+	parchment  = [3]int{150, 140, 116}
+	stippleInk = [3]int{30, 25, 22}
+)
+
+// stippleWash is how far the paper under a cell darkens toward the ink as its dots thicken, so
+// broad dark surfaces read as shade between the dots.
+const stippleWash = 0.12
+
+func (Stippled) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
+	bits := 0
+	shade := 0.0
+	for dy := range 4 {
+		for dx := range 2 {
+			x, y := col*2+dx, row*4+dy
+			darkness := stippleDarkness(c, palette, x, y)
+			shade += darkness
+			if darkness > grain(x, y) {
+				bits |= 1 << brailleDot[dy][dx]
+			}
+		}
+	}
+	return forestCell{bits: uint8(bits), inked: true, color: stippleInk, paper: mix(parchment, stippleInk, stippleWash*shade/8)}
+}
+
+// stippleDarkness is how likely the canvas pixel at x, y is to take a dot: none where nothing is
+// drawn, all but certain on the hero and along an edge, and elsewhere the darkness of its
+// material's color in its light.
+func stippleDarkness(c *forestCanvas, palette [][3]int, x, y int) float64 {
+	p := c.pixels[y*c.width+x]
+	if p.light <= 0 {
+		return 0
+	}
+	if figureInk(p.ink) {
+		return 0.92
+	}
+	for _, step := range [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
+		nx, ny := x+step[0], y+step[1]
+		if nx < 0 || ny < 0 || nx >= c.width || ny >= c.height {
+			continue
+		}
+		if c.pixels[ny*c.width+nx].depth-p.depth > outlineGap {
+			return 1
+		}
+	}
+	color := palette[p.ink]
+	value := p.light * float64(color[0]*3+color[1]*6+color[2]) / (10 * 255)
+	// The eye reads stipple density on a log scale: spread values from the darkest shade to sunlit
+	// leaves between the faintest grain and the thickest, then steepen the middle as an engraving
+	// does, so shade gathers into dark masses and light opens onto paper.
+	dark := 1 - min(1, math.Log(max(value, darkestValue)/darkestValue)/math.Log(palestValue/darkestValue))
+	dark = dark * dark * (3 - 2*dark)
+	return faintestStipple + (thickestStipple-faintestStipple)*dark
+}
+
+// darkestValue and palestValue bound the material values the stipple spreads its density over, and
+// faintestStipple and thickestStipple are the densities at either end.
+const (
+	darkestValue    = 0.015
+	palestValue     = 0.8
+	faintestStipple = 0.04
+	thickestStipple = 0.95
+)
+
+// grain is a scattered threshold from 0 to 1 for the canvas pixel at x, y, so dots fall unevenly
+// as stippling does rather than in the dither's ordered pattern.
+func grain(x, y int) float64 {
+	h := uint32(x)*0x9e3779b1 ^ uint32(y)*0x85ebca77
+	h ^= h >> 15
+	h *= 0x2c1b3c6d
+	h ^= h >> 12
+	h *= 0x297a2d39
+	h ^= h >> 15
+	return float64(h) / (1 << 32)
+}

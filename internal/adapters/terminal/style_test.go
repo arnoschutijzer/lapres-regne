@@ -127,3 +127,110 @@ func TestLooksCycleThroughEveryStyle(t *testing.T) {
 		t.Fatalf("after two switches looks show %q; want pixel again", looks.Name())
 	}
 }
+
+// dots counts the braille dots a cell draws.
+func dots(cell forestCell) int {
+	count := 0
+	for bits := cell.bits; bits != 0; bits &= bits - 1 {
+		count++
+	}
+	return count
+}
+
+// evenCanvas is a canvas cols by rows cells wide and high, lit evenly by one ink.
+func evenCanvas(cols, rows, ink int, light float64) *forestCanvas {
+	c := &forestCanvas{width: cols * 2, height: rows * 4, pixels: make([]forestPixel, cols*rows*8)}
+	for i := range c.pixels {
+		c.pixels[i] = forestPixel{ink: ink, light: light}
+	}
+	return c
+}
+
+// stippledDots counts the dots stippled over every cell of a canvas.
+func stippledDots(c *forestCanvas) int {
+	count := 0
+	for row := range c.height / 4 {
+		for col := range c.width / 2 {
+			count += dots(Stippled{}.cell(c, forestPalette[:], col, row))
+		}
+	}
+	return count
+}
+
+func TestStippleScattersMoreInkInShadowThanInLight(t *testing.T) {
+	shadow, light := stippledDots(evenCanvas(8, 8, 1, 0.2)), stippledDots(evenCanvas(8, 8, 1, 0.9))
+	if shadow <= light {
+		t.Errorf("grass in shadow takes %d dots and in light %d; want more in shadow", shadow, light)
+	}
+}
+
+func TestStippleScattersMoreInkOverDarkMaterials(t *testing.T) {
+	ground, leaves := stippledDots(evenCanvas(8, 8, 0, 0.8)), stippledDots(evenCanvas(8, 8, 12, 0.8))
+	if ground <= leaves {
+		t.Errorf("dark ground takes %d dots and pale willow leaves %d in the same light; want more over the ground", ground, leaves)
+	}
+}
+
+func TestStippleScattersDotsUnevenly(t *testing.T) {
+	c := evenCanvas(8, 8, 1, 0.5)
+	first := Stippled{}.cell(c, forestPalette[:], 0, 0).bits
+	for col := 1; col < 8; col++ {
+		if (Stippled{}).cell(c, forestPalette[:], col, 0).bits != first {
+			return
+		}
+	}
+	t.Errorf("every cell of an even surface draws the dots %08b; want them scattered", first)
+}
+
+func TestStippleDrawsDarkInkOnParchment(t *testing.T) {
+	cell := Stippled{}.cell(oneCell(1, 0.4, 1, 0.4), forestPalette[:], 0, 0)
+	if !cell.inked {
+		t.Fatal("stippled dots take the palette's ink; want their own")
+	}
+	if brightnessOf(cell.color) >= brightnessOf(cell.paper) {
+		t.Errorf("dots %v on paper %v; want dark ink on lighter paper", cell.color, cell.paper)
+	}
+	if cell.paper == background {
+		t.Errorf("stippled paper is the terminal background; want parchment")
+	}
+}
+
+func TestStippleLeavesBareParchmentWhereNothingIsDrawn(t *testing.T) {
+	if cell := (Stippled{}).cell(oneCell(1, 0, 1, 0), forestPalette[:], 0, 0); cell.bits != 0 || cell.paper != parchment {
+		t.Errorf("an empty cell draws dots %08b on %v; want bare parchment", cell.bits, cell.paper)
+	}
+}
+
+func TestStippleInksTheEdgeOfWhatStandsInFront(t *testing.T) {
+	// Two cells side by side, lit brightly: the left one's ink stands far in front of the right one's.
+	c := evenCanvas(2, 1, 1, 1)
+	for i := range c.pixels {
+		if i%4 < 2 {
+			c.pixels[i].depth = -5
+		}
+	}
+	edge, open := Stippled{}.cell(c, forestPalette[:], 0, 0), Stippled{}.cell(evenCanvas(1, 1, 1, 1), forestPalette[:], 0, 0)
+	if dots(edge) <= dots(open) {
+		t.Errorf("the edge takes %d dots and open grass %d; want a line of ink along the edge", dots(edge), dots(open))
+	}
+}
+
+func TestStippleDrawsTheHeroInDenseInk(t *testing.T) {
+	if hero := stippledDots(evenCanvas(4, 4, defaultLook.skin, 1)); hero < 4*4*6 {
+		t.Errorf("the hero in full light takes %d of %d dots; want them nearly solid ink", hero, 4*4*8)
+	}
+}
+
+func TestStippledFramesDrawBrailleOnParchment(t *testing.T) {
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
+	r.style = Stippled{}
+	frame := r.frame(100, 30, 0)
+	if !strings.ContainsFunc(frame, func(glyph rune) bool { return glyph > 0x2800 && glyph <= 0x28ff }) {
+		t.Error("a stippled frame draws no braille dots")
+	}
+	for _, cell := range r.cells {
+		if brightnessOf(cell.paper) < brightnessOf(parchment)*3/4 {
+			t.Fatalf("a stippled frame lays paper %v; want parchment near %v", cell.paper, parchment)
+		}
+	}
+}

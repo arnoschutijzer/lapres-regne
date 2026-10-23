@@ -132,7 +132,9 @@ type forestPixel struct {
 type forestCell struct {
 	bits, ink uint8
 	// solid uses filled quadrants for the figure; the scenery keeps its braille dithering.
-	solid        bool
+	solid bool
+	// inked draws the braille dots in color rather than in the palette's ink.
+	inked        bool
 	color, paper [3]int
 	// veil dims the forest under an overlay, in sixteenths; an overlay's glyph replaces the forest's
 	// braille and shows its ink at veil sixteenths of full strength.
@@ -786,6 +788,9 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 				}
 				if cell.solid {
 					color, glyph = cell.color, quadrants[cell.bits]
+				}
+				if cell.inked {
+					color = cell.color
 				}
 				if cell.glyph != 0 {
 					color, paper, glyph = mix(background, color, float64(cell.veil)/16), background, cell.glyph
