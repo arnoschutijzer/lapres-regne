@@ -26,8 +26,28 @@ func TestClearSetsTheGroundsMaterialsApartByValue(t *testing.T) {
 	grass := lumaOf(clearPaper(1, 0.18, forestScale))
 	path := lumaOf(clearPaper(pathInk, 0.16, forestScale))
 	stone := lumaOf(clearPaper(stoneInk, 0.7, forestScale))
-	if !(water+0.08 < grass && grass+0.08 < path && path+0.15 < stone) {
-		t.Errorf("water %.2f, grass %.2f, path %.2f, stone %.2f; want each clearly brighter than the last", water, grass, path, stone)
+	// In the dark, the eye tells values apart by their ratio rather than their difference.
+	if !(water*1.4 < grass && grass*1.3 < path && path*1.3 < stone) {
+		t.Errorf("water %.3f, grass %.3f, path %.3f, stone %.3f; want each clearly brighter than the last", water, grass, path, stone)
+	}
+}
+
+func TestClearKeepsEvenThePalestStoneDim(t *testing.T) {
+	if stone := lumaOf(clearPaper(stoneInk, 1, detailScale)); stone > 0.3 {
+		t.Errorf("stone in full light shows %.2f; want the view kept dark, at most 0.30", stone)
+	}
+}
+
+// saturationOf is how far a color's strongest channel stands above its weakest, from 0 to 1.
+func saturationOf(color [3]int) float64 {
+	return float64(max(color[0], color[1], color[2])-min(color[0], color[1], color[2])) / 255
+}
+
+func TestClearMutesColorsTowardGrey(t *testing.T) {
+	roof := clearPaper(clayInk, 0.62, detailScale)
+	full := withValue(forestPalette[clayInk], lumaOf(roof))
+	if saturationOf(roof) > 0.8*saturationOf(full) {
+		t.Errorf("a clay roof shows %v; want its color muted below the full clay %v of the same value", roof, full)
 	}
 }
 
