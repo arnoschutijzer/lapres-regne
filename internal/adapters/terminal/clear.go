@@ -271,7 +271,8 @@ func foliage(ink int) bool {
 
 // pool is how much brighter the ground shows at the canvas pixel x, y from the pool of light
 // around the hero's feet, which lets the hero be found at once however far the view is zoomed out:
-// most at their feet, fading to none at the pool's edge, and stronger the farther out the view is.
+// most at their feet, falling off as light does to none at the pool's edge, and stronger the
+// farther out the view is.
 func (c *forestCanvas) pool(x, y int) float64 {
 	if !c.heroShown {
 		return 0
@@ -287,18 +288,25 @@ func (c *forestCanvas) pool(x, y int) float64 {
 	if d >= 1 {
 		return 0
 	}
+	// Light falls off with the square of the distance from a source a little above the ground,
+	// eased to nothing at the pool's edge so it ends without a seam.
+	edge := 1 / (1 + 1/poolHeight)
+	falloff := (1/(1+d/poolHeight) - edge) / (1 - edge)
 	out := c.underlay() - 1
-	return (poolNear + (poolFar-poolNear)*out) * (1 - d) * (1 - d)
+	return (poolNear + (poolFar-poolNear)*out) * falloff
 }
 
 // poolReach is how far the pool of light around the hero reaches, in world units, but never fewer
 // than poolPixels canvas pixels; poolNear is how much brighter the ground shows at the hero's feet at
-// the zoom where trees show their detail, and poolFar how much all the way out.
+// the zoom where trees show their detail, and poolFar how much all the way out. poolHeight is how
+// high the light hangs, squared, as a share of the pool's reach squared: the lower it hangs, the
+// faster its light falls off.
 const (
-	poolReach  = 2.5
-	poolPixels = 12
-	poolNear   = 0.25
-	poolFar    = 0.55
+	poolReach  = 3.0
+	poolPixels = 14
+	poolNear   = 0.6
+	poolFar    = 1.1
+	poolHeight = 0.06
 )
 
 // clearShadow is how bright ground in the shadow of a tree or a building shows, as a share of its
