@@ -83,6 +83,7 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 		if p.shaded || p.ink == shadowGrassInk || p.ink == shadowPathInk || p.ink == shadowFloorInk {
 			lift *= clearShadow
 		}
+		lift *= 1 - contactDepth*c.contact(x, y)
 	}
 	ratio := light / typical
 	switch {
@@ -206,6 +207,44 @@ func floorDiv(a, b int) int {
 }
 
 func floorMod(a, b int) int { return a - floorDiv(a, b)*b }
+
+// contact is how much of the sky the ground at the canvas pixel x, y is hidden from by whatever
+// stands close behind it and rises above it, from 0 in the open to 1 hemmed in: walls, trunks and
+// figures darken the ground at their feet, most right at them. It looks up the canvas, where what
+// stands on the ground just behind a point rises, for pixels standing well nearer the viewer than
+// the ground there, and weighs the nearest most.
+func (c *forestCanvas) contact(x, y int) float64 {
+	depth := c.pixels[y*c.width+x].depth
+	reach := max(2, int(contactReach*c.scale))
+	hidden, total := 0.0, 0.0
+	for k := 1; k <= reach; k++ {
+		weight := 1 - float64(k-1)/float64(reach)
+		for _, dx := range [3]int{-k / 2, 0, k / 2} {
+			nx, ny := x+dx, y-k
+			if nx < 0 || ny < 0 || nx >= c.width {
+				continue
+			}
+			total += weight
+			q := c.pixels[ny*c.width+nx]
+			if (q.light > 0 || q.face > 0) && !groundInk(q.ink) && depth-q.depth > contactGap {
+				hidden += weight
+			}
+		}
+	}
+	if total == 0 {
+		return 0
+	}
+	return hidden / total
+}
+
+// contactReach is how far, in world units, the ground looks for what hems it in; contactGap is how
+// much nearer the viewer, in world units, a pixel must stand to hide the sky; contactDepth is how
+// much of its light hemmed-in ground loses.
+const (
+	contactReach = 0.8
+	contactGap   = 0.15
+	contactDepth = 0.6
+)
 
 // relit is how brightly a surface shows under a low sun and a faint sky, for the sunlight the
 // renderer lit it with: that sunlight is a third the sky's and the rest the sun's own as the

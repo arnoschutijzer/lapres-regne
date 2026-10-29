@@ -359,3 +359,38 @@ func TestClearCoolsTheGroundInShadow(t *testing.T) {
 		t.Errorf("ground in a tree's shadow shows %v; want it cooler than open ground, %v", shaded, open)
 	}
 }
+
+// walled is a canvas cols by rows cells of bare ground at detail zoom, with a wall standing on it
+// over the rows of pixels above wallFoot when standing holds.
+func walled(cols, rows, wallFoot int, standing bool) *forestCanvas {
+	c := evenCanvas(cols, rows, 0, 0.24)
+	c.scale = detailScale
+	c.tiltTo(openingTilt)
+	for y := range c.height {
+		for x := range c.width {
+			p := &c.pixels[y*c.width+x]
+			// The ground falls away from the viewer up the canvas.
+			p.depth = float64(c.height-y) * 0.1
+			if standing && y < wallFoot {
+				p.ink, p.light, p.face = stoneInk, 0.7, 0.7
+				p.depth = float64(c.height-wallFoot)*0.1 - float64(wallFoot-y)*0.2
+			}
+		}
+	}
+	return c
+}
+
+func TestClearDarkensTheGroundAtTheFootOfAWall(t *testing.T) {
+	foot := lumaOf(Clear{}.cell(walled(3, 12, 16, true), forestPalette[:], 1, 4).paper)
+	open := lumaOf(Clear{}.cell(walled(3, 12, 16, false), forestPalette[:], 1, 4).paper)
+	if foot > 0.85*open {
+		t.Errorf("ground at the foot of a wall shows %.3f; want it darker than open ground, %.3f", foot, open)
+	}
+}
+
+func TestClearLeavesGroundWellAwayFromAWallInTheOpen(t *testing.T) {
+	away := Clear{}.cell(walled(3, 12, 16, true), forestPalette[:], 1, 10).paper
+	if open := (Clear{}).cell(walled(3, 12, 16, false), forestPalette[:], 1, 10).paper; away != open {
+		t.Errorf("ground well away from a wall shows %v; want it as open ground, %v", away, open)
+	}
+}
