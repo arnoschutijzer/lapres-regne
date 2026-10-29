@@ -80,6 +80,9 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 		// light leaves it one calm tone over wide stretches.
 		light /= c.quiet()
 		contrast = clearGroundContrast
+		if p.shaded || p.ink == shadowGrassInk || p.ink == shadowPathInk || p.ink == shadowFloorInk {
+			lift *= clearShadow
+		}
 	}
 	out := c.underlay() - 1
 	step := clearStep + (clearStepFar-clearStep)*out
@@ -179,6 +182,10 @@ const (
 	poolFar    = 0.55
 )
 
+// clearShadow is how bright ground in the shadow of a tree or a building shows, as a share of its
+// shade in the open, so shadows fall in one clear direction whatever the noise in the ground's light.
+const clearShadow = 0.65
+
 // clearContrast is how strongly a surface's shade follows the light it catches, as a power of how
 // many times its typical light that is; clearGroundContrast is how strongly the ground's does.
 const (
@@ -224,17 +231,17 @@ func clearBand(palette [][3]int, ink int) (value, typical float64) {
 	case 6: // ripples
 		return 0.16, 0.8
 	case 0: // bare ground
-		return 0.15, 0.24
+		return 0.17, 0.24
 	case 1, shadowGrassInk:
-		return 0.17, 0.36
+		return 0.19, 0.36
 	case 7: // sunlit banks
-		return 0.19, 0.54
+		return 0.21, 0.54
 	case bankInk:
-		return 0.17, 0.34
+		return 0.19, 0.34
 	case reedInk:
 		return 0.2, 0.6
 	case pathInk, shadowPathInk:
-		return 0.27, 0.32
+		return 0.29, 0.32
 	case floorInk, shadowFloorInk:
 		return 0.23, 0.36
 	case boardsInk:
@@ -244,21 +251,21 @@ func clearBand(palette [][3]int, ink int) (value, typical float64) {
 	case pebbleInk:
 		return 0.25, 0.64
 	case bushInk:
-		return 0.14, 0.64
+		return 0.11, 0.64
 	case shadedLeafInk, 11, 15:
-		return 0.08, 0.45
+		return 0.065, 0.45
 	case leafInk, 12, 16:
-		return 0.14, 0.8
-	case 13: // shaded yew needles
-		return 0.07, 0.45
-	case 14: // sunlit yew needles
 		return 0.12, 0.8
+	case 13: // shaded yew needles
+		return 0.055, 0.45
+	case 14: // sunlit yew needles
+		return 0.1, 0.8
 	case 4: // bark
-		return 0.12, 0.62
+		return 0.1, 0.62
 	case stoneInk:
-		return 0.44, 0.7
+		return 0.46, 0.7
 	case shadedStoneInk:
-		return 0.32, 0.46
+		return 0.34, 0.46
 	case mossInk:
 		return 0.3, 0.49
 	case glassInk:

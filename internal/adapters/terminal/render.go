@@ -132,6 +132,8 @@ type forestPixel struct {
 	// face is the light falling on the face of a structure or model drawn here, before its surface
 	// patterns it; 0 for anything else.
 	face float64
+	// shaded marks ground lying in a tree's shadow.
+	shaded bool
 }
 
 type forestCell struct {
@@ -451,7 +453,7 @@ func (c *forestCanvas) plot(x, y int, depth, light float64, ink int) {
 	}
 	i := y*c.width + x
 	if depth <= c.pixels[i].depth {
-		c.pixels[i] = forestPixel{depth, light, ink, c.drawing, c.drawingDoorway, c.drawingFace}
+		c.pixels[i] = forestPixel{depth, light, ink, c.drawing, c.drawingDoorway, c.drawingFace, false}
 	}
 }
 
@@ -945,7 +947,7 @@ func (r *renderer) march(c *forestCanvas, x int, seconds float64, floors bool) {
 				continue
 			}
 			ink, light := r.groundLight(c, point.x, point.z, point.height+c.eye, floors, seconds)
-			c.pixels[y*c.width+x] = forestPixel{-point.toward*c.tiltCos - point.height*c.tiltSin, light * quiet, ink, 0, 0, 0}
+			c.pixels[y*c.width+x] = forestPixel{-point.toward*c.tiltCos - point.height*c.tiltSin, light * quiet, ink, 0, 0, 0, false}
 			c.under[y*c.width+x] = groundPoint{point.x, point.z}
 		}
 		previous = current
