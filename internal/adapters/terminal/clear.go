@@ -13,6 +13,7 @@ func (Clear) Name() string { return "clear" }
 
 func (Clear) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 	var colors [8][3]int
+	originX, originY := c.patternOrigin()
 	for dy := range 4 {
 		for dx := range 2 {
 			x, y := col*2+dx, row*4+dy
@@ -20,15 +21,24 @@ func (Clear) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 			if p.light > 0 && figureInk(p.ink) {
 				return c.figureCell(col, row)
 			}
-			colors[dy*2+dx] = clearTone(c, palette, x, y)
+			colors[dy*2+dx] = clearTone(c, palette, x, y, x-originX, y-originY)
 		}
 	}
 	return twoTone(colors)
 }
 
+// patternOrigin is the canvas pixel showing where the world's origin lies on level ground, so
+// patterns laid out from it move with the world as the view pans.
+func (c *forestCanvas) patternOrigin() (int, int) {
+	across, toward := c.toView(0, 0)
+	return int(math.Round(float64(c.width)/2 + across*c.scale)),
+		int(math.Round(float64(c.height)*0.57 + (toward*c.tiltSin+c.eye*c.tiltCos)*c.scale))
+}
+
 // clearTone is the flat color the canvas pixel at x, y shows: its material's band of value, in the
-// nearest shade of how much more or less light it catches than that material typically does.
-func clearTone(c *forestCanvas, palette [][3]int, x, y int) [3]int {
+// nearest shade of how much more or less light it catches than that material typically does, a
+// shade lighter or darker where the material's pattern marks u, v, its place among the patterns.
+func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 	p := c.pixels[y*c.width+x]
 	light := p.light
 	// A wall's face is shaded by the light falling on it rather than its stonework, so it reads as
@@ -48,8 +58,71 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y int) [3]int {
 		light /= c.quiet()
 		contrast = clearGroundContrast
 	}
-	return withValue(palette[p.ink], value*clearShade(light/typical, contrast, x, y, c.underlay()-1))
+	out := c.underlay() - 1
+	step := clearStep + (clearStepFar-clearStep)*out
+	shade := clearShade(light/typical, contrast, step, clearBlend+(clearBlendFar-clearBlend)*out, x, y)
+	shade += step * clearPattern(p.ink, p.face > 0, u, v, out)
+	return withValue(palette[p.ink], value*max(step, shade))
 }
+
+// clearPattern is how many shades lighter, or darker for less than 0, a material is drawn at u, v
+// among its pattern, so materials of near value still read apart: grass in upright blades, water in
+// level dashes, paths speckled, roofs in faint courses of tiles and the faces of stone walls in faint
+// bricks, which fade as the view zooms out, to 1 all the way out, where they would only be noise.
+func clearPattern(ink int, face bool, u, v int, out float64) float64 {
+	switch ink {
+	case 1, shadowGrassInk:
+		if blade(u, v) {
+			return 1.5
+		}
+	case waterInk:
+		// Every fourth row of pixels, dashes three long lie staggered from row to row.
+		if floorMod(v, 4) == 0 && floorMod(u+5*floorDiv(v, 4), 9) < 3 {
+			return 1
+		}
+	case pathInk, shadowPathInk:
+		if grain(u*3+11, v*5+7) < 0.12 {
+			return -1
+		}
+	case clayInk, shadedClayInk, slateInk, shadedSlateInk, thatchInk, shadedThatchInk:
+		if floorMod(v, 4) == 0 {
+			return -0.5
+		}
+	case stoneInk, shadedStoneInk:
+		// Courses five pixels high, their joints eight apart and staggered by half a brick.
+		if face && (floorMod(v, 5) == 0 || floorMod(u+4*floorMod(floorDiv(v, 5), 2), 8) == 0) {
+			return -0.6 * (1 - out)
+		}
+	}
+	return 0
+}
+
+// blade tells whether a blade of grass passes through u, v. The ground is parted into tiles three
+// pixels wide and five high, most holding a blade three pixels tall rising from a scattered root
+// and leaning one way or the other at its tip.
+func blade(u, v int) bool {
+	tileU, tileV := floorDiv(u, 3), floorDiv(v, 5)
+	if grain(tileU*7+1, tileV*13+5) > 0.7 {
+		return false
+	}
+	rootU := tileU*3 + int(grain(tileU*5+3, tileV*11+2)*2)
+	rootV := tileV*5 + 2 + int(grain(tileU*3+9, tileV*7+4)*3)
+	tip := rootU
+	if grain(tileU*11+6, tileV*3+8) < 0.5 {
+		tip++
+	}
+	return u == rootU && (v == rootV || v == rootV-1) || u == tip && v == rootV-2
+}
+
+// floorDiv divides a by b, rounding down, and floorMod is what it leaves over, from 0 up to b.
+func floorDiv(a, b int) int {
+	if a < 0 {
+		return (a - b + 1) / b
+	}
+	return a / b
+}
+
+func floorMod(a, b int) int { return a - floorDiv(a, b)*b }
 
 // clearContrast is how strongly a surface's shade follows the light it catches, as a power of how
 // many times its typical light that is; clearGroundContrast is how strongly the ground's does.
@@ -71,21 +144,18 @@ const (
 // clearShade is the share of its band a pixel at x, y shows for how many times its material's
 // typical light it catches: the nearest of the style's shades, which lie a step apart either side
 // of the material's typical light, dithered with the next only within the blend of the step between
-// them. contrast is how strongly the shade follows the ratio, and out is how far the view is zoomed
-// out, from 0 at the zoom where trees show their detail to 1 all the way out.
-func clearShade(ratio, contrast float64, x, y int, out float64) float64 {
+// them. contrast is how strongly the shade follows the ratio.
+func clearShade(ratio, contrast, step, blend float64, x, y int) float64 {
 	// Light is felt more evenly than it falls: at a contrast of 0.6, halving it darkens a surface by
 	// about a third.
 	shade := math.Pow(min(1.8, max(0.3, ratio)), contrast)
-	step := clearStep + (clearStepFar-clearStep)*out
-	blend := clearBlend + (clearBlendFar-clearBlend)*out
 	// Counted from the typical light, so a surface lit as it typically is shows one flat shade.
 	level := (shade - 1) / step
 	lower := math.Floor(level)
 	if min(1, max(0, (level-lower-(1-blend)/2)/blend)) > ordered(x, y) {
 		lower++
 	}
-	return max(step, 1+lower*step)
+	return 1 + lower*step
 }
 
 // clearBand is the value, from 0 to 1, a material shows in the clear style at the light it typically
