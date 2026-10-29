@@ -502,11 +502,6 @@ func (Solid) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 	// all the way out, where the ground quiets as in the bold style.
 	out := c.underlay() - 1
 	var colors [8][3]int
-	var tally [8]struct {
-		color [3]int
-		count int
-	}
-	kinds := 0
 	for dy := range 4 {
 		for dx := range 2 {
 			x, y := col*2+dx, row*4+dy
@@ -522,16 +517,29 @@ func (Solid) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 				}
 			}
 			colors[dy*2+dx] = color
-			at := 0
-			for at < kinds && tally[at].color != color {
-				at++
-			}
-			if at == kinds {
-				tally[at].color = color
-				kinds++
-			}
-			tally[at].count++
 		}
+	}
+	return twoTone(colors)
+}
+
+// twoTone draws a cell whose eight pixels show colors, listed row by row, in flat color: the most
+// common color fills the cell and the next is dotted over it.
+func twoTone(colors [8][3]int) forestCell {
+	var tally [8]struct {
+		color [3]int
+		count int
+	}
+	kinds := 0
+	for _, color := range colors {
+		at := 0
+		for at < kinds && tally[at].color != color {
+			at++
+		}
+		if at == kinds {
+			tally[at].color = color
+			kinds++
+		}
+		tally[at].count++
 	}
 	// The most common color fills the cell and the next is dotted over it; any other color takes
 	// whichever of the two lies nearer.
