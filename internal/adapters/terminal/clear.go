@@ -45,8 +45,8 @@ func (c *forestCanvas) vignette(col, row int) float64 {
 // vignetteFrom is how far from the middle toward a corner the vignette starts to darken the view,
 // and vignetteDepth how far it sinks the corners toward the background.
 const (
-	vignetteFrom  = 0.4
-	vignetteDepth = 0.55
+	vignetteFrom  = 0.2
+	vignetteDepth = 0.7
 )
 
 // patternOrigin is the canvas pixel showing where the world's origin lies on level ground, so
@@ -88,8 +88,30 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 	step := clearStep + (clearStepFar-clearStep)*out
 	shade := clearShade(light/typical, contrast, lift, step, clearBlend+(clearBlendFar-clearBlend)*out, x, y)
 	shade += step * clearPattern(p.ink, p.face > 0, u, v, out)
-	return withValue(palette[p.ink], value*max(step, shade))
+	return withValue(muted(palette[p.ink]), dusk(value*max(step, shade)))
 }
+
+// dusk darkens a value as dusk does, the palest most, so the view stays dark and calm while every
+// material keeps its place among the others.
+func dusk(value float64) float64 {
+	return value * max(0, duskDim-duskFall*value)
+}
+
+// duskDim is how far dusk keeps the darkest values, and duskFall how much further it darkens each
+// value the paler it is.
+const (
+	duskDim  = 0.75
+	duskFall = 0.45
+)
+
+// muted is a color drawn clearMute of the way toward the grey of its own value.
+func muted(color [3]int) [3]int {
+	grey := int(math.Round(lumaFraction(color) * 255))
+	return mix(color, [3]int{grey, grey, grey}, clearMute)
+}
+
+// clearMute is how far the clear style mutes every color toward grey.
+const clearMute = 0.25
 
 // clearPattern is how many shades lighter, or darker for less than 0, a material is drawn at u, v
 // among its pattern, so materials of near value still read apart: grass in upright blades, water in
