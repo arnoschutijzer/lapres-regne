@@ -50,8 +50,9 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 		return background
 	}
 	value, typical := clearBand(palette, p.ink)
-	contrast := clearContrast
+	contrast, lift := clearContrast, 1.0
 	if groundInk(p.ink) {
+		lift += c.pool(x, y)
 		// The ground is lit more faintly zoomed out to quiet it; here its band of value sets it
 		// apart instead, so it keeps its strength. Its shading is softened, so the noise in its
 		// light leaves it one calm tone over wide stretches.
@@ -60,7 +61,7 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 	}
 	out := c.underlay() - 1
 	step := clearStep + (clearStepFar-clearStep)*out
-	shade := clearShade(light/typical, contrast, step, clearBlend+(clearBlendFar-clearBlend)*out, x, y)
+	shade := clearShade(light/typical, contrast, lift, step, clearBlend+(clearBlendFar-clearBlend)*out, x, y)
 	shade += step * clearPattern(p.ink, p.face > 0, u, v, out)
 	return withValue(palette[p.ink], value*max(step, shade))
 }
@@ -124,6 +125,38 @@ func floorDiv(a, b int) int {
 
 func floorMod(a, b int) int { return a - floorDiv(a, b)*b }
 
+// pool is how much brighter the ground shows at the canvas pixel x, y from the pool of light
+// around the hero's feet, which lets the hero be found at once however far the view is zoomed out:
+// most at their feet, fading to none at the pool's edge, and stronger the farther out the view is.
+func (c *forestCanvas) pool(x, y int) float64 {
+	if !c.heroShown {
+		return 0
+	}
+	radius := max(poolPixels, poolReach*c.scale)
+	across := (float64(x) - c.heroX) / radius
+	// The pool lies on the ground, so it is foreshortened as the ground is.
+	down := (float64(y) - c.heroY) / (radius * c.tiltSin)
+	if c.tiltSin == 0 {
+		down = (float64(y) - c.heroY) / radius
+	}
+	d := across*across + down*down
+	if d >= 1 {
+		return 0
+	}
+	out := c.underlay() - 1
+	return (poolNear + (poolFar-poolNear)*out) * (1 - d) * (1 - d)
+}
+
+// poolReach is how far the pool of light around the hero reaches, in world units, but never fewer
+// than poolPixels canvas pixels; poolNear is how much brighter the ground shows at the hero's feet at
+// the zoom where trees show their detail, and poolFar how much all the way out.
+const (
+	poolReach  = 2.5
+	poolPixels = 12
+	poolNear   = 0.25
+	poolFar    = 0.55
+)
+
 // clearContrast is how strongly a surface's shade follows the light it catches, as a power of how
 // many times its typical light that is; clearGroundContrast is how strongly the ground's does.
 const (
@@ -144,11 +177,12 @@ const (
 // clearShade is the share of its band a pixel at x, y shows for how many times its material's
 // typical light it catches: the nearest of the style's shades, which lie a step apart either side
 // of the material's typical light, dithered with the next only within the blend of the step between
-// them. contrast is how strongly the shade follows the ratio.
-func clearShade(ratio, contrast, step, blend float64, x, y int) float64 {
+// them. contrast is how strongly the shade follows the ratio, and lift brightens it by a factor
+// before it is banded.
+func clearShade(ratio, contrast, lift, step, blend float64, x, y int) float64 {
 	// Light is felt more evenly than it falls: at a contrast of 0.6, halving it darkens a surface by
 	// about a third.
-	shade := math.Pow(min(1.8, max(0.3, ratio)), contrast)
+	shade := math.Pow(min(1.8, max(0.3, ratio)), contrast) * lift
 	// Counted from the typical light, so a surface lit as it typically is shows one flat shade.
 	level := (shade - 1) / step
 	lower := math.Floor(level)
