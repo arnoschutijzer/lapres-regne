@@ -248,6 +248,10 @@ type forestCanvas struct {
 	under []groundPoint
 	// clearing is the space around the hero that faces in front of them leave open.
 	clearing clearing
+	// heroX and heroY are the canvas pixel under the hero's feet, and heroShown marks that the frame
+	// drew the hero there.
+	heroX, heroY float64
+	heroShown    bool
 }
 
 // clearing is an ellipse on the canvas around the hero, through which they show past whatever
@@ -582,6 +586,10 @@ func (r *renderer) render(cols, rows int, seconds float64) *forestCanvas {
 	r.drawGrass(c, left, right, back, front, seconds)
 	c.floor = r.floorOf(storey)
 	c.halo(r.world.Hero().Position())
+	heroX, heroZ := r.world.Hero().Position()
+	c.standOn(heroX, heroZ)
+	c.heroX, c.heroY, _ = c.project(heroX, 0, heroZ)
+	c.heroShown = true
 	c.floor = nil
 	r.drawFireworks(c)
 	return c

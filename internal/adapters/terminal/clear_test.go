@@ -194,3 +194,38 @@ func TestClearKeepsPatternsOnTheWorldAsTheViewPans(t *testing.T) {
 		}
 	}
 }
+
+func TestClearLightsTheGroundAroundTheHero(t *testing.T) {
+	// Bare ground, which has no pattern of its own.
+	c := evenCanvas(60, 20, 0, 0.12)
+	c.scale = forestScale
+	c.heroX, c.heroY, c.heroShown = 60, 40, true
+	near := lumaOf(Clear{}.cell(c, forestPalette[:], 30, 10).paper)
+	far := lumaOf(Clear{}.cell(c, forestPalette[:], 2, 2).paper)
+	if near < far*1.3 {
+		t.Errorf("ground beside the hero shows %.2f; want clearly brighter than ground far off, %.2f", near, far)
+	}
+}
+
+func TestClearLeavesTheGroundUnlitWithoutAHero(t *testing.T) {
+	// Bare ground, which has no pattern of its own.
+	c := evenCanvas(60, 20, 0, 0.12)
+	c.scale = forestScale
+	c.heroX, c.heroY = 60, 40
+	near := Clear{}.cell(c, forestPalette[:], 30, 10).paper
+	if far := (Clear{}).cell(c, forestPalette[:], 2, 2).paper; near != far {
+		t.Errorf("with no hero drawn, ground in the middle shows %v; want it as ground far off, %v", near, far)
+	}
+}
+
+func TestRenderingMarksWhereTheHeroStands(t *testing.T) {
+	r := newRenderer(world.New(7), NewCamera(0, 0), "L’Après-Règne")
+	c := r.render(100, 30, 0)
+	if !c.heroShown {
+		t.Fatal("a rendered frame does not mark where the hero stands")
+	}
+	feet := c.pixels[int(c.heroY-1)*c.width+int(c.heroX)]
+	if !figureInk(feet.ink) {
+		t.Errorf("just above the marked spot lies ink %d; want the hero's feet", feet.ink)
+	}
+}
