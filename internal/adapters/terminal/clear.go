@@ -96,9 +96,35 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 	out := c.underlay() - 1
 	step := clearStep + (clearStepFar-clearStep)*out
 	shade := clearShade(ratio, contrast, lift, step, clearBlend+(clearBlendFar-clearBlend)*out, x, y)
+	// Sunlight is warm and the sky that lights the shade is cool, so a surface leans warm the more
+	// light it catches than its material typically does, and cool the less.
+	color := tinted(muted(palette[p.ink]), (shade-1)/temperatureSpan)
 	shade += step * clearPattern(p.ink, p.face > 0, u, v, out)
-	return withValue(muted(palette[p.ink]), dusk(value*max(step, shade)))
+	return withValue(color, dusk(value*max(step, shade)))
 }
+
+// tinted leans a color toward the sun's warm hue for warmth above 0, up to 1, and toward the sky's
+// cool hue for warmth below 0, down to -1.
+func tinted(color [3]int, warmth float64) [3]int {
+	if warmth > 0 {
+		return mix(color, sunHue, sunTint*min(1, warmth))
+	}
+	return mix(color, skyHue, skyTint*min(1, -warmth))
+}
+
+// sunHue and skyHue are the hues of sunlight and of the sky's light in the shade; sunTint and skyTint
+// are how far the most sunlit and the most shaded surfaces lean toward them, and temperatureSpan how
+// far from a material's typical shade a surface must be to lean all the way.
+var (
+	sunHue = [3]int{255, 190, 120}
+	skyHue = [3]int{110, 140, 200}
+)
+
+const (
+	sunTint         = 0.3
+	skyTint         = 0.4
+	temperatureSpan = 0.4
+)
 
 // dusk darkens a value as dusk does, the palest most, so the view stays dark and calm while every
 // material keeps its place among the others.
@@ -287,9 +313,9 @@ func clearBand(palette [][3]int, ink int) (value, typical float64) {
 	case 6: // ripples
 		return 0.16, 0.8
 	case 0: // bare ground
-		return 0.17, 0.24
+		return 0.18, 0.24
 	case 1, shadowGrassInk:
-		return 0.19, 0.36
+		return 0.2, 0.36
 	case 7: // sunlit banks
 		return 0.21, 0.54
 	case bankInk:
@@ -309,13 +335,13 @@ func clearBand(palette [][3]int, ink int) (value, typical float64) {
 	case bushInk:
 		return 0.11, 0.64
 	case shadedLeafInk, 11, 15:
-		return 0.065, 0.45
+		return 0.075, 0.45
 	case leafInk, 12, 16:
-		return 0.12, 0.8
+		return 0.17, 0.8
 	case 13: // shaded yew needles
-		return 0.055, 0.45
+		return 0.065, 0.45
 	case 14: // sunlit yew needles
-		return 0.1, 0.8
+		return 0.14, 0.8
 	case 4: // bark
 		return 0.1, 0.62
 	case stoneInk:

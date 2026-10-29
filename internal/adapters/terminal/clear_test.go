@@ -335,3 +335,27 @@ func TestClearLeavesTheSunlessSideOfACrownInDeepShade(t *testing.T) {
 		t.Errorf("leaves facing the sun show %.3f and leaves turned from it %.3f; want the turned ones in deep shade", sunlit, sunless)
 	}
 }
+
+// warmth is how far a color leans from blue toward red, as the ratio of its red to its blue.
+func warmth(color [3]int) float64 { return float64(color[0]+1) / float64(color[2]+1) }
+
+func TestClearWarmsSunlitFacesAndCoolsShadedOnes(t *testing.T) {
+	toward := Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{-0.52, 0.80, -0.29})), forestPalette[:], 0, 0).paper
+	away := Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{0.87, 0, 0.49})), forestPalette[:], 0, 0).paper
+	if warmth(toward) < 1.25*warmth(away) {
+		t.Errorf("stone in sunlight shows %v and in shade %v; want the sunlit stone warm and the shaded cool", toward, away)
+	}
+}
+
+func TestClearCoolsTheGroundInShadow(t *testing.T) {
+	open := clearPaper(0, 0.24, detailScale)
+	c := evenCanvas(3, 3, 0, 0.24*0.55)
+	c.scale = detailScale
+	for i := range c.pixels {
+		c.pixels[i].shaded = true
+	}
+	shaded := Clear{}.cell(c, forestPalette[:], 1, 1).paper
+	if warmth(shaded) > 0.85*warmth(open) {
+		t.Errorf("ground in a tree's shadow shows %v; want it cooler than open ground, %v", shaded, open)
+	}
+}
