@@ -307,3 +307,31 @@ func TestATreeMarksTheGroundItShades(t *testing.T) {
 		t.Error("a tree's shadow marks no ground as shaded")
 	}
 }
+
+// faceCanvas is a canvas a cell wide and high showing the face of a structure in one ink, facing so
+// that the sun lights it by sun, as the renderer lights faces.
+func faceCanvas(ink int, sun float64) *forestCanvas {
+	c := evenCanvas(1, 1, ink, 0.5)
+	c.scale = detailScale
+	for i := range c.pixels {
+		c.pixels[i].face = 0.45 + 0.55*sun
+	}
+	return c
+}
+
+func TestClearLightsAWallFacingTheSunFarAboveOneTurnedAway(t *testing.T) {
+	// A wall faces the sun as squarely as an upright face can, and another turns its back on it.
+	toward := lumaOf(Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{-0.87, 0, -0.49})), forestPalette[:], 0, 0).paper)
+	away := lumaOf(Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{0.87, 0, 0.49})), forestPalette[:], 0, 0).paper)
+	if toward < 1.8*away {
+		t.Errorf("a wall facing the sun shows %.3f and one turned away %.3f; want the sunlit one far brighter, as under a low sun", toward, away)
+	}
+}
+
+func TestClearLeavesTheSunlessSideOfACrownInDeepShade(t *testing.T) {
+	sunlit := lumaOf(clearPaper(leafInk, sunlight(vec{-0.52, 0.80, -0.29}), detailScale))
+	sunless := lumaOf(clearPaper(leafInk, sunlight(vec{0.52, -0.80, 0.29}), detailScale))
+	if sunlit < 2*sunless {
+		t.Errorf("leaves facing the sun show %.3f and leaves turned from it %.3f; want the turned ones in deep shade", sunlit, sunless)
+	}
+}
