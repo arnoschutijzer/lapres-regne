@@ -45,8 +45,8 @@ func (c *forestCanvas) vignette(col, row int) float64 {
 // vignetteFrom is how far from the middle toward a corner the vignette starts to darken the view,
 // and vignetteDepth how far it sinks the corners toward the background.
 const (
-	vignetteFrom  = 0.2
-	vignetteDepth = 0.7
+	vignetteFrom  = 0.3
+	vignetteDepth = 0.45
 )
 
 // patternOrigin is the canvas pixel showing where the world's origin lies on level ground, so
@@ -101,7 +101,7 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 	// light it catches than its material typically does, and cool the less.
 	color := tinted(muted(palette[p.ink]), (shade-1)/temperatureSpan)
 	shade += step * clearPattern(p.ink, p.face > 0, u, v, out)
-	return withValue(color, dusk(value*max(step, shade)))
+	return withValue(color, exposed(value*max(step, shade)))
 }
 
 // tinted leans a color toward the sun's warm hue for warmth above 0, up to 1, and toward the sky's
@@ -127,17 +127,18 @@ const (
 	temperatureSpan = 0.4
 )
 
-// dusk darkens a value as dusk does, the palest most, so the view stays dark and calm while every
+// exposed is the value shown for a value of light, as a camera exposes it: darker values in full,
+// the palest rolled off gently, so sunlit stone shows bright without washing out to white and every
 // material keeps its place among the others.
-func dusk(value float64) float64 {
-	return value * max(0, duskDim-duskFall*value)
+func exposed(value float64) float64 {
+	return value * max(0, exposure-rollOff*value)
 }
 
-// duskDim is how far dusk keeps the darkest values, and duskFall how much further it darkens each
-// value the paler it is.
+// exposure is how much of the darkest values is shown, and rollOff how much less of each value is
+// the paler it is.
 const (
-	duskDim  = 0.75
-	duskFall = 0.45
+	exposure = 1.0
+	rollOff  = 0.35
 )
 
 // muted is a color drawn clearMute of the way toward the grey of its own value.
@@ -147,7 +148,7 @@ func muted(color [3]int) [3]int {
 }
 
 // clearMute is how far the clear style mutes every color toward grey.
-const clearMute = 0.25
+const clearMute = 0.2
 
 // clearPattern is how many shades lighter, or darker for less than 0, a material is drawn at u, v
 // among its pattern, so materials of near value still read apart: grass in upright blades, water in
@@ -259,7 +260,7 @@ func relit(sun float64) float64 {
 // sunlight; faceSun is the sunlight on a face the clear style shows at its material's own value,
 // a wall turned halfway toward the sun.
 const (
-	skyLight = 0.2
+	skyLight = 0.35
 	faceSun  = 0.55
 )
 
@@ -311,7 +312,7 @@ const (
 
 // clearShadow is how bright ground in the shadow of a tree or a building shows, as a share of its
 // shade in the open, so shadows fall in one clear direction whatever the noise in the ground's light.
-const clearShadow = 0.65
+const clearShadow = 0.72
 
 // clearContrast is how strongly a surface's shade follows the light it catches, as a power of how
 // many times its typical light that is; clearGroundContrast is how strongly the ground's does, and

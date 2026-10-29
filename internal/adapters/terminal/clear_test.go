@@ -32,9 +32,18 @@ func TestClearSetsTheGroundsMaterialsApartByValue(t *testing.T) {
 	}
 }
 
-func TestClearKeepsEvenThePalestStoneDim(t *testing.T) {
-	if stone := lumaOf(clearPaper(stoneInk, 1, detailScale)); stone > 0.3 {
-		t.Errorf("stone in full light shows %.2f; want the view kept dark, at most 0.30", stone)
+func TestClearShowsSunlitStoneBrightButNotBlownOut(t *testing.T) {
+	stone := lumaOf(Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{-0.52, 0.80, -0.29})), forestPalette[:], 0, 0).paper)
+	if stone < 0.4 || stone > 0.7 {
+		t.Errorf("stone facing the sun shows %.2f; want it bright, from 0.40, yet short of white, to 0.70", stone)
+	}
+}
+
+func TestClearFillsTheShadeWithSkyLight(t *testing.T) {
+	toward := lumaOf(Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{-0.52, 0.80, -0.29})), forestPalette[:], 0, 0).paper)
+	away := lumaOf(Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{0.87, 0, 0.49})), forestPalette[:], 0, 0).paper)
+	if away < toward/3.5 {
+		t.Errorf("stone turned from the sun shows %.3f against %.3f in sunlight; want the sky to keep the shade from sinking past a third or so", away, toward)
 	}
 }
 
@@ -323,8 +332,8 @@ func TestClearLightsAWallFacingTheSunFarAboveOneTurnedAway(t *testing.T) {
 	// A wall faces the sun as squarely as an upright face can, and another turns its back on it.
 	toward := lumaOf(Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{-0.87, 0, -0.49})), forestPalette[:], 0, 0).paper)
 	away := lumaOf(Clear{}.cell(faceCanvas(stoneInk, sunlight(vec{0.87, 0, 0.49})), forestPalette[:], 0, 0).paper)
-	if toward < 1.8*away {
-		t.Errorf("a wall facing the sun shows %.3f and one turned away %.3f; want the sunlit one far brighter, as under a low sun", toward, away)
+	if toward < 1.5*away {
+		t.Errorf("a wall facing the sun shows %.3f and one turned away %.3f; want the sunlit one clearly brighter, as under a low sun", toward, away)
 	}
 }
 
