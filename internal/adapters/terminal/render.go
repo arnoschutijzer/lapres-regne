@@ -20,13 +20,15 @@ var bayer = [4][4]float64{
 
 // renderer draws the forest as braille cells and sends only changed cells.
 type renderer struct {
-	world                     *world.World
-	camera                    *Camera
-	title                     string
-	canvas                    forestCanvas
-	trees                     []world.Tree
-	rivers                    riverSamples
-	cells                     []forestCell
+	world  *world.World
+	camera *Camera
+	title  string
+	canvas forestCanvas
+	trees  []world.Tree
+	rivers riverSamples
+	cells  []forestCell
+	// styled holds the cells the style draws for the frame being drawn, row by row.
+	styled                    []forestCell
 	screenWidth, screenHeight int
 	lastStatus, lastHint      string
 	lastSkill                 string
@@ -776,12 +778,21 @@ func (r *renderer) frame(width, height int, seconds float64) string {
 		}
 	}
 	banner := levelUpBanner(r.world, cols)
+	// Each cell depends only on the finished canvas, so the rows are styled across the cores.
+	if len(r.styled) != cols*rows {
+		r.styled = make([]forestCell, cols*rows)
+	}
+	shareOut(rows, func(row int) {
+		for col := range cols {
+			r.styled[row*cols+col] = r.style.cell(c, r.palette, col, row)
+		}
+	})
 	lastColor := [3]int{-1, -1, -1}
 	lastPaper := [3]int{-1, -1, -1}
 	for row := range rows {
 		var current [maxForestColumns]forestCell
 		for col := range cols {
-			current[col] = r.style.cell(c, r.palette, col, row)
+			current[col] = r.styled[row*cols+col]
 			if cover, covered := banner.at(row, col); covered {
 				if cover.glyph != 0 {
 					current[col] = cover
