@@ -84,9 +84,18 @@ func clearTone(c *forestCanvas, palette [][3]int, x, y, u, v int) [3]int {
 			lift *= clearShadow
 		}
 	}
+	ratio := light / typical
+	switch {
+	case p.face > 0:
+		// The renderer lights a face 0.45 + 0.55 of the sunlight on it, lifting faces turned from
+		// the sun so they show in braille; here they fall to the sky's light alone.
+		ratio, contrast = relit((p.face-0.45)/0.55)/relit(faceSun), clearLitContrast
+	case foliage(p.ink):
+		ratio, contrast = relit(light)/relit(typical), clearLitContrast
+	}
 	out := c.underlay() - 1
 	step := clearStep + (clearStepFar-clearStep)*out
-	shade := clearShade(light/typical, contrast, lift, step, clearBlend+(clearBlendFar-clearBlend)*out, x, y)
+	shade := clearShade(ratio, contrast, lift, step, clearBlend+(clearBlendFar-clearBlend)*out, x, y)
 	shade += step * clearPattern(p.ink, p.face > 0, u, v, out)
 	return withValue(muted(palette[p.ink]), dusk(value*max(step, shade)))
 }
@@ -172,6 +181,29 @@ func floorDiv(a, b int) int {
 
 func floorMod(a, b int) int { return a - floorDiv(a, b)*b }
 
+// relit is how brightly a surface shows under a low sun and a faint sky, for the sunlight the
+// renderer lit it with: that sunlight is a third the sky's and the rest the sun's own as the
+// surface turns toward it, and the sky's share here falls to skyLight, so surfaces turned from the
+// sun sink into shade as they do outdoors.
+func relit(sun float64) float64 {
+	direct := min(1, max(0, (sun-0.34)/0.6))
+	return skyLight + (1-skyLight)*direct
+}
+
+// skyLight is how brightly the sky alone lights a surface turned from the sun, as a share of full
+// sunlight; faceSun is the sunlight on a face the clear style shows at its material's own value,
+// a wall turned halfway toward the sun.
+const (
+	skyLight = 0.2
+	faceSun  = 0.55
+)
+
+// foliage tells whether an ink belongs to a crown of leaves or needles, which the renderer lights by
+// the sunlight on each leaf.
+func foliage(ink int) bool {
+	return ink == shadedLeafInk || ink == leafInk || ink >= 11 && ink <= 16
+}
+
 // pool is how much brighter the ground shows at the canvas pixel x, y from the pool of light
 // around the hero's feet, which lets the hero be found at once however far the view is zoomed out:
 // most at their feet, fading to none at the pool's edge, and stronger the farther out the view is.
@@ -209,10 +241,12 @@ const (
 const clearShadow = 0.65
 
 // clearContrast is how strongly a surface's shade follows the light it catches, as a power of how
-// many times its typical light that is; clearGroundContrast is how strongly the ground's does.
+// many times its typical light that is; clearGroundContrast is how strongly the ground's does, and
+// clearLitContrast how strongly that of faces and leaves relit by the sun and sky does.
 const (
 	clearContrast       = 0.6
 	clearGroundContrast = 0.3
+	clearLitContrast    = 0.8
 )
 
 // clearStep is how far apart the clear style's shades lie, as a share of a material's band, at the
