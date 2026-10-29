@@ -95,3 +95,102 @@ func TestClearFramesDrawBraille(t *testing.T) {
 		t.Error("the hint line does not name the clear style")
 	}
 }
+
+// viewedCanvas is a canvas cols by rows cells lit evenly by one ink at a light, seen from the
+// opening camera at the zoom where trees show their detail, centred on x, z.
+func viewedCanvas(cols, rows, ink int, light, x, z float64) *forestCanvas {
+	c := evenCanvas(cols, rows, ink, light)
+	c.scale = detailScale
+	c.turnTo(0)
+	c.tiltTo(openingTilt)
+	c.x, c.z = x, z
+	return c
+}
+
+// clearDots is which dots of a canvas the clear style draws lighter, or darker, than the paper under
+// them, row by row of dots.
+func clearDots(c *forestCanvas, lighter bool) [][]bool {
+	dotted := make([][]bool, c.height)
+	for y := range dotted {
+		dotted[y] = make([]bool, c.width)
+	}
+	for row := range c.height / 4 {
+		for col := range c.width / 2 {
+			cell := Clear{}.cell(c, forestPalette[:], col, row)
+			if cell.color == cell.paper || (lumaOf(cell.color) > lumaOf(cell.paper)) != lighter {
+				continue
+			}
+			for dy := range 4 {
+				for dx := range 2 {
+					if cell.bits&(1<<brailleDot[dy][dx]) != 0 {
+						dotted[row*4+dy][col*2+dx] = true
+					}
+				}
+			}
+		}
+	}
+	return dotted
+}
+
+// dotRuns counts the dots with another dot beside them, and those with one above or below them.
+func dotRuns(dotted [][]bool) (total, beside, upright int) {
+	at := func(x, y int) bool { return y >= 0 && y < len(dotted) && x >= 0 && x < len(dotted[y]) && dotted[y][x] }
+	for y := range dotted {
+		for x := range dotted[y] {
+			if !dotted[y][x] {
+				continue
+			}
+			total++
+			if at(x-1, y) || at(x+1, y) {
+				beside++
+			}
+			if at(x, y-1) || at(x, y+1) {
+				upright++
+			}
+		}
+	}
+	return total, beside, upright
+}
+
+func TestClearDrawsGrassAsUprightBlades(t *testing.T) {
+	total, _, upright := dotRuns(clearDots(viewedCanvas(30, 12, 1, 0.36, 0, 0), true))
+	if total == 0 || float64(upright) < 0.8*float64(total) {
+		t.Errorf("grass draws %d light dots, %d of them in upright runs; want blades of upright dots", total, upright)
+	}
+}
+
+func TestClearDrawsWaterAsLevelDashes(t *testing.T) {
+	total, beside, upright := dotRuns(clearDots(viewedCanvas(30, 12, waterInk, 0.44, 0, 0), true))
+	if total == 0 || float64(beside) < 0.8*float64(total) || upright > 0 {
+		t.Errorf("water draws %d light dots, %d beside another and %d above or below one; want level dashes", total, beside, upright)
+	}
+}
+
+func TestClearSpecklesPathsDarker(t *testing.T) {
+	total, _, _ := dotRuns(clearDots(viewedCanvas(30, 12, pathInk, 0.32, 0, 0), false))
+	if total == 0 {
+		t.Error("a path draws no darker specks")
+	}
+}
+
+func TestClearLaysRoofTilesInCourses(t *testing.T) {
+	total, beside, _ := dotRuns(clearDots(viewedCanvas(30, 12, clayInk, 0.62, 0, 0), false))
+	if total == 0 || float64(beside) < 0.9*float64(total) {
+		t.Errorf("a roof draws %d darker dots, %d beside another; want level courses", total, beside)
+	}
+}
+
+func TestClearKeepsPatternsOnTheWorldAsTheViewPans(t *testing.T) {
+	// Panning two canvas pixels east slides everything one cell west.
+	here := viewedCanvas(30, 12, 1, 0.36, 0, 0)
+	panned := viewedCanvas(30, 12, 1, 0.36, 2/detailScale, 0)
+	for row := range 12 {
+		for col := 1; col < 30; col++ {
+			before := Clear{}.cell(here, forestPalette[:], col, row)
+			after := Clear{}.cell(panned, forestPalette[:], col-1, row)
+			if before != after {
+				t.Fatalf("grass at cell %d, %d draws %08b, but %08b one cell west once panned; want the blades to move with the world", col, row, before.bits, after.bits)
+			}
+		}
+	}
+}
