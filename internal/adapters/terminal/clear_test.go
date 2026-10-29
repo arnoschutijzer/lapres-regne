@@ -188,7 +188,7 @@ func TestClearKeepsPatternsOnTheWorldAsTheViewPans(t *testing.T) {
 		for col := 1; col < 30; col++ {
 			before := Clear{}.cell(here, forestPalette[:], col, row)
 			after := Clear{}.cell(panned, forestPalette[:], col-1, row)
-			if before != after {
+			if before.bits != after.bits {
 				t.Fatalf("grass at cell %d, %d draws %08b, but %08b one cell west once panned; want the blades to move with the world", col, row, before.bits, after.bits)
 			}
 		}
@@ -212,9 +212,10 @@ func TestClearLeavesTheGroundUnlitWithoutAHero(t *testing.T) {
 	c := evenCanvas(60, 20, 0, 0.12)
 	c.scale = forestScale
 	c.heroX, c.heroY = 60, 40
-	near := Clear{}.cell(c, forestPalette[:], 30, 10).paper
-	if far := (Clear{}).cell(c, forestPalette[:], 2, 2).paper; near != far {
-		t.Errorf("with no hero drawn, ground in the middle shows %v; want it as ground far off, %v", near, far)
+	underfoot := Clear{}.cell(c, forestPalette[:], 30, 10).paper
+	c.heroX, c.heroY = -1000, -1000
+	if elsewhere := (Clear{}).cell(c, forestPalette[:], 30, 10).paper; underfoot != elsewhere {
+		t.Errorf("with no hero drawn, ground at their last spot shows %v; want it as when they stood far off, %v", underfoot, elsewhere)
 	}
 }
 
@@ -227,5 +228,26 @@ func TestRenderingMarksWhereTheHeroStands(t *testing.T) {
 	feet := c.pixels[int(c.heroY-1)*c.width+int(c.heroX)]
 	if !figureInk(feet.ink) {
 		t.Errorf("just above the marked spot lies ink %d; want the hero's feet", feet.ink)
+	}
+}
+
+func TestClearDarkensTheCornersOfTheView(t *testing.T) {
+	// Bare ground, which has no pattern of its own.
+	c := evenCanvas(60, 20, 0, 0.24)
+	c.scale = detailScale
+	middle := lumaOf(Clear{}.cell(c, forestPalette[:], 30, 11).paper)
+	corner := lumaOf(Clear{}.cell(c, forestPalette[:], 0, 0).paper)
+	if corner > middle*0.7 {
+		t.Errorf("the corner shows %.2f; want it clearly darker than the middle, %.2f", corner, middle)
+	}
+}
+
+func TestClearLeavesTheMiddleOfTheViewUndimmed(t *testing.T) {
+	small := evenCanvas(3, 3, 0, 0.24)
+	small.scale = detailScale
+	wide := evenCanvas(60, 20, 0, 0.24)
+	wide.scale = detailScale
+	if middle, alone := (Clear{}).cell(wide, forestPalette[:], 30, 11).paper, (Clear{}).cell(small, forestPalette[:], 1, 1).paper; middle != alone {
+		t.Errorf("the middle of a wide view shows %v; want it as bright as the middle of a small one, %v", middle, alone)
 	}
 }
