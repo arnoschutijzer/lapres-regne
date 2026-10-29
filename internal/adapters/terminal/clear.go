@@ -24,8 +24,30 @@ func (Clear) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 			colors[dy*2+dx] = clearTone(c, palette, x, y, x-originX, y-originY)
 		}
 	}
-	return twoTone(colors)
+	drawn := twoTone(colors)
+	dim := c.vignette(col, row)
+	drawn.color, drawn.paper = mix(drawn.color, background, dim), mix(drawn.paper, background, dim)
+	return drawn
 }
+
+// vignette is how far the cell at col, row sinks toward the background, as the view darkens toward
+// its edges and corners: not at all around the middle, where the camera looks, and most in the
+// corners, drawing the eye toward the hero.
+func (c *forestCanvas) vignette(col, row int) float64 {
+	// The camera looks at the point 0.57 of the way down the canvas.
+	across := (float64(col*2+1) - float64(c.width)/2) / (float64(c.width) / 2)
+	down := (float64(row*4+2) - float64(c.height)*0.57) / (float64(c.height) * 0.57)
+	d := math.Sqrt((across*across + down*down) / 2)
+	t := min(1, max(0, (d-vignetteFrom)/(1-vignetteFrom)))
+	return vignetteDepth * t * t * (3 - 2*t)
+}
+
+// vignetteFrom is how far from the middle toward a corner the vignette starts to darken the view,
+// and vignetteDepth how far it sinks the corners toward the background.
+const (
+	vignetteFrom  = 0.4
+	vignetteDepth = 0.55
+)
 
 // patternOrigin is the canvas pixel showing where the world's origin lies on level ground, so
 // patterns laid out from it move with the world as the view pans.
