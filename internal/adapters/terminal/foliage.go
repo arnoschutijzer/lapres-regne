@@ -28,6 +28,7 @@ func (c *forestCanvas) shadow(tree world.Tree) {
 			if d := u*u + v*v; d < 1 {
 				p := &c.pixels[py*c.width+px]
 				p.light *= 0.42 + d*0.36
+				p.shaded = true
 				if p.ink == 7 {
 					p.ink = 0
 				}

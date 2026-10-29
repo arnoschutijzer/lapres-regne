@@ -251,3 +251,39 @@ func TestClearLeavesTheMiddleOfTheViewUndimmed(t *testing.T) {
 		t.Errorf("the middle of a wide view shows %v; want it as bright as the middle of a small one, %v", middle, alone)
 	}
 }
+
+func TestClearCastsATreesShadowDarkOnTheGround(t *testing.T) {
+	open := lumaOf(clearPaper(0, 0.24, detailScale))
+	// A tree's shadow lets about half the light through.
+	c := evenCanvas(3, 3, 0, 0.24*0.55)
+	c.scale = detailScale
+	for i := range c.pixels {
+		c.pixels[i].shaded = true
+	}
+	if shaded := lumaOf(Clear{}.cell(c, forestPalette[:], 1, 1).paper); shaded > open*0.7 {
+		t.Errorf("ground in a tree's shadow shows %.2f; want it clearly darker than open ground, %.2f", shaded, open)
+	}
+}
+
+func TestClearCastsABuildingsShadowDarkOnTheGround(t *testing.T) {
+	open := lumaOf(clearPaper(1, 0.36, detailScale))
+	if shaded := lumaOf(clearPaper(shadowGrassInk, 0.36*castShadow, detailScale)); shaded > open*0.7 {
+		t.Errorf("grass in a building's shadow shows %.2f; want it clearly darker than open grass, %.2f", shaded, open)
+	}
+}
+
+func TestATreeMarksTheGroundItShades(t *testing.T) {
+	c := viewedCanvas(40, 20, 0, 0.24, 0, 0)
+	c.eye = 0
+	c.under = make([]groundPoint, len(c.pixels))
+	c.shadow(world.Tree{X: 0, Z: 0, Height: 6, Radius: 2})
+	shaded := 0
+	for _, p := range c.pixels {
+		if p.shaded {
+			shaded++
+		}
+	}
+	if shaded == 0 {
+		t.Error("a tree's shadow marks no ground as shaded")
+	}
+}
