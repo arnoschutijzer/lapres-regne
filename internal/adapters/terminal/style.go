@@ -1,7 +1,5 @@
 package terminal
 
-import "math"
-
 // Style turns the canvas pixels under one terminal cell into the cell drawn there, so the same
 // forest can be drawn in different looks.
 type Style interface {
@@ -121,199 +119,6 @@ func dottedCell(c *forestCanvas, palette [][3]int, col, row int, threshold func(
 	return drawn
 }
 
-// PixelArt draws the forest as square pixels of flat color, two to a cell: the upper half block
-// in one, the paper under it in the other. Its shading follows gothic pixel art such as
-// Blasphemous: a few flat shades per material, shadows sinking toward a cold violet and highlights
-// lifting toward warm gold, and a dark outline where something stands in front of what lies
-// behind it.
-type PixelArt struct{}
-
-func (PixelArt) Name() string { return "pixel" }
-
-// pixelShades is how many flat shades of each material pixel art shows.
-const pixelShades = 5
-
-// shadowHue is the cold violet every material's darkest shade sinks toward, and lightHue the warm
-// gold its brightest shade lifts toward.
-var (
-	shadowHue = [3]int{22, 14, 34}
-	lightHue  = [3]int{255, 214, 150}
-)
-
-// fullShade is the shade at which a material shows its own color; brighter shades lift toward
-// lightHue by up to highlightLift.
-const (
-	fullShade     = 0.8
-	highlightLift = 0.25
-)
-
-// outlineGap is how far, in world units, an art pixel must stand in front of a neighbour to be
-// outlined.
-const outlineGap = 1.0
-
-func (PixelArt) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
-	left, top := col*2, row*4
-	return forestCell{bits: 3, solid: true, color: outlinedPixel(c, palette, left, top), paper: outlinedPixel(c, palette, left, top+2)}
-}
-
-// outlinedPixel is the color of the art pixel covering the 2 x 2 canvas pixels from left, top:
-// its material's darkest shade where it stands well in front of a neighbour, and its banded shade
-// anywhere else.
-func outlinedPixel(c *forestCanvas, palette [][3]int, left, top int) [3]int {
-	pixel := artPixel(c, left, top)
-	if !pixel.lit {
-		return background
-	}
-	shade := float64(int(pixel.light*pixelShades+0.5)) / pixelShades
-	for _, step := range [4][2]int{{-2, 0}, {2, 0}, {0, -2}, {0, 2}} {
-		x, y := left+step[0], top+step[1]
-		if x < 0 || y < 0 || x+1 >= c.width || y+1 >= c.height {
-			continue
-		}
-		if artPixel(c, x, y).depth-pixel.depth > outlineGap {
-			shade = 1.0 / pixelShades
-			break
-		}
-	}
-	return ramp(palette[pixel.ink], shade)
-}
-
-// ramp is a material's color at a shade from 0 to 1: sinking from its own color toward shadowHue,
-// faster in the darks, below fullShade, and lifting toward lightHue above it.
-func ramp(color [3]int, shade float64) [3]int {
-	if shade >= fullShade {
-		return mix(color, lightHue, highlightLift*(shade-fullShade)/(1-fullShade))
-	}
-	return mix(shadowHue, color, math.Pow(shade/fullShade, 1.5))
-}
-
-// art is what one art pixel shows: the ink covering most of its canvas pixels, at their mean light,
-// and the depth of its frontmost canvas pixel, lit or not.
-type art struct {
-	ink          int
-	light, depth float64
-	lit          bool
-}
-
-func artPixel(c *forestCanvas, left, top int) art {
-	var tally [4]struct {
-		ink, coverage int
-		light         float64
-	}
-	inks := 0
-	front := math.Inf(1)
-	for y := top; y < top+2; y++ {
-		for x := left; x < left+2; x++ {
-			p := c.pixels[y*c.width+x]
-			front = min(front, p.depth)
-			if p.light <= 0 {
-				continue
-			}
-			at := 0
-			for at < inks && tally[at].ink != p.ink {
-				at++
-			}
-			if at == inks {
-				tally[at].ink = p.ink
-				inks++
-			}
-			tally[at].coverage++
-			tally[at].light += p.light
-		}
-	}
-	if inks == 0 {
-		return art{depth: front}
-	}
-	best, score := 0, 0
-	for i, counted := range tally[:inks] {
-		// The hero, their axe and flying chips stay visible over anything else, as in the dither.
-		weight := counted.coverage
-		if foremost(counted.ink) {
-			weight += 64
-		}
-		if prominent(counted.ink) {
-			weight *= 2
-		}
-		if weight > score {
-			best, score = i, weight
-		}
-	}
-	chosen := tally[best]
-	return art{ink: chosen.ink, light: min(1, chosen.light/float64(chosen.coverage)), depth: front, lit: true}
-}
-
-// Stippled draws the world as a pointillist engraving: dark ink dots scattered over parchment,
-// thickest where a material is dark or lies in shadow, an unbroken line of ink where something
-// stands in front of what lies behind it, and the hero in dense ink.
-type Stippled struct{}
-
-func (Stippled) Name() string { return "stipple" }
-
-// parchment is the paper the stipple is drawn on, and stippleInk the color of its dots.
-var (
-	parchment  = [3]int{150, 140, 116}
-	stippleInk = [3]int{30, 25, 22}
-)
-
-// stippleWash is how far the paper under a cell darkens toward the ink as its dots thicken, so
-// broad dark surfaces read as shade between the dots.
-const stippleWash = 0.12
-
-func (Stippled) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
-	bits := 0
-	shade := 0.0
-	for dy := range 4 {
-		for dx := range 2 {
-			x, y := col*2+dx, row*4+dy
-			darkness := stippleDarkness(c, palette, x, y)
-			shade += darkness
-			if darkness > grain(x, y) {
-				bits |= 1 << brailleDot[dy][dx]
-			}
-		}
-	}
-	return forestCell{bits: uint8(bits), inked: true, color: stippleInk, paper: mix(parchment, stippleInk, stippleWash*shade/8)}
-}
-
-// stippleDarkness is how likely the canvas pixel at x, y is to take a dot: none where nothing is
-// drawn, all but certain on the hero and along an edge, and elsewhere the darkness of its
-// material's color in its light.
-func stippleDarkness(c *forestCanvas, palette [][3]int, x, y int) float64 {
-	p := c.pixels[y*c.width+x]
-	if p.light <= 0 {
-		return 0
-	}
-	if figureInk(p.ink) {
-		return 0.92
-	}
-	for _, step := range [4][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}} {
-		nx, ny := x+step[0], y+step[1]
-		if nx < 0 || ny < 0 || nx >= c.width || ny >= c.height {
-			continue
-		}
-		if c.pixels[ny*c.width+nx].depth-p.depth > outlineGap {
-			return 1
-		}
-	}
-	color := palette[p.ink]
-	value := p.light * float64(color[0]*3+color[1]*6+color[2]) / (10 * 255)
-	// The eye reads stipple density on a log scale: spread values from the darkest shade to sunlit
-	// leaves between the faintest grain and the thickest, then steepen the middle as an engraving
-	// does, so shade gathers into dark masses and light opens onto paper.
-	dark := 1 - min(1, math.Log(max(value, darkestValue)/darkestValue)/math.Log(palestValue/darkestValue))
-	dark = dark * dark * (3 - 2*dark)
-	return faintestStipple + (thickestStipple-faintestStipple)*dark
-}
-
-// darkestValue and palestValue bound the material values the stipple spreads its density over, and
-// faintestStipple and thickestStipple are the densities at either end.
-const (
-	darkestValue    = 0.015
-	palestValue     = 0.8
-	faintestStipple = 0.04
-	thickestStipple = 0.95
-)
-
 // grain is a scattered threshold from 0 to 1 for the canvas pixel at x, y, so dots fall unevenly
 // as stippling does rather than in the dither's ordered pattern.
 func grain(x, y int) float64 {
@@ -369,6 +174,13 @@ const (
 	boldDimmestShade   = 0.5
 )
 
+// boldShades is how many flat shades of each material a block shows.
+const boldShades = 5
+
+// outlineGap is how far, in world units, a canvas pixel must stand in front of a neighbour for its
+// block to be rimmed.
+const outlineGap = 1.0
+
 func (Bold) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 	drawn := dottedCell(c, palette, col, row, ordered)
 	if drawn.solid {
@@ -390,7 +202,7 @@ func (Bold) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
 		return drawn
 	}
 	// A few flat shades keep the block solid, never so dim that it sinks into the ground.
-	shade := max(1, float64(int(block.light*pixelShades+0.5))) / pixelShades
+	shade := max(1, float64(int(block.light*boldShades+0.5))) / boldShades
 	shade = max(shade, boldDimmestShade*out)
 	strength := min(boldStrongest, boldPaper*c.underlay()) * shade
 	if block.rim {
@@ -478,49 +290,8 @@ func standsInFront(c *forestCanvas, x, y int) bool {
 	return false
 }
 
-// Solid draws every surface in flat color, a few shades to each material, and keeps dither dots
-// for where one shade gives way to the next and where two materials meet within a cell.
-type Solid struct{}
-
-func (Solid) Name() string { return "solid" }
-
-// solidShades is how many flat shades of each material the solid style shows, from solidDarkest of
-// its color in the deepest shade up to all of it in full light, and solidBlend how much of the
-// step between two shades is dithered, so most of a surface shows one shade or the other in solid
-// color.
-const (
-	solidShades  = 4
-	solidDarkest = 0.35
-	solidBlend   = 0.4
-)
-
 // solidSpeck is how many unlit pixels within a cell its surface fills rather than dotting them.
 const solidSpeck = 2
-
-func (Solid) cell(c *forestCanvas, palette [][3]int, col, row int) forestCell {
-	// out is how far the view is zoomed out, from 0 at the zoom where trees show their detail to 1
-	// all the way out, where the ground quiets as in the bold style.
-	out := c.underlay() - 1
-	var colors [8][3]int
-	for dy := range 4 {
-		for dx := range 2 {
-			x, y := col*2+dx, row*4+dy
-			p := c.pixels[y*c.width+x]
-			if p.light > 0 && figureInk(p.ink) {
-				return c.figureCell(col, row)
-			}
-			color := background
-			if p.light > 0 {
-				color = mix(background, palette[p.ink], solidShade(p.light, x, y))
-				if groundInk(p.ink) {
-					color = mix(background, color, 1-(1-boldFaintestGround)*out)
-				}
-			}
-			colors[dy*2+dx] = color
-		}
-	}
-	return twoTone(colors)
-}
 
 // twoTone draws a cell whose eight pixels show colors, listed row by row, in flat color: the most
 // common color fills the cell and the next is dotted over it.
@@ -570,16 +341,4 @@ func twoTone(colors [8][3]int) forestCell {
 		}
 	}
 	return drawn
-}
-
-// solidShade is how much of its material's color a lit canvas pixel at x, y shows in its light: the
-// nearest of solidShades, dithered with the next only within solidBlend of the step between them.
-func solidShade(light float64, x, y int) float64 {
-	level := min(1, light) * solidShades
-	lower := math.Floor(level)
-	blend := min(1, max(0, (level-lower-(1-solidBlend)/2)/solidBlend))
-	if blend > ordered(x, y) {
-		lower++
-	}
-	return solidDarkest + (1-solidDarkest)*(min(solidShades, max(1, lower))-1)/(solidShades-1)
 }
