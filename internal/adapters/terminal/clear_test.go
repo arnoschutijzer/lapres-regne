@@ -394,3 +394,23 @@ func TestClearLeavesGroundWellAwayFromAWallInTheOpen(t *testing.T) {
 		t.Errorf("ground well away from a wall shows %v; want it as open ground, %v", away, open)
 	}
 }
+
+// poolAlong is how much brighter the pool around a hero standing at the middle of a wide canvas
+// makes the ground a share of the way out along its reach.
+func poolAlong(share float64) float64 {
+	c := evenCanvas(100, 20, 0, 0.24)
+	c.scale = forestScale
+	c.heroX, c.heroY, c.heroShown = 100, 40, true
+	reach := max(poolPixels, poolReach*c.scale)
+	return c.pool(100+int(share*reach), 40)
+}
+
+func TestThePoolOfLightFallsOffAsLightDoes(t *testing.T) {
+	feet, half, far := poolAlong(0), poolAlong(0.5), poolAlong(0.75)
+	if half > feet/3 {
+		t.Errorf("halfway out the pool brightens the ground by %.2f against %.2f at the feet; want light that falls off with the square of distance", half, feet)
+	}
+	if far <= 0 {
+		t.Error("three quarters of the way out the pool no longer brightens the ground; want a long dim tail")
+	}
+}
